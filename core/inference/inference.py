@@ -268,8 +268,7 @@ def encode_genre(primary_genre: str | None, genre_cols: list[str]) -> dict[str, 
     Produce a {col: 0|1} dict for all genre_cols.
     Unknown or missing genres → all-zero row.
 
-    genre_cols entries are formatted as "genre__<name>" (double-underscore
-    separator, matching pd.get_dummies(prefix="genre", prefix_sep="__")).
+    genre_cols entries are formatted as "genre_<name>" (e.g., "genre_Action").
     """
     encoded = {col: 0 for col in genre_cols}
 
@@ -277,7 +276,7 @@ def encode_genre(primary_genre: str | None, genre_cols: list[str]) -> dict[str, 
         log.warning("primary_genre is None — all genre columns set to 0")
         return encoded
 
-    expected_col = f"genre__{primary_genre.lower().replace(' ', '_')}"
+    expected_col = f"genre_{primary_genre}"
     if expected_col in encoded:
         encoded[expected_col] = 1
     else:
