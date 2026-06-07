@@ -1,0 +1,95 @@
+name: collect
+
+on:
+  schedule:
+    - cron: "0 17 * * *"   # 02:00 UTC daily
+  workflow_dispatch:        # manual trigger for testing / backfill
+
+concurrency:
+  group: collect
+  cancel-in-progress: false  # never cancel a running collection mid-way
+
+jobs:
+  collect:
+    name: Data Collection
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+      TURSO_AUTH_TOKEN:   ${{ secrets.TURSO_AUTH_TOKEN }}
+      STEAM_API_KEY:      ${{ secrets.STEAM_API_KEY }}
+      PYTHONPATH: ${{ github.workspace }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ------------------------------------------------------------------
+      # Discovery
+      # ------------------------------------------------------------------
+
+      - name: Discover new games
+        run: python data/collection/pipeline_discovery.py
+        continue-on-error: false
+
+      - name: Check graduated games
+        run: python data/collection/pipeline_discovery.py --check-graduated
+        continue-on-error: true   # graduation check failure should not abort collection
+
+      # ------------------------------------------------------------------
+      # Raw data collection  (order matters — discovery must complete first)
+      # ------------------------------------------------------------------
+
+      - name: Collect CCU history # also used as ELIGIBILITY filter
+        run: python data/collection/collect_ccu_history.py --delta #also check review count >50 AND EA age >90 days
+        continue-on-error: true
+
+      - name: Collect review history
+        run: python data/collection/collect_review_history.py --delta
+        continue-on-error: true
+
+      - name: Collect events
+        run: python data/collection/collect_events.py --delta
+        continue-on-error: true
+
+      - name: Collect genres
+        run: data/collection/python collect_genres.py --delta #check if there is unclassified genre
+        continue-on-error: true
+
+      # ------------------------------------------------------------------
+      # Derived data  (label → snapshots → aggregates, strict order)
+      # ------------------------------------------------------------------
+      - name: Label outcomes
+        run: python data/processing/label_outcomes.py --delta
+        continue-on-error: false  # snapshots depend on this — hard fail
+
+      - name: Compute genre price medians
+        run: python data/processing/compute_genre_price_medians.py --delta
+        continue-on-error: true
+
+      - name: Collect Pre 2022 EA Games
+        run: data/collection/python collect_pre2022_ea_games.py --delta
+        continue-on-error: true
+
+      - name: Compute dev features
+        run: python data/processing/compute_dev_features.py --delta
+        continue-on-error: true
+
+      # ------------------------------------------------------------------
+      # Notify on failure
+      # ------------------------------------------------------------------
+
+      - name: Report failure
+        if: failure()
+        run: |
+          echo "::error::Collection pipeline failed at $(date -u). Check logs above."
