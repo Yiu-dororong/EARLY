@@ -60,6 +60,17 @@ CREATE TABLE IF NOT EXISTS genre_price_medians (
 )
 """
 
+CREATE_LIVE_MEDIANS_TABLE = """
+CREATE TABLE IF NOT EXISTS live_genre_price_medians (
+    primary_genre        TEXT    PRIMARY KEY,
+    genre_scope          INTEGER,
+    median_price_usd     REAL,
+    game_count           INTEGER,
+    genre_median_source  TEXT,
+    computed_at          TEXT
+)
+"""
+
 ALTER_SNAPSHOTS_SQL = """
 ALTER TABLE snapshots ADD COLUMN price_vs_genre_median REAL
 """
@@ -252,11 +263,12 @@ def write_medians(
     conn: libsql.Connection,
     medians: pd.DataFrame,
     computed_at: str,
+    table_name: str = "genre_price_medians",
 ) -> None:
     for _, row in medians.iterrows():
         conn.execute(
-            """
-            INSERT INTO genre_price_medians
+            f"""
+            INSERT INTO {table_name}
                 (primary_genre, genre_scope, median_price_usd,
                  game_count, genre_median_source, computed_at)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -278,7 +290,7 @@ def write_medians(
         )
         conn.commit()
 
-    log.info("Wrote %d rows to genre_price_medians.", len(medians))
+    log.info("Wrote %d rows to %s.", len(medians), table_name)
 
 
 def write_ratios(
@@ -329,6 +341,7 @@ def write_ratios(
 def run(dry_run: bool, thin_threshold: int, delta: bool) -> None:
     conn = get_conn()
     conn.execute(CREATE_MEDIANS_TABLE)
+    conn.execute(CREATE_LIVE_MEDIANS_TABLE)
 
     # Load
     eligible = load_eligible_games(conn)
@@ -345,11 +358,12 @@ def run(dry_run: bool, thin_threshold: int, delta: bool) -> None:
 
     # Write
     computed_at = datetime.now(timezone.utc).isoformat()
-    write_medians(conn, medians, computed_at)
 
     if delta:
-        log.info("Delta run: skipping snapshot price_vs_genre_median updates.")
+        log.info("Delta run: writing to live_genre_price_medians and skipping snapshot updates.")
+        write_medians(conn, medians, computed_at, table_name="live_genre_price_medians")
     else:
+        write_medians(conn, medians, computed_at, table_name="genre_price_medians")
         snapshots = load_snapshots(conn)
         ratios = compute_price_ratios(snapshots, medians)
         ensure_column_exists(conn)
