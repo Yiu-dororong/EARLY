@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 900
 
     env:
-      TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+      TURSO_URL: ${{ secrets.TURSO_URL }}
       TURSO_AUTH_TOKEN:   ${{ secrets.TURSO_AUTH_TOKEN }}
       STEAM_API_KEY:      ${{ secrets.STEAM_API_KEY }}
       PYTHONPATH: ${{ github.workspace }}
