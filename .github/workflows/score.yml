@@ -1,0 +1,67 @@
+name: score
+
+on:
+  workflow_run:
+    workflows: ["collect"]
+    types:
+      - completed            # GH Actions requires 'completed'; success is checked at the job level
+  workflow_dispatch:         # manual trigger for re-scoring without re-collecting
+
+concurrency:
+  group: score
+  cancel-in-progress: false
+
+jobs:
+  score:
+    name: Pre-calculate Snapshots for Inference
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+
+    # Only run if collection succeeded, unless triggered manually
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    env:
+      TURSO_URL:          ${{ secrets.TURSO_URL }}
+      TURSO_AUTH_TOKEN:   ${{ secrets.TURSO_AUTH_TOKEN }}
+      STEAM_API_KEY:      ${{ secrets.STEAM_API_KEY }}
+      ITAD_API_KEY:       ${{ secrets.ITAD_API_KEY }}
+      PYTHONPATH:         ${{ github.workspace }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ------------------------------------------------------------------
+      # Build Snapshots
+      # ------------------------------------------------------------------
+      - name: Build snapshots
+        run: python core/builders/build_snapshots.py --delta
+        continue-on-error: false
+
+      # ------------------------------------------------------------------
+      # Scoring
+      # ------------------------------------------------------------------
+
+      - name: Run inference
+        run: python core/inference/inference.py
+        continue-on-error: false
+
+      # ------------------------------------------------------------------
+      # Notify on failure
+      # ------------------------------------------------------------------
+
+      - name: Report failure
+        if: failure()
+        run: |
+          echo "::error::Scoring pipeline failed at $(date -u). Check logs above."

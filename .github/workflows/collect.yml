@@ -2,7 +2,7 @@ name: collect
 
 on:
   schedule:
-    - cron: "0 17 * * 5"   # 17:00 UTC on Friday (01:00 AM Saturday UTC+8)
+    - cron: "0 1 * * 6"   # 01:00 UTC on Saturday (09:00 AM Saturday UTC+8)
   workflow_dispatch:        # manual trigger for testing / backfill
 
 concurrency:
@@ -16,10 +16,10 @@ jobs:
     timeout-minutes: 900
 
     env:
-      TURSO_URL: ${{ secrets.TURSO_URL }}
+      TURSO_URL:          ${{ secrets.TURSO_URL }}
       TURSO_AUTH_TOKEN:   ${{ secrets.TURSO_AUTH_TOKEN }}
       STEAM_API_KEY:      ${{ secrets.STEAM_API_KEY }}
-      PYTHONPATH: ${{ github.workspace }}
+      PYTHONPATH:         ${{ github.workspace }}
 
     steps:
       - name: Checkout
@@ -67,7 +67,7 @@ jobs:
         continue-on-error: true
 
       # ------------------------------------------------------------------
-      # Derived data  (label → snapshots → aggregates, strict order)
+      # Derived data  (label → aggregates, strict order)
       # ------------------------------------------------------------------
       - name: Label outcomes
         run: python data/processing/label_outcomes.py --delta
