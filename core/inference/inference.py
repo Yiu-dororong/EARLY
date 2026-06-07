@@ -106,7 +106,7 @@ load_dotenv()
 DB_URL  = os.getenv("TURSO_URL", "")
 DB_AUTH = os.getenv("TURSO_AUTH_TOKEN", "")
 
-DEFAULT_MODEL_VERSION = "v1.2"
+DEFAULT_MODEL_VERSION = "v1.3"
 
 # Dynamically locate the project root to ensure models directory is found regardless of cwd
 PROJECT_ROOT          = Path(__file__).resolve().parent.parent.parent

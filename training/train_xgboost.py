@@ -72,11 +72,11 @@ log = logging.getLogger(__name__)
 # SECTION 0 — Config & Constants
 # ---------------------------------------------------------------------------
 
-MODEL_VERSION = "v1.2"
+MODEL_VERSION = "v1.3"
 RANDOM_SEED   = 42
 N_FOLDS       = 5
 TEMPORAL_HOLDOUT_YEAR = 2024
-CONFIG_VERSION = "v0.4"
+CONFIG_VERSION = "v1.0" #scorecard version
 
 # XGBoost base params — scale_pos_weight set dynamically from class balance
 XGB_PARAMS = {
@@ -97,11 +97,11 @@ XGB_PARAMS = {
     "verbosity":        0,
 }
 
-# L1 state ordinal (At Risk = highest risk = 3)
+# L1 state ordinal (At Risk = highest risk = 2)
 L1_STATE_MAP = {
-    "Healthy":       1,
-    "Watch":         2,
-    "At Risk":       3,
+    "Healthy":       0,
+    "Watch":         1,
+    "At Risk":       2,
 
 }
 
@@ -184,13 +184,13 @@ FEATURE_COLS = [
     "review_update_divergence",
 
     # ── L1 Scorecard ───────────────────────────────────────────────────────
-    # "l1_composite_score",
-    # "l1_update_health_score",
-    # "l1_player_retention_score",
-    # "l1_dev_engagement_score",
-    # "l1_sentiment_score",
-    # "l1_price_market_score",
-    # "l1_state_encoded",             # derived below from l1_state
+    "l1_composite_score",
+    "l1_update_health_score",
+    "l1_player_retention_score",
+    "l1_dev_engagement_score",
+    "l1_sentiment_score",
+    "l1_price_market_score",
+    "l1_state_encoded",             # derived below from l1_state
 
     # ── Categorical (one-hot encoded inline) ───────────────────────────────
     # "primary_genre", #→ one-hot columns appended after loading
@@ -447,6 +447,7 @@ def train_final_model(
     scale_pos_weight: float,
     genre_enc,
     feature_names: list[str],
+    threshold: float,
 ):
     # n_estimators: mean of CV folds + 10% data-volume buffer
     # final_n = int(np.mean(best_iters) * 1.1)
@@ -472,9 +473,16 @@ def train_final_model(
     model_path   = OUTPUT_DIR / f"xgb_{MODEL_VERSION}.json"
     feature_path = OUTPUT_DIR / f"xgb_{MODEL_VERSION}_features.json"
 
+    genre_cols = [c for c in feature_names if c.startswith("genre_")]
+    base_features = [c for c in feature_names if not c.startswith("genre_")]
+
     model.save_model(str(model_path))
     with open(feature_path, "w") as f:
-        json.dump(feature_names, f, indent=2)
+        json.dump({
+            "features": base_features,
+            "genre_columns": genre_cols,
+            "threshold": threshold,
+        }, f, indent=2)
 
     log.info("Model saved → %s", model_path)
     log.info("Features saved → %s", feature_path)
@@ -738,7 +746,7 @@ def run_tuning(df_train_val: pd.DataFrame, scale_pos_weight: float, n_trials: in
 
     def objective(trial):
         params = {
-            "n_estimators":      trial.suggest_int("n_estimators", 100, 1000),
+            "n_estimators":      trial.suggest_int("n_estimators", 100, 500),
             "max_depth":         trial.suggest_int("max_depth", 3, 8),
             "learning_rate":     trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
             "subsample":         trial.suggest_float("subsample", 0.5, 1.0),
@@ -920,7 +928,7 @@ def main():
 
     # ── Section 4: Final model ───────────────────────────────────────────────
     model = train_final_model(
-        df_train_val, best_iters, scale_pos_weight, genre_enc, feature_names
+        df_train_val, best_iters, scale_pos_weight, genre_enc, feature_names, threshold
     )
 
     # ── Section 5: Evaluation + Lift ─────────────────────────────────────────
