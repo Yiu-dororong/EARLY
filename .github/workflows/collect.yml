@@ -13,7 +13,7 @@ jobs:
   collect:
     name: Data Collection
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 900
 
     env:
       TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
