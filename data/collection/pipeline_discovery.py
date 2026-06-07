@@ -13,7 +13,6 @@ Step 3: histogram API — ea_start_date (results.start_date)
 
 Tables:  games_v2, pipeline_log_v2, run_meta
 Storage: Turso (libSQL)
-run meta: 1779297626
 Run modes:
   python pipeline_discovery.py                      # delta run (uses last run timestamp)
   python pipeline_discovery.py --bootstrap          # force full re-fetch

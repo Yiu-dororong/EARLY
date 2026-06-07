@@ -25,7 +25,7 @@ Inference requires two files produced by train_xgboost.py:
                                    {
                                      "features": ["col_a", "col_b", ...],
                                      "threshold": 0.5364,
-                                     "genre_columns": ["genre__action", ...]
+                                     "genre_columns": ["genre_action", ...]
                                    }
 
 The feature list governs column ordering passed to xgb.DMatrix. Any column
