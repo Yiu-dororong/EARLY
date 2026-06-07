@@ -414,7 +414,7 @@ def score_game(
         features["l1_community_sentiment_score"] = sentiment
         features["l1_price_signals_score"] = price_market
 
-        state_map = {"Healthy": 2, "Watch": 1, "At risk": 0}
+        state_map = {"Healthy": 0, "Watch": 1, "At risk": 2}
         features["l1_state_encoded"] = state_map.get(l1_state)
     else:
         l1_state = None
