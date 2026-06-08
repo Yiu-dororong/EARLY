@@ -67,6 +67,8 @@ REVIEW_API_DELAY = float(os.getenv("REVIEW_API_DELAY", "0.5"))
 MIN_EA_AGE_DAYS = 90
 DELTA_GRADUATION_DAYS = 90
 MIN_REVIEW_COUNT = 50
+DB_MAX_RETRIES = 3
+DB_RETRY_DELAY = 5.0
 
 STEAM_REVIEW_URL = "https://store.steampowered.com/appreviews/{appid}"
 STEAM_CHARTS_URL = "https://steamcharts.com/app/{appid}"
@@ -113,10 +115,16 @@ def ensure_tables(conn: libsql.Connection) -> None:
             ccu_available       TEXT    NOT NULL,
             -- AVAILABLE / UNAVAILABLE / SKIP_LOW_REVIEWS / SKIP_EA_AGE / ERROR
             review_count_at_check INTEGER,     -- review count observed at Step 2
+            review_checked_at   INTEGER,       -- unix ts when review count was actually fetched
             months_collected    INTEGER,        -- how many monthly rows stored
             collected_at        INTEGER NOT NULL
         )
     """)
+    try:
+        conn.execute("ALTER TABLE ccu_availability ADD COLUMN review_checked_at INTEGER")
+    except Exception:
+        pass
+
     conn.commit()
     log.info("ccu_history and ccu_availability tables ready")
 
@@ -135,7 +143,7 @@ def get_candidates(conn: libsql.Connection, delta: bool = False) -> list[dict]:
         delta_filter = f"AND (g.currently_in_ea = 1 OR (g.currently_in_ea = 0 AND g.graduation_date IS NOT NULL AND g.graduation_date >= date('now', '-{DELTA_GRADUATION_DAYS} days')))"
 
     query = f"""
-        SELECT g.appid, g.ea_start_date, g.ea_start_ts, g.graduation_date, ca.review_count_at_check
+        SELECT g.appid, g.ea_start_date, g.ea_start_ts, g.graduation_date, ca.review_count_at_check, ca.review_checked_at
         FROM games_v2 g
         LEFT JOIN ccu_availability ca ON g.appid = ca.appid
         WHERE g.eligibility_status = 'ELIGIBLE'
@@ -157,7 +165,7 @@ def get_candidates(conn: libsql.Connection, delta: bool = False) -> list[dict]:
     """
     rows = conn.execute(query, (min_age_ts,)).fetchall()
 
-    return [{"appid": r[0], "ea_start_date": r[1], "ea_start_ts": r[2], "review_count": r[4]} for r in rows]
+    return [{"appid": r[0], "ea_start_date": r[1], "ea_start_ts": r[2], "review_count": r[4], "review_checked_at": r[5]} for r in rows]
 
 
 def get_already_collected(conn: libsql.Connection) -> set[int]:
@@ -172,52 +180,68 @@ def write_availability(
     appid: int,
     status: str,
     review_count: int | None,
+    review_checked_at: int | None,
     months_collected: int,
 ) -> None:
-    conn.execute("""
-        INSERT OR REPLACE INTO ccu_availability
-            (appid, ccu_available, review_count_at_check, months_collected, collected_at)
-        VALUES (?, ?, ?, ?, ?)
-    """, (
-        appid, status, review_count, months_collected,
-        int(datetime.now(timezone.utc).timestamp()),
-    ))
-    conn.commit()
+    for attempt in range(1, DB_MAX_RETRIES + 1):
+        try:
+            conn.execute("""
+                INSERT OR REPLACE INTO ccu_availability
+                    (appid, ccu_available, review_count_at_check, review_checked_at, months_collected, collected_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                appid, status, review_count, review_checked_at, months_collected,
+                int(datetime.now(timezone.utc).timestamp()),
+            ))
+            conn.commit()
+            return
+        except Exception as e:
+            if attempt == DB_MAX_RETRIES:
+                raise
+            log.warning("DB write_availability error attempt %d for appid %d: %s - retrying in %ds", attempt, appid, e, DB_RETRY_DELAY)
+            time.sleep(DB_RETRY_DELAY)
 
 
 def upsert_ccu_rows(conn: libsql.Connection, rows: list[dict], delta: bool = False) -> int:
     if not rows:
         return 0
 
-    if delta:
-        appid = rows[0]["appid"]
-        max_date_row = conn.execute(
-            "SELECT MAX(month_date) FROM ccu_history WHERE appid = ?", (appid,)
-        ).fetchone()
-        if max_date_row and max_date_row[0]:
-            max_date = max_date_row[0]
-            rows = [r for r in rows if r["month_date"] >= max_date]
-
-    inserted = 0
-    for row in rows:
+    for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
-            conn.execute("""
-                INSERT OR REPLACE INTO ccu_history
-                    (appid, month_date, avg_players, peak_players, collected_at)
-                VALUES (?, ?, ?, ?, ?)
-            """, (
-                row["appid"],
-                row["month_date"],
-                row["avg_players"],
-                row["peak_players"],
-                row["collected_at"],
-            ))
-            inserted += 1
+            current_rows = rows
+            if delta:
+                appid = current_rows[0]["appid"]
+                max_date_row = conn.execute(
+                    "SELECT MAX(month_date) FROM ccu_history WHERE appid = ?", (appid,)
+                ).fetchone()
+                if max_date_row and max_date_row[0]:
+                    max_date = max_date_row[0]
+                    current_rows = [r for r in current_rows if r["month_date"] >= max_date]
+
+            inserted = 0
+            for row in current_rows:
+                conn.execute("""
+                    INSERT OR REPLACE INTO ccu_history
+                        (appid, month_date, avg_players, peak_players, collected_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (
+                    row["appid"],
+                    row["month_date"],
+                    row["avg_players"],
+                    row["peak_players"],
+                    row["collected_at"],
+                ))
+                inserted += 1
+            conn.commit()
+            return inserted
         except Exception as e:
-            log.warning("CCU row insert failed appid=%d month=%s: %s",
-                        row["appid"], row["month_date"], e)
-    conn.commit()
-    return inserted
+            if attempt == DB_MAX_RETRIES:
+                log.warning("CCU row insert failed after %d attempts for appid=%d: %s", DB_MAX_RETRIES, rows[0]["appid"], e)
+                return 0
+            log.warning("DB upsert_ccu_rows error attempt %d for appid %d: %s - retrying in %ds", attempt, rows[0]["appid"], e, DB_RETRY_DELAY)
+            time.sleep(DB_RETRY_DELAY)
+            
+    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -415,7 +439,7 @@ def main() -> None:
     # --- Step 1: EA age gate ---
     if args.appid:
         # Single-appid mode bypasses DB candidate query
-        candidates = [{"appid": args.appid, "ea_start_date": None, "ea_start_ts": None, "review_count": None}]
+        candidates = [{"appid": args.appid, "ea_start_date": None, "ea_start_ts": None, "review_count": None, "review_checked_at": None}]
         log.info("Single-appid mode: %d", args.appid)
     else:
         candidates = get_candidates(conn, delta=args.delta)
@@ -467,6 +491,7 @@ def main() -> None:
     for i, candidate in enumerate(candidates, 1):
         appid = candidate["appid"]
         prev_review_count = candidate.get("review_count")
+        review_checked_at = candidate.get("review_checked_at")
 
         # --- Step 2: Review count gate ---
         review_count = None
@@ -481,6 +506,7 @@ def main() -> None:
 
         if not bypass_api:
             review_count = get_review_count(appid, session)
+            review_checked_at = int(datetime.now(timezone.utc).timestamp())
             time.sleep(REVIEW_API_DELAY)
 
             if review_count is not None and review_count < MIN_REVIEW_COUNT:
@@ -488,7 +514,7 @@ def main() -> None:
                     "[%d/%d] appid %d: SKIP — %d reviews (need %d)",
                     i, len(candidates), appid, review_count, MIN_REVIEW_COUNT,
                 )
-                write_availability(conn, appid, "SKIP_LOW_REVIEWS", review_count, 0)
+                write_availability(conn, appid, "SKIP_LOW_REVIEWS", review_count, review_checked_at, 0)
                 n_skip_reviews += 1
                 continue
 
@@ -504,7 +530,7 @@ def main() -> None:
 
         if status == "AVAILABLE":
             inserted = upsert_ccu_rows(conn, rows, delta=args.delta)
-            write_availability(conn, appid, "AVAILABLE", review_count, inserted)
+            write_availability(conn, appid, "AVAILABLE", review_count, review_checked_at, inserted)
             n_available += 1
             total_months += inserted
             log.info(
@@ -514,7 +540,7 @@ def main() -> None:
             )
 
         elif status == "UNAVAILABLE":
-            write_availability(conn, appid, "UNAVAILABLE", review_count, 0)
+            write_availability(conn, appid, "UNAVAILABLE", review_count, review_checked_at, 0)
             n_unavailable += 1
             log.info(
                 "[%d/%d] appid %d: UNAVAILABLE — below Steam Charts threshold "
@@ -524,7 +550,7 @@ def main() -> None:
             )
 
         else:  # ERROR
-            write_availability(conn, appid, "ERROR", review_count, 0)
+            write_availability(conn, appid, "ERROR", review_count, review_checked_at, 0)
             n_error += 1
             log.warning(
                 "[%d/%d] appid %d: ERROR — will need retry",
