@@ -388,7 +388,7 @@ def run_check_graduated(dry_run: bool = False):
     init_schema(conn)
 
     # Select all current EA appids from the database
-    rows = conn.execute("SELECT appid, name, ea_start_ts FROM games_v2 WHERE currently_in_ea = 1").fetchall()
+    rows = conn.execute("SELECT appid, name, ea_start_ts FROM games_v2 WHERE currently_in_ea = 1 AND appid >3845420").fetchall()
 
     log.info(f"Found {len(rows)} active EA games to check for graduation.")
 
