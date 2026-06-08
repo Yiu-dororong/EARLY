@@ -126,9 +126,9 @@ def init_schema(conn):
     log.info("Schema initialised.")
 
 
-def load_existing_appids(conn) -> set:
-    rows = conn.execute("SELECT appid FROM games_v2").fetchall()
-    return {r[0] for r in rows}
+def load_existing_games(conn) -> dict:
+    rows = conn.execute("SELECT appid, currently_in_ea FROM games_v2").fetchall()
+    return {r[0]: r[1] for r in rows}
 
 
 def get_last_run_ts(conn) -> int:
@@ -382,6 +382,60 @@ def fetch_ea_start(appid: int) -> int | None:
     return data.get("results", {}).get("start_date")
 
 
+def check_and_update_graduation(conn, appid: int, name: str) -> str:
+    """
+    Checks appdetails for graduation.
+    Returns status: "GRADUATED", "STILL_EA", "ERROR", "DELISTED"
+    """
+    time.sleep(REQUEST_DELAY)
+    data = safe_get(APPDETAILS_URL, params={"appids": appid, "cc": "us", "l": "en"})
+
+    if not data or str(appid) not in data:
+        log.warning(f"  ERROR — Failed to fetch appdetails for {appid}")
+        return "ERROR"
+
+    app_data = data[str(appid)]
+    if not app_data.get("success"):
+        log.warning(f"  WARNING — appdetails success=false for {appid} (possibly delisted)")
+        return "DELISTED"
+
+    info = app_data.get("data", {})
+
+    # Check if the EA genre ("70") is still present
+    genres = info.get("genres", [])
+    has_ea_genre = any(g.get("id") == EA_GENRE_ID for g in genres)
+
+    if not has_ea_genre:
+        release_date_str = info.get("release_date", {}).get("date", "")
+        release_ts = parse_steam_date(release_date_str)
+
+        graduation_date = None
+        if release_ts:
+            graduation_date = datetime.fromtimestamp(release_ts, tz=timezone.utc).date().isoformat()
+
+        log.info(f"  ✓ GRADUATED — {name} | graduation_date={graduation_date}")
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                conn.execute(
+                    "UPDATE games_v2 SET currently_in_ea = 0, graduation_date = ?, fetched_at = ? WHERE appid = ?",
+                    (graduation_date, now_iso, appid)
+                )
+                conn.commit()
+                break
+            except Exception as e:
+                if attempt == MAX_RETRIES:
+                    raise
+                log.warning(f"DB update error attempt {attempt} for appid {appid}: {e} — retrying in {RETRY_DELAY}s")
+                time.sleep(RETRY_DELAY)
+
+        log_step(conn, appid, "check_graduated", "GRADUATED", f"graduation_date={graduation_date}")
+        return "GRADUATED"
+    
+    return "STILL_EA"
+
+
 # ── Step 4: Check Graduated Games ─────────────────────────────────────────────
 def run_check_graduated(dry_run: bool = False):
     conn = get_conn()
@@ -401,53 +455,11 @@ def run_check_graduated(dry_run: bool = False):
 
     for i, (appid, name, ea_start_ts) in enumerate(rows, 1):
         log.info(f"[{i}/{len(rows)}] Checking graduation status for appid={appid} name={name!r}")
-        time.sleep(REQUEST_DELAY)
-
-        data = safe_get(APPDETAILS_URL, params={"appids": appid, "cc": "us", "l": "en"})
-
-        if not data or str(appid) not in data:
-            log.warning(f"  ERROR — Failed to fetch appdetails for {appid}")
-            error_count += 1
-            continue
-
-        app_data = data[str(appid)]
-        if not app_data.get("success"):
-            log.warning(f"  WARNING — appdetails success=false for {appid} (possibly delisted)")
-            continue
-
-        info = app_data.get("data", {})
-
-        # Check if the EA genre ("70") is still present
-        genres = info.get("genres", [])
-        has_ea_genre = any(g.get("id") == EA_GENRE_ID for g in genres)
-
-        if not has_ea_genre:
-            release_date_str = info.get("release_date", {}).get("date", "")
-            release_ts = parse_steam_date(release_date_str)
-
-            graduation_date = None
-            if release_ts:
-                graduation_date = datetime.fromtimestamp(release_ts, tz=timezone.utc).date().isoformat()
-
-            log.info(f"  ✓ GRADUATED — {name} | graduation_date={graduation_date}")
-
-            now_iso = datetime.now(timezone.utc).isoformat()
-            for attempt in range(1, MAX_RETRIES + 1):
-                try:
-                    conn.execute(
-                        "UPDATE games_v2 SET currently_in_ea = 0, graduation_date = ?, fetched_at = ? WHERE appid = ?",
-                        (graduation_date, now_iso, appid)
-                    )
-                    conn.commit()
-                    break
-                except Exception as e:
-                    if attempt == MAX_RETRIES:
-                        raise
-                    log.warning(f"DB update error attempt {attempt} for appid {appid}: {e} — retrying in {RETRY_DELAY}s")
-                    time.sleep(RETRY_DELAY)
-
-            log_step(conn, appid, "check_graduated", "GRADUATED", f"graduation_date={graduation_date}")
+        res = check_and_update_graduation(conn, appid, name)
+        if res == "GRADUATED":
             graduated_count += 1
+        elif res == "ERROR":
+            error_count += 1
 
     log.info(
         f"\n── Graduation Check Complete ──\n"
@@ -464,6 +476,9 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
     conn = get_conn()
     init_schema(conn)
 
+    to_process = []
+    to_check_graduation = []
+
     if retry_errors:
         rows = conn.execute(
             "SELECT appid, name, last_modified_steam FROM games_v2 WHERE eligibility_status = 'ERROR'"
@@ -471,7 +486,7 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
         to_process = [{"appid": r[0], "name": r[1], "last_modified": r[2]} for r in rows]
         log.info(f"Retry errors run — Found {len(to_process)} games with ERROR status to retry.")
     else:
-        existing    = load_existing_appids(conn)
+        existing_games = load_existing_games(conn)
         last_run_ts = 0 if force_bootstrap else get_last_run_ts(conn)
 
         if last_run_ts == 0:
@@ -483,12 +498,18 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
             )
 
         apps = fetch_app_list(if_modified_since=last_run_ts)
-        to_process = [a for a in apps if a["appid"] not in existing]
+        
+        for a in apps:
+            appid = a["appid"]
+            if appid not in existing_games:
+                to_process.append(a)
+            elif existing_games.get(appid) == 1:
+                to_check_graduation.append(a)
 
         log.info(
             f"From Steam: {len(apps)} | "
-            f"Already in DB: {len(apps) - len(to_process)} | "
-            f"To process: {len(to_process)}"
+            f"New to DB: {len(to_process)} | "
+            f"Updated active EA: {len(to_check_graduation)}"
         )
 
     if dry_run:
@@ -504,6 +525,7 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
         "skip_no_histogram":  0,
         "skip_not_ea":        0,
         "errors":             0,
+        "graduated_in_delta": 0,
     }
 
     for i, app in enumerate(to_process, 1):
@@ -662,6 +684,17 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
             f"ea_start={ea_date_str} graduated={graduation_date}",
         )
 
+    # ── Check updated EA games for graduation ──
+    if to_check_graduation and not retry_errors:
+        log.info(f"\n── Checking {len(to_check_graduation)} updated EA games for graduation ──")
+        for i, app in enumerate(to_check_graduation, 1):
+            appid = app["appid"]
+            name = app.get("name", "")
+            log.info(f"[{i}/{len(to_check_graduation)}] Checking graduation status for appid={appid} name={name!r}")
+            res = check_and_update_graduation(conn, appid, name)
+            if res == "GRADUATED":
+                stats["graduated_in_delta"] += 1
+
     if not retry_errors:
         save_run_ts(conn, run_start_ts)
 
@@ -669,6 +702,7 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
         f"\n── Pipeline complete ──\n"
         f"  Eligible (active EA):   {stats['eligible_active']}\n"
         f"  Eligible (graduated):   {stats['eligible_graduated']}\n"
+        f"  Graduated via delta:    {stats['graduated_in_delta']}\n"
         f"  Skip (not game):        {stats['skip_not_game']}\n"
         f"  Skip (free):            {stats['skip_free']}\n"
         f"  Skip (pre-2022):        {stats['skip_pre_2022']}\n"

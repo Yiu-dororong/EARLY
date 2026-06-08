@@ -38,13 +38,9 @@ jobs:
       # Discovery
       # ------------------------------------------------------------------
 
-      - name: Discover new games
-        run: python data/collection/pipeline_discovery.py
+      - name: Discover new games and check graduated games
+        run: python data/collection/pipeline_discovery.py #delta run by default, look for new games and check graduation
         continue-on-error: false
-
-      - name: Check graduated games
-        run: python data/collection/pipeline_discovery.py --check-graduated
-        continue-on-error: true   # graduation check failure should not abort collection
 
       # ------------------------------------------------------------------
       # Raw data collection  (order matters — discovery must complete first)
