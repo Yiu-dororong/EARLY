@@ -1,0 +1,57 @@
+name: discover
+
+on:
+  schedule:
+    - cron: "0 1 * * 6"   # 01:00 UTC on Saturday (09:00 AM Saturday UTC+8)
+  workflow_dispatch:        # manual trigger for testing / backfill
+
+concurrency:
+  group: discover
+  cancel-in-progress: false  # never cancel a running collection mid-way
+
+jobs:
+  discover:
+    name: Discover new games and verify eligibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 900
+
+    env:
+      TURSO_URL:          ${{ secrets.TURSO_URL }}
+      TURSO_AUTH_TOKEN:   ${{ secrets.TURSO_AUTH_TOKEN }}
+      STEAM_API_KEY:      ${{ secrets.STEAM_API_KEY }}
+      PYTHONPATH:         ${{ github.workspace }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ------------------------------------------------------------------
+      # Discover new games and verify eligibility
+      # ------------------------------------------------------------------
+
+      - name: Discover new games and check graduated games
+        run: python data/collection/pipeline_discovery.py #delta run by default, look for new games and check graduation
+        continue-on-error: false
+
+      - name: Collect CCU history # also used as ELIGIBILITY filter
+        run: python data/collection/collect_ccu_history.py --delta #also check review count >50 AND EA age >90 days
+        continue-on-error: true
+
+
+      # ------------------------------------------------------------------
+      # Notify on failure
+      # ------------------------------------------------------------------
+
+      - name: Report failure
+        if: failure()
+        run: |
+          echo "::error::Discovery pipeline failed at $(date -u). Check logs above."

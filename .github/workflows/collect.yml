@@ -1,8 +1,10 @@
 name: collect
 
 on:
-  schedule:
-    - cron: "0 1 * * 6"   # 01:00 UTC on Saturday (09:00 AM Saturday UTC+8)
+  workflow_run:
+    workflows: ["discover"]
+    types:
+      - completed
   workflow_dispatch:        # manual trigger for testing / backfill
 
 concurrency:
@@ -14,6 +16,11 @@ jobs:
     name: Data Collection
     runs-on: ubuntu-latest
     timeout-minutes: 900
+
+    # Only run if discovery succeeded, unless triggered manually
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
 
     env:
       TURSO_URL:          ${{ secrets.TURSO_URL }}
@@ -35,20 +42,8 @@ jobs:
         run: pip install -r requirements.txt
 
       # ------------------------------------------------------------------
-      # Discovery
+      # Raw data collection 
       # ------------------------------------------------------------------
-
-      - name: Discover new games and check graduated games
-        run: python data/collection/pipeline_discovery.py #delta run by default, look for new games and check graduation
-        continue-on-error: false
-
-      # ------------------------------------------------------------------
-      # Raw data collection  (order matters — discovery must complete first)
-      # ------------------------------------------------------------------
-
-      - name: Collect CCU history # also used as ELIGIBILITY filter
-        run: python data/collection/collect_ccu_history.py --delta #also check review count >50 AND EA age >90 days
-        continue-on-error: true
 
       - name: Collect review history
         run: python data/collection/collect_review_history.py --delta
@@ -59,7 +54,7 @@ jobs:
         continue-on-error: true
 
       - name: Collect genres
-        run: data/collection/python collect_genres.py --delta #check if there is unclassified genre
+        run: python data/collection/collect_genres.py --delta #check if there is unclassified genre
         continue-on-error: true
 
       # ------------------------------------------------------------------
@@ -74,7 +69,7 @@ jobs:
         continue-on-error: true
 
       - name: Collect Pre 2022 EA Games
-        run: data/collection/python collect_pre2022_ea_games.py --delta
+        run: python data/collection/collect_pre2022_ea_games.py --delta
         continue-on-error: true
 
       - name: Compute dev features

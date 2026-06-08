@@ -132,31 +132,32 @@ def get_candidates(conn: libsql.Connection, delta: bool = False) -> list[dict]:
 
     delta_filter = ""
     if delta:
-        delta_filter = f"AND (currently_in_ea = 1 OR (currently_in_ea = 0 AND graduation_date IS NOT NULL AND graduation_date >= date('now', '-{DELTA_GRADUATION_DAYS} days')))"
+        delta_filter = f"AND (g.currently_in_ea = 1 OR (g.currently_in_ea = 0 AND g.graduation_date IS NOT NULL AND g.graduation_date >= date('now', '-{DELTA_GRADUATION_DAYS} days')))"
 
     query = f"""
-        SELECT appid, ea_start_date, ea_start_ts, graduation_date
-        FROM games_v2
-        WHERE eligibility_status = 'ELIGIBLE'
-        AND ea_start_ts IS NOT NULL
+        SELECT g.appid, g.ea_start_date, g.ea_start_ts, g.graduation_date, ca.review_count_at_check
+        FROM games_v2 g
+        LEFT JOIN ccu_availability ca ON g.appid = ca.appid
+        WHERE g.eligibility_status = 'ELIGIBLE'
+        AND g.ea_start_ts IS NOT NULL
         AND (
             -- Active EA: still in EA and has been for >= 90 days
-            (currently_in_ea = 1
-            AND ea_start_ts <= ?)
+            (g.currently_in_ea = 1
+            AND g.ea_start_ts <= ?)
             OR
             -- Graduated: EA duration from start to graduation was >= 90 days
-            (currently_in_ea = 0
-            AND graduation_date IS NOT NULL
+            (g.currently_in_ea = 0
+            AND g.graduation_date IS NOT NULL
             AND CAST(
-                (julianday(graduation_date) - julianday(ea_start_date))
+                (julianday(g.graduation_date) - julianday(g.ea_start_date))
                 AS INTEGER) >= 90)
         )
         {delta_filter}
-        ORDER BY appid
+        ORDER BY g.appid
     """
     rows = conn.execute(query, (min_age_ts,)).fetchall()
 
-    return [{"appid": r[0], "ea_start_date": r[1], "ea_start_ts": r[2]} for r in rows]
+    return [{"appid": r[0], "ea_start_date": r[1], "ea_start_ts": r[2], "review_count": r[4]} for r in rows]
 
 
 def get_already_collected(conn: libsql.Connection) -> set[int]:
@@ -184,7 +185,19 @@ def write_availability(
     conn.commit()
 
 
-def upsert_ccu_rows(conn: libsql.Connection, rows: list[dict]) -> int:
+def upsert_ccu_rows(conn: libsql.Connection, rows: list[dict], delta: bool = False) -> int:
+    if not rows:
+        return 0
+
+    if delta:
+        appid = rows[0]["appid"]
+        max_date_row = conn.execute(
+            "SELECT MAX(month_date) FROM ccu_history WHERE appid = ?", (appid,)
+        ).fetchone()
+        if max_date_row and max_date_row[0]:
+            max_date = max_date_row[0]
+            rows = [r for r in rows if r["month_date"] >= max_date]
+
     inserted = 0
     for row in rows:
         try:
@@ -402,7 +415,7 @@ def main() -> None:
     # --- Step 1: EA age gate ---
     if args.appid:
         # Single-appid mode bypasses DB candidate query
-        candidates = [{"appid": args.appid, "ea_start_date": None, "ea_start_ts": None}]
+        candidates = [{"appid": args.appid, "ea_start_date": None, "ea_start_ts": None, "review_count": None}]
         log.info("Single-appid mode: %d", args.appid)
     else:
         candidates = get_candidates(conn, delta=args.delta)
@@ -453,10 +466,20 @@ def main() -> None:
 
     for i, candidate in enumerate(candidates, 1):
         appid = candidate["appid"]
+        prev_review_count = candidate.get("review_count")
 
         # --- Step 2: Review count gate ---
         review_count = None
-        if not args.skip_review_gate:
+        
+        # Fast path for delta runs: skip API call if we know it's already safely > MIN_REVIEW_COUNT + 10
+        bypass_api = args.skip_review_gate
+        if args.delta and prev_review_count is not None and prev_review_count > MIN_REVIEW_COUNT + 10:
+            bypass_api = True
+            review_count = prev_review_count
+            log.debug("[%d/%d] appid %d: bypass review API (previous count %d > %d)",
+                      i, len(candidates), appid, prev_review_count, MIN_REVIEW_COUNT + 10)
+
+        if not bypass_api:
             review_count = get_review_count(appid, session)
             time.sleep(REVIEW_API_DELAY)
 
@@ -480,7 +503,7 @@ def main() -> None:
         status, rows = fetch_ccu_history(appid, session)
 
         if status == "AVAILABLE":
-            inserted = upsert_ccu_rows(conn, rows)
+            inserted = upsert_ccu_rows(conn, rows, delta=args.delta)
             write_availability(conn, appid, "AVAILABLE", review_count, inserted)
             n_available += 1
             total_months += inserted
