@@ -9,11 +9,11 @@ Event type reference (confirmed against live Steam API):
   13  k_EClanPreAnnounceMajorUpdateEvent — in practice: regular patch update
   14  k_EClanMajorUpdateEvent   — major content update / season launch
 
-Build clock:  types 12 + 13 only
-Post clock:   type 14 only (developer-authored posts, filtered)
+Build clock:  types 12 + 13 +14 only
+Post clock:   type 28 only (developer-authored posts, filtered)
 Branch note:  build_branch field is empty for most games in the events API.
               Branch filtering is NOT implemented — live API data confirms the
-              field is unpopulated. All 12/13 events are treated as main-branch
+              field is unpopulated. All 12/13/14 events are treated as main-branch
               unless a future Steam API change exposes branch data.
 
 Key design decisions (from project context):
@@ -61,7 +61,7 @@ load_dotenv()
 
 DB_URL = os.getenv("TURSO_URL")
 DB_AUTH = os.getenv("TURSO_AUTH_TOKEN")
-REQUEST_DELAY = float("1.0")  # seconds between API calls
+REQUEST_DELAY = float("1.5")  # seconds between API calls
 BATCH_SIZE = 100          # Steam API max per page
 BUILD_EVENT_TYPES = {12, 13, 14}
 POST_EVENT_TYPES = {28}

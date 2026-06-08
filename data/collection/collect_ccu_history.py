@@ -266,7 +266,12 @@ def get_review_count(appid: int, session: requests.Session) -> int | None:
         )
         resp.raise_for_status()
         data = resp.json()
-        summary = data.get("query_summary", {})
+        
+        if data.get("success") != 1:
+            log.warning("appid %d review count API returned success != 1", appid)
+            return None
+            
+        summary = data.get("query_summary") or {}
         total = summary.get("total_reviews")
         if total is not None:
             return int(total)
@@ -504,10 +509,23 @@ def main() -> None:
             log.debug("[%d/%d] appid %d: bypass review API (previous count %d > %d)",
                       i, len(candidates), appid, prev_review_count, MIN_REVIEW_COUNT + 10)
 
+        # If bypassing via CLI flag, ensure we carry over the previous count instead of leaving it None
+        if bypass_api and review_count is None and prev_review_count is not None:
+            review_count = prev_review_count
+
         if not bypass_api:
             review_count = get_review_count(appid, session)
             review_checked_at = int(datetime.now(timezone.utc).timestamp())
             time.sleep(REVIEW_API_DELAY)
+
+            # Rescue mission: If the API failed today, keep the valid count from yesterday!
+            if review_count is None and prev_review_count is not None:
+                log.debug(
+                    "[%d/%d] appid %d: API failed, rescuing previous review count (%d)",
+                    i, len(candidates), appid, prev_review_count
+                )
+                review_count = prev_review_count
+                review_checked_at = candidate.get("review_checked_at")
 
             if review_count is not None and review_count < MIN_REVIEW_COUNT:
                 log.info(
