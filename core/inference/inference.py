@@ -360,13 +360,15 @@ PRICE_TREND_ENCODING = {"decreased": -1, "stable": 0, "increased": 1}
 
 
 def encode_price_trend(features: dict) -> dict:
-    """Return a copy of features with price_trend replaced by its numeric encoding."""
+    """Return a copy of features with price_trend encoded as price_trend_encoded."""
     encoded = dict(features)
     raw = encoded.get("price_trend")
     if raw is not None:
-        encoded["price_trend"] = PRICE_TREND_ENCODING.get(raw)
-        if encoded["price_trend"] is None:
+        encoded["price_trend_encoded"] = PRICE_TREND_ENCODING.get(raw)
+        if encoded["price_trend_encoded"] is None:
             log.warning("Unexpected price_trend value %r — treating as null", raw)
+    else:
+        encoded["price_trend_encoded"] = None
     return encoded
 
 
@@ -510,7 +512,12 @@ def main() -> None:
         log.error("%s", e)
         return
 
-    all_feature_cols = feature_cols + genre_cols
+    # The model artifact is the absolute source of truth for feature ordering.
+    # Recombining feature_cols + genre_cols manually can cause ordering mismatches.
+    if booster.feature_names:
+        all_feature_cols = booster.feature_names
+    else:
+        all_feature_cols = feature_cols + genre_cols
 
     # Load pre-computed snapshot candidates
     candidates = load_latest_live_snapshots(conn, args.appid)
