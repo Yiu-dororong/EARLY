@@ -112,6 +112,10 @@ DEFAULT_MODEL_VERSION = "v1.3"
 PROJECT_ROOT          = Path(__file__).resolve().parent.parent.parent
 MODEL_DIR             = PROJECT_ROOT / "models"
 
+import sys
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)-8s %(message)s",
@@ -301,8 +305,8 @@ def run_scorecard(features: dict) -> dict | None:
         from training.scorecard import compute_scorecard
         result = compute_scorecard(features)
         return result
-    except ImportError:
-        log.debug("scorecard.py not available — l1_state will be None")
+    except ImportError as e:
+        log.warning("scorecard.py not available — l1_state will be None: %s", e)
         return None
     except Exception as e:
         log.warning("Scorecard error for appid %s: %s", features.get("appid"), e)
@@ -396,7 +400,19 @@ def score_game(
     # Encode price_trend to numeric (decision 37)
     features = encode_price_trend(features)
 
-    # Inject context columns required by evaluation.scorecard.compute_scorecard
+    # Inject derived feature: review_update_divergence
+    rev_score = features.get("review_score_at_T")
+    upd_trend = features.get("update_frequency_trend")
+    if rev_score is not None and upd_trend is not None:
+        try:
+            clipped_trend = max(-1.0, min(1.0, float(upd_trend)))
+            features["review_update_divergence"] = float(rev_score) * (1.0 - clipped_trend)
+        except (ValueError, TypeError):
+            features["review_update_divergence"] = None
+    else:
+        features["review_update_divergence"] = None
+
+    # Inject context columns required by training.scorecard.compute_scorecard
 
     # Layer 1 — always run, regardless of ml_eligible
     l1_result = run_scorecard(features)
@@ -413,8 +429,8 @@ def score_game(
         features["l1_update_health_score"] = update_health
         features["l1_player_retention_score"] = player_retention
         features["l1_dev_engagement_score"] = dev_engagement
-        features["l1_community_sentiment_score"] = sentiment
-        features["l1_price_signals_score"] = price_market
+        features["l1_sentiment_score"] = sentiment
+        features["l1_price_market_score"] = price_market
 
         state_map = {"Healthy": 0, "Watch": 1, "At risk": 2}
         features["l1_state_encoded"] = state_map.get(l1_state)

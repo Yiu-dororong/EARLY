@@ -328,12 +328,12 @@ def parse_steamcharts_page(html: str, appid: int) -> list[dict]:
     # avg is second, peak is last (5th) td
     row_pattern = re.compile(
         r"<tr[^>]*>\s*"
-        r"<td[^>]*>\s*([A-Za-z]+ \d{4})\s*</td>\s*"   # month name
+        r"<td[^>]*>\s*([A-Za-z]+ \d{4}|Last 30 Days)\s*</td>\s*"   # month name
         r"<td[^>]*>\s*([\d,.\-]+)\s*</td>\s*"           # avg players
         r"<td[^>]*>.*?</td>\s*"                          # gain (skip)
         r"<td[^>]*>.*?</td>\s*"                          # % gain (skip)
         r"<td[^>]*>\s*([\d,]+)\s*</td>",                 # peak players
-        re.DOTALL,
+        re.IGNORECASE | re.DOTALL,
     )
 
     month_map = {
@@ -345,19 +345,23 @@ def parse_steamcharts_page(html: str, appid: int) -> list[dict]:
     for m in row_pattern.finditer(html):
         month_str, avg_str, peak_str = m.group(1), m.group(2), m.group(3)
 
-        # Parse month → YYYY-MM-01
-        parts = month_str.strip().split()
-        if len(parts) != 2:
-            continue
-        month_name, year_str = parts
-        month_num = month_map.get(month_name.lower())
-        if not month_num:
-            continue
-        try:
-            year = int(year_str)
-            month_date = date(year, month_num, 1).isoformat()
-        except ValueError:
-            continue
+        if month_str.strip().lower() == "last 30 days":
+            now = datetime.now(timezone.utc)
+            month_date = date(now.year, now.month, 1).isoformat()
+        else:
+            # Parse month → YYYY-MM-01
+            parts = month_str.strip().split()
+            if len(parts) != 2:
+                continue
+            month_name, year_str = parts
+            month_num = month_map.get(month_name.lower())
+            if not month_num:
+                continue
+            try:
+                year = int(year_str)
+                month_date = date(year, month_num, 1).isoformat()
+            except ValueError:
+                continue
 
         # Parse avg (can be float, e.g. "1,234.5"; or "-" for current month)
         try:
@@ -379,9 +383,17 @@ def parse_steamcharts_page(html: str, appid: int) -> list[dict]:
             "collected_at": now_ts,
         })
 
+    # Deduplicate by month_date keeping the first (most recent / Last 30 Days)
+    seen = set()
+    unique_rows = []
+    for r in rows:
+        if r["month_date"] not in seen:
+            seen.add(r["month_date"])
+            unique_rows.append(r)
+
     # Sort oldest first for clean storage
-    rows.sort(key=lambda r: r["month_date"])
-    return rows
+    unique_rows.sort(key=lambda r: r["month_date"])
+    return unique_rows
 
 
 def fetch_ccu_history(
