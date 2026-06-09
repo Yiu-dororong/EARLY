@@ -168,11 +168,21 @@ def get_candidates(conn: libsql.Connection, delta: bool = False) -> list[dict]:
     return [{"appid": r[0], "ea_start_date": r[1], "ea_start_ts": r[2], "review_count": r[4], "review_checked_at": r[5]} for r in rows]
 
 
-def get_already_collected(conn: libsql.Connection) -> set[int]:
-    rows = conn.execute(
-        "SELECT appid FROM ccu_availability WHERE appid"
-    ).fetchall()
-    return {r[0] for r in rows}
+def get_already_collected(conn: libsql.Connection) -> tuple[set[int], libsql.Connection]:
+    for attempt in range(1, DB_MAX_RETRIES + 1):
+        try:
+            rows = conn.execute("SELECT appid FROM ccu_availability WHERE appid").fetchall()
+            return {r[0] for r in rows}, conn
+        except Exception as e:
+            if attempt == DB_MAX_RETRIES:
+                raise
+            log.warning("DB read error attempt %d: %s - reconnecting", attempt, e)
+            time.sleep(DB_RETRY_DELAY)
+            try:
+                conn.close()
+            except Exception:
+                pass
+            conn = get_conn()
 
 
 def write_availability(
@@ -182,7 +192,7 @@ def write_availability(
     review_count: int | None,
     review_checked_at: int | None,
     months_collected: int,
-) -> None:
+) -> libsql.Connection:
     for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
             conn.execute("""
@@ -194,17 +204,22 @@ def write_availability(
                 int(datetime.now(timezone.utc).timestamp()),
             ))
             conn.commit()
-            return
+            return conn
         except Exception as e:
             if attempt == DB_MAX_RETRIES:
                 raise
-            log.warning("DB write_availability error attempt %d for appid %d: %s - retrying in %ds", attempt, appid, e, DB_RETRY_DELAY)
+            log.warning("DB write_availability error attempt %d for appid %d: %s - reconnecting in %ds", attempt, appid, e, DB_RETRY_DELAY)
             time.sleep(DB_RETRY_DELAY)
+            try:
+                conn.close()
+            except Exception:
+                pass
+            conn = get_conn()
 
 
-def upsert_ccu_rows(conn: libsql.Connection, rows: list[dict], delta: bool = False) -> int:
+def upsert_ccu_rows(conn: libsql.Connection, rows: list[dict], delta: bool = False) -> tuple[int, libsql.Connection]:
     if not rows:
-        return 0
+        return 0, conn
 
     for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
@@ -218,30 +233,31 @@ def upsert_ccu_rows(conn: libsql.Connection, rows: list[dict], delta: bool = Fal
                     max_date = max_date_row[0]
                     current_rows = [r for r in current_rows if r["month_date"] >= max_date]
 
-            inserted = 0
-            for row in current_rows:
-                conn.execute("""
-                    INSERT OR REPLACE INTO ccu_history
-                        (appid, month_date, avg_players, peak_players, collected_at)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (
-                    row["appid"],
-                    row["month_date"],
-                    row["avg_players"],
-                    row["peak_players"],
-                    row["collected_at"],
-                ))
-                inserted += 1
+            tuples = [
+                (r["appid"], r["month_date"], r["avg_players"], r["peak_players"], r["collected_at"])
+                for r in current_rows
+            ]
+            
+            conn.executemany("""
+                INSERT OR REPLACE INTO ccu_history
+                    (appid, month_date, avg_players, peak_players, collected_at)
+                VALUES (?, ?, ?, ?, ?)
+            """, tuples)
             conn.commit()
-            return inserted
+            return len(tuples), conn
         except Exception as e:
             if attempt == DB_MAX_RETRIES:
                 log.warning("CCU row insert failed after %d attempts for appid=%d: %s", DB_MAX_RETRIES, rows[0]["appid"], e)
-                return 0
-            log.warning("DB upsert_ccu_rows error attempt %d for appid %d: %s - retrying in %ds", attempt, rows[0]["appid"], e, DB_RETRY_DELAY)
+                return 0, conn
+            log.warning("DB upsert_ccu_rows error attempt %d for appid %d: %s - reconnecting in %ds", attempt, rows[0]["appid"], e, DB_RETRY_DELAY)
             time.sleep(DB_RETRY_DELAY)
+            try:
+                conn.close()
+            except Exception:
+                pass
+            conn = get_conn()
             
-    return 0
+    return 0, conn
 
 
 # ---------------------------------------------------------------------------
@@ -454,7 +470,7 @@ def main() -> None:
         )
 
         if not args.force and not args.delta:
-            already = get_already_collected(conn)
+            already, conn = get_already_collected(conn)
             before = len(candidates)
             candidates = [c for c in candidates if c["appid"] not in already]
             log.info(
@@ -532,7 +548,7 @@ def main() -> None:
                     "[%d/%d] appid %d: SKIP — %d reviews (need %d)",
                     i, len(candidates), appid, review_count, MIN_REVIEW_COUNT,
                 )
-                write_availability(conn, appid, "SKIP_LOW_REVIEWS", review_count, review_checked_at, 0)
+                conn = write_availability(conn, appid, "SKIP_LOW_REVIEWS", review_count, review_checked_at, 0)
                 n_skip_reviews += 1
                 continue
 
@@ -547,8 +563,8 @@ def main() -> None:
         status, rows = fetch_ccu_history(appid, session)
 
         if status == "AVAILABLE":
-            inserted = upsert_ccu_rows(conn, rows, delta=args.delta)
-            write_availability(conn, appid, "AVAILABLE", review_count, review_checked_at, inserted)
+            inserted, conn = upsert_ccu_rows(conn, rows, delta=args.delta)
+            conn = write_availability(conn, appid, "AVAILABLE", review_count, review_checked_at, inserted)
             n_available += 1
             total_months += inserted
             log.info(
@@ -558,7 +574,7 @@ def main() -> None:
             )
 
         elif status == "UNAVAILABLE":
-            write_availability(conn, appid, "UNAVAILABLE", review_count, review_checked_at, 0)
+            conn = write_availability(conn, appid, "UNAVAILABLE", review_count, review_checked_at, 0)
             n_unavailable += 1
             log.info(
                 "[%d/%d] appid %d: UNAVAILABLE — below Steam Charts threshold "
@@ -568,7 +584,7 @@ def main() -> None:
             )
 
         else:  # ERROR
-            write_availability(conn, appid, "ERROR", review_count, review_checked_at, 0)
+            conn = write_availability(conn, appid, "ERROR", review_count, review_checked_at, 0)
             n_error += 1
             log.warning(
                 "[%d/%d] appid %d: ERROR — will need retry",

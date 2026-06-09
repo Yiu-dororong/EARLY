@@ -67,6 +67,8 @@ DB_AUTH = os.getenv("TURSO_AUTH_TOKEN")
 # Steam histogram API: ~200 req / 5 min → 1.5 s floor
 REQUEST_DELAY = float(os.getenv("HISTOGRAM_REQUEST_DELAY", "1.5"))
 DELTA_GRADUATION_DAYS = 90
+DB_MAX_RETRIES = 3
+DB_RETRY_DELAY = 5.0
 
 HISTOGRAM_URL = "https://store.steampowered.com/appreviewhistogram/{appid}"
 
@@ -123,7 +125,7 @@ def ensure_tables(conn: libsql.Connection) -> None:
     log.info("review_history table ready")
 
 
-def get_candidates(conn: libsql.Connection, delta: bool = False) -> list[int]:
+def get_candidates(conn: libsql.Connection, delta: bool = False) -> tuple[list[int], libsql.Connection]:
     """
     Select appids from ccu_availability where collection succeeded (AVAILABLE)
     or where the game bled out but still has review signal (UNAVAILABLE).
@@ -147,58 +149,79 @@ def get_candidates(conn: libsql.Connection, delta: bool = False) -> list[int]:
         {delta_filter}
         ORDER BY appid
     """
-    rows = conn.execute(query).fetchall()
-    return [r[0] for r in rows]
+    for attempt in range(1, DB_MAX_RETRIES + 1):
+        try:
+            rows = conn.execute(query).fetchall()
+            return [r[0] for r in rows], conn
+        except Exception as e:
+            if attempt == DB_MAX_RETRIES: raise
+            log.warning("DB read error: %s", e)
+            time.sleep(DB_RETRY_DELAY)
+            try: conn.close()
+            except: pass
+            conn = get_conn()
 
 
-def get_latest_bucket_dates(conn: libsql.Connection, appids: list[int]) -> dict[int, str]:
+def get_latest_bucket_dates(conn: libsql.Connection, appids: list[int]) -> tuple[dict[int, str], libsql.Connection]:
     """
     For each appid already in review_history, return the most recent
     bucket_start stored. Used by append logic to skip already-collected buckets.
     Returns dict of {appid: latest_bucket_start_str}.
     """
     if not appids:
-        return {}
+        return {}, conn
     placeholders = ",".join("?" * len(appids))
-    rows = conn.execute(f"""
-        SELECT appid, MAX(bucket_start)
-        FROM review_history
-        WHERE appid IN ({placeholders})
-        GROUP BY appid
-    """, appids).fetchall()
-    return {r[0]: r[1] for r in rows}
+    for attempt in range(1, DB_MAX_RETRIES + 1):
+        try:
+            rows = conn.execute(f"""
+                SELECT appid, MAX(bucket_start)
+                FROM review_history
+                WHERE appid IN ({placeholders})
+                GROUP BY appid
+            """, appids).fetchall()
+            return {r[0]: r[1] for r in rows}, conn
+        except Exception as e:
+            if attempt == DB_MAX_RETRIES: raise
+            log.warning("DB read error: %s", e)
+            time.sleep(DB_RETRY_DELAY)
+            try: conn.close()
+            except: pass
+            conn = get_conn()
 
 
-def insert_buckets(conn: libsql.Connection, rows: list[dict]) -> int:
+def insert_buckets(conn: libsql.Connection, rows: list[dict]) -> tuple[int, libsql.Connection]:
     """
     Insert review_history rows. Uses INSERT OR REPLACE so --force re-runs
     cleanly overwrite stale data without constraint errors.
     Returns number of rows inserted/replaced.
     """
-    inserted = 0
+    if not rows:
+        return 0, conn
+        
     now_ts = int(datetime.now(timezone.utc).timestamp())
-    for row in rows:
+    tuples = [
+        (row["appid"], row["bucket_start"], row["bucket_end"], row["positive"], row["negative"], now_ts)
+        for row in rows
+    ]
+
+    for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
-            conn.execute("""
+            conn.executemany("""
                 INSERT OR REPLACE INTO review_history
                     (appid, bucket_start, bucket_end, positive, negative, collected_at)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                row["appid"],
-                row["bucket_start"],
-                row["bucket_end"],
-                row["positive"],
-                row["negative"],
-                now_ts,
-            ))
-            inserted += 1
+            """, tuples)
+            conn.commit()
+            return len(tuples), conn
         except Exception as e:
-            log.warning(
-                "review_history insert failed appid=%d bucket=%s: %s",
-                row["appid"], row["bucket_start"], e,
-            )
-    conn.commit()
-    return inserted
+            if attempt == DB_MAX_RETRIES:
+                log.warning("review_history insert failed: %s", e)
+                return 0, conn
+            log.warning("DB insert error attempt %d: %s - reconnecting", attempt, e)
+            time.sleep(DB_RETRY_DELAY)
+            try: conn.close()
+            except: pass
+            conn = get_conn()
 
 
 # ---------------------------------------------------------------------------
@@ -384,7 +407,7 @@ def main() -> None:
         candidates = [args.appid]
         log.info("Single-appid mode: %d", args.appid)
     else:
-        candidates = get_candidates(conn, delta=args.delta)
+        candidates, conn = get_candidates(conn, delta=args.delta)
         log.info(
             "Candidates from ccu_availability (AVAILABLE + UNAVAILABLE): %d",
             len(candidates),
@@ -401,7 +424,7 @@ def main() -> None:
     # --- Append mode: find latest stored bucket per appid ---
     latest_stored: dict[int, str] = {}
     if not args.force:
-        latest_stored = get_latest_bucket_dates(conn, candidates)
+        latest_stored, conn = get_latest_bucket_dates(conn, candidates)
         already_have = len(latest_stored)
         log.info(
             "Append mode: %d appids already have buckets — will extend from latest",
@@ -466,7 +489,7 @@ def main() -> None:
                 time.sleep(delay)
             continue
 
-        inserted = insert_buckets(conn, to_insert)
+        inserted, conn = insert_buckets(conn, to_insert)
         total_buckets += inserted
         n_ok += 1
         log.info(

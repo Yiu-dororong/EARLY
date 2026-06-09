@@ -76,6 +76,8 @@ DELTA_GRADUATION_DAYS = 90
 
 DEFAULT_STEAM_SLEEP = 1.5
 FLUSH_BATCH_SIZE    = 2
+DB_MAX_RETRIES      = 3
+DB_RETRY_DELAY      = 5.0
 
 STEAM_APPDETAILS_URL = "https://store.steampowered.com/api/appdetails"
 STEAM_HISTOGRAM_URL  = "https://store.steampowered.com/appreviewhistogram/{appid}?json=1"
@@ -136,8 +138,21 @@ def ensure_table(conn: libsql.Connection) -> None:
     log.info("pre2022_review_history table ready")
 
 
-def load_already_collected(conn: libsql.Connection) -> set[int]:
-    return {r[0] for r in conn.execute("SELECT appid FROM pre2022_ea_games").fetchall()}
+def load_already_collected(conn: libsql.Connection) -> tuple[set[int], libsql.Connection]:
+    for attempt in range(1, DB_MAX_RETRIES + 1):
+        try:
+            res = {r[0] for r in conn.execute("SELECT appid FROM pre2022_ea_games").fetchall()}
+            return res, conn
+        except Exception as e:
+            if attempt == DB_MAX_RETRIES:
+                raise
+            log.warning("DB read error attempt %d: %s - reconnecting in %ds", attempt, e, DB_RETRY_DELAY)
+            time.sleep(DB_RETRY_DELAY)
+            try:
+                conn.close()
+            except Exception:
+                pass
+            conn = get_conn()
 
 
 # ---------------------------------------------------------------------------
@@ -435,7 +450,10 @@ def run(dry_run: bool, resume: bool, steam_sleep: float, delta: bool) -> None:
     conn = get_conn()
     ensure_table(conn)
 
-    already_collected = load_already_collected(conn) if resume else set()
+    if resume:
+        already_collected, conn = load_already_collected(conn)
+    else:
+        already_collected = set()
     candidates        = discover_candidates(conn, delta=delta)
 
     if dry_run:
@@ -533,7 +551,7 @@ def run(dry_run: bool, resume: bool, steam_sleep: float, delta: bool) -> None:
 
             # Flush every FLUSH_BATCH_SIZE to preserve progress
             if len(records_buf) % FLUSH_BATCH_SIZE == 0:
-                _flush(conn, records_buf, buckets_buf)
+                conn = _flush(conn, records_buf, buckets_buf)
                 records_buf.clear()
                 buckets_buf.clear()
 
@@ -550,7 +568,7 @@ def run(dry_run: bool, resume: bool, steam_sleep: float, delta: bool) -> None:
 
     # Flush remaining
     if records_buf or buckets_buf:
-        _flush(conn, records_buf, buckets_buf)
+        conn = _flush(conn, records_buf, buckets_buf)
 
     conn.commit()
 
@@ -575,40 +593,53 @@ def run(dry_run: bool, resume: bool, steam_sleep: float, delta: bool) -> None:
     conn.close()
 
 
-def _flush(conn: libsql.Connection, records: list[dict], buckets: list[dict] = None) -> None:
-    conn.executemany(
-        """
-        INSERT OR REPLACE INTO pre2022_ea_games (
-            appid, developer_norm, ea_start_date, graduation_date,
-            first_review_date, outcome, crossed_50_reviews, ea_age_days, is_free,
-            confidence, collected_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        [
-            (
-                r["appid"], r["developer_norm"], r["ea_start_date"],
-                r["graduation_date"], r["first_review_date"], r["outcome"], r["crossed_50_reviews"],
-                r["ea_age_days"], r["is_free"], r["confidence"], r["collected_at"],
+def _flush(conn: libsql.Connection, records: list[dict], buckets: list[dict] = None) -> libsql.Connection:
+    for attempt in range(1, DB_MAX_RETRIES + 1):
+        try:
+            conn.executemany(
+                """
+                INSERT OR REPLACE INTO pre2022_ea_games (
+                    appid, developer_norm, ea_start_date, graduation_date,
+                    first_review_date, outcome, crossed_50_reviews, ea_age_days, is_free,
+                    confidence, collected_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        r["appid"], r["developer_norm"], r["ea_start_date"],
+                        r["graduation_date"], r["first_review_date"], r["outcome"], r["crossed_50_reviews"],
+                        r["ea_age_days"], r["is_free"], r["confidence"], r["collected_at"],
+                    )
+                    for r in records
+                ],
             )
-            for r in records
-        ],
-    )
 
-    if buckets:
-        conn.executemany(
-            """
-            INSERT OR REPLACE INTO pre2022_review_history (
-                appid, bucket_start, bucket_end, positive, negative, collected_at
-            ) VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            [
-                (b["appid"], b["bucket_start"], b["bucket_end"], b["positive"], b["negative"], b["collected_at"])
-                for b in buckets
-            ],
-        )
+            if buckets:
+                conn.executemany(
+                    """
+                    INSERT OR REPLACE INTO pre2022_review_history (
+                        appid, bucket_start, bucket_end, positive, negative, collected_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        (b["appid"], b["bucket_start"], b["bucket_end"], b["positive"], b["negative"], b["collected_at"])
+                        for b in buckets
+                    ],
+                )
 
-    conn.commit()
-    log.info("Successfully uploaded %d records and %d buckets to the database.", len(records), len(buckets) if buckets else 0)
+            conn.commit()
+            log.info("Successfully uploaded %d records and %d buckets to the database.", len(records), len(buckets) if buckets else 0)
+            return conn
+        except Exception as e:
+            if attempt == DB_MAX_RETRIES:
+                raise
+            log.warning("DB flush error attempt %d: %s - reconnecting in %ds", attempt, e, DB_RETRY_DELAY)
+            time.sleep(DB_RETRY_DELAY)
+            try:
+                conn.close()
+            except Exception:
+                pass
+            conn = get_conn()
 
 
 if __name__ == "__main__":

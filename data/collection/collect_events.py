@@ -67,6 +67,8 @@ BUILD_EVENT_TYPES = {12, 13, 14}
 POST_EVENT_TYPES = {28}
 DELTA_GRADUATION_DAYS = 90
 ALL_WANTED_TYPES = BUILD_EVENT_TYPES | POST_EVENT_TYPES
+DB_MAX_RETRIES = 3
+DB_RETRY_DELAY = 5.0
 
 # Steam event API endpoint (undocumented but stable)
 EVENTS_URL = "https://store.steampowered.com/events/ajaxgetpartnereventspageable/"
@@ -150,7 +152,7 @@ def ensure_table(conn: libsql.Connection) -> None:
     log.info("event_history table ready")
 
 
-def get_eligible_appids(conn: libsql.Connection, delta: bool = False) -> list[int]:
+def get_eligible_appids(conn: libsql.Connection, delta: bool = False) -> tuple[list[int], libsql.Connection]:
     delta_filter = ""
     if delta:
         delta_filter = f"""
@@ -166,63 +168,93 @@ def get_eligible_appids(conn: libsql.Connection, delta: bool = False) -> list[in
         {delta_filter}
         ORDER BY appid
     """
-    rows = conn.execute(query).fetchall()
-    return [r[0] for r in rows]
+    for attempt in range(1, DB_MAX_RETRIES + 1):
+        try:
+            rows = conn.execute(query).fetchall()
+            return [r[0] for r in rows], conn
+        except Exception as e:
+            if attempt == DB_MAX_RETRIES:
+                raise
+            log.warning("DB read error attempt %d: %s - reconnecting", attempt, e)
+            time.sleep(DB_RETRY_DELAY)
+            try: conn.close()
+            except: pass
+            conn = get_conn()
 
 
-def get_already_collected(conn: libsql.Connection) -> set[int]:
+def get_already_collected(conn: libsql.Connection) -> tuple[set[int], libsql.Connection]:
     """Return appids that have at least one row in event_history."""
-    rows = conn.execute(
-        "SELECT DISTINCT appid FROM event_history"
-    ).fetchall()
-    return {r[0] for r in rows}
+    for attempt in range(1, DB_MAX_RETRIES + 1):
+        try:
+            rows = conn.execute("SELECT DISTINCT appid FROM event_history").fetchall()
+            return {r[0] for r in rows}, conn
+        except Exception as e:
+            if attempt == DB_MAX_RETRIES:
+                raise
+            log.warning("DB read error attempt %d: %s - reconnecting", attempt, e)
+            time.sleep(DB_RETRY_DELAY)
+            try: conn.close()
+            except: pass
+            conn = get_conn()
 
 
-def upsert_events(conn: libsql.Connection, events: list[dict]) -> int:
+def upsert_events(conn: libsql.Connection, events: list[dict]) -> tuple[int, libsql.Connection]:
     """Insert events, ignoring duplicates. Returns count inserted."""
-    inserted = 0
-    for ev in events:
+    if not events:
+        return 0, conn
+
+    tuples = [
+        (ev["appid"], ev["event_gid"], ev["event_type"], ev["event_name"],
+         ev["event_ts"], ev["announcement_body"], ev["word_count"],
+         ev["is_automated"], ev["build_id"], ev["build_branch"], ev["collected_at"])
+        for ev in events
+    ]
+
+    for attempt in range(1, DB_MAX_RETRIES + 1):
+        try:
+            conn.executemany("""
+                INSERT OR IGNORE INTO event_history
+                    (appid, event_gid, event_type, event_name,
+                     event_ts, announcement_body, word_count,
+                     is_automated, build_id, build_branch, collected_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, tuples)
+            conn.commit()
+            return len(tuples), conn
+        except Exception as e:
+            if attempt == DB_MAX_RETRIES:
+                log.warning("upsert failed: %s", e)
+                return 0, conn
+            log.warning("DB upsert_events error attempt %d: %s - reconnecting", attempt, e)
+            time.sleep(DB_RETRY_DELAY)
+            try: conn.close()
+            except: pass
+            conn = get_conn()
+
+
+def mark_no_events(conn: libsql.Connection, appid: int) -> libsql.Connection:
+    """
+    Insert a sentinel row so we know this appid was checked but had no events.
+    Uses event_gid='NONE' and event_ts=0 as sentinel values.
+    This prevents re-fetching on every run for quiet games.
+    """
+    for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
             conn.execute("""
                 INSERT OR IGNORE INTO event_history
                     (appid, event_gid, event_type, event_name,
                      event_ts, announcement_body, word_count,
                      is_automated, build_id, build_branch, collected_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                ev["appid"],
-                ev["event_gid"],
-                ev["event_type"],
-                ev["event_name"],
-                ev["event_ts"],
-                ev["announcement_body"],
-                ev["word_count"],
-                ev["is_automated"],
-                ev["build_id"],
-                ev["build_branch"],
-                ev["collected_at"],
-            ))
-            inserted += 1
+                VALUES (?, 'NONE', 0, 'NO_EVENTS_SENTINEL', 0, NULL, 0, 0, NULL, NULL, ?)
+            """, (appid, int(datetime.now(timezone.utc).timestamp())))
+            conn.commit()
+            return conn
         except Exception as e:
-            log.warning("upsert failed for gid %s: %s", ev["event_gid"], e)
-    conn.commit()
-    return inserted
-
-
-def mark_no_events(conn: libsql.Connection, appid: int) -> None:
-    """
-    Insert a sentinel row so we know this appid was checked but had no events.
-    Uses event_gid='NONE' and event_ts=0 as sentinel values.
-    This prevents re-fetching on every run for quiet games.
-    """
-    conn.execute("""
-        INSERT OR IGNORE INTO event_history
-            (appid, event_gid, event_type, event_name,
-             event_ts, announcement_body, word_count,
-             is_automated, build_id, build_branch, collected_at)
-        VALUES (?, 'NONE', 0, 'NO_EVENTS_SENTINEL', 0, NULL, 0, 0, NULL, NULL, ?)
-    """, (appid, int(datetime.now(timezone.utc).timestamp())))
-    conn.commit()
+            if attempt == DB_MAX_RETRIES: raise
+            time.sleep(DB_RETRY_DELAY)
+            try: conn.close()
+            except: pass
+            conn = get_conn()
 
 
 # ---------------------------------------------------------------------------
@@ -448,11 +480,11 @@ def main() -> None:
         appids = [args.appid]
         log.info("Single-appid mode: %d", args.appid)
     else:
-        appids = get_eligible_appids(conn, delta=args.delta)
+        appids, conn = get_eligible_appids(conn, delta=args.delta)
         log.info("Found %d ELIGIBLE games in games_v2", len(appids))
 
         if not args.force and not args.delta:
-            already = get_already_collected(conn)
+            already, conn = get_already_collected(conn)
             before = len(appids)
             appids = [a for a in appids if a not in already]
             log.info(
@@ -504,11 +536,11 @@ def main() -> None:
 
             if not events:
                 if not existing_gids or existing_gids == {'NONE'}:
-                    mark_no_events(conn, appid)
+                    conn = mark_no_events(conn, appid)
                 no_events += 1
                 log.debug("appid %d: no new events found", appid)
             else:
-                inserted = upsert_events(conn, events)
+                inserted, conn = upsert_events(conn, events)
                 n_build = sum(1 for e in events if e["event_type"] in BUILD_EVENT_TYPES)
                 n_post = sum(1 for e in events if e["event_type"] in POST_EVENT_TYPES and not e["is_automated"])
                 n_auto = sum(1 for e in events if e["is_automated"])
