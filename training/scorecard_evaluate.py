@@ -40,7 +40,7 @@ load_dotenv()
 import libsql
 import pandas as pd
 
-from evaluation.scorecard_config import (
+from training.scorecard_config import (
     CONFIG_VERSION,
     DIMENSION_FEATURES,
     FEATURE_SCALES,
