@@ -33,6 +33,7 @@ import argparse
 import logging
 import os
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from itertools import groupby
 from dotenv import load_dotenv
@@ -55,6 +56,8 @@ MIN_EVENTS_FOR_PERSONAL_THRESHOLD = 5  # below this, use FLOOR_GAP_DAYS
 POST_GAP_DAYS = 365                    # dev post clock — independent of build clock
 MIN_EA_AGE_DAYS = 90                   # clock doesn't start until game has been in EA 90+ days
 DELTA_GRADUATION_DAYS = 90             # delta run look-back window
+DB_MAX_RETRIES = 3                     # max DB connection retries
+DB_RETRY_DELAY = 5.0                   # delay between DB retries
 
 logging.basicConfig(
     level=logging.INFO,
@@ -267,18 +270,27 @@ def fetch_last_build_update_dates(conn, appids: list[int]) -> dict[int, str | No
     for i in range(0, len(appids), chunk_size):
         chunk = appids[i : i + chunk_size]
         placeholders = ",".join("?" * len(chunk))
-        rows = conn.execute(
-            f"""
-            SELECT appid, datetime(MAX(event_ts), 'unixepoch') AS last_build_update_date
-            FROM event_history
-            WHERE appid IN ({placeholders})
-              AND event_type IN (12, 13, 14)
-            GROUP BY appid
-            """,
-            chunk,
-        ).fetchall()
-        for row in rows:
-            result[row[0]] = row[1]
+        
+        for attempt in range(1, DB_MAX_RETRIES + 1):
+            try:
+                rows = conn.execute(
+                    f"""
+                    SELECT appid, datetime(MAX(event_ts), 'unixepoch') AS last_build_update_date
+                    FROM event_history
+                    WHERE appid IN ({placeholders})
+                      AND event_type IN (12, 13, 14)
+                    GROUP BY appid
+                    """,
+                    chunk,
+                ).fetchall()
+                for row in rows:
+                    result[row[0]] = row[1]
+                break
+            except Exception as e:
+                if attempt == DB_MAX_RETRIES:
+                    raise
+                log.warning("DB read error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
+                time.sleep(DB_RETRY_DELAY)
     for appid in appids:
         result.setdefault(appid, None)
     return result
@@ -300,18 +312,27 @@ def fetch_last_dev_post_dates(conn, appids: list[int]) -> dict[int, str | None]:
     for i in range(0, len(appids), chunk_size):
         chunk = appids[i : i + chunk_size]
         placeholders = ",".join("?" * len(chunk))
-        rows = conn.execute(
-            f"""
-            SELECT appid, datetime(MAX(event_ts), 'unixepoch') AS last_dev_post_date
-            FROM event_history
-            WHERE appid IN ({placeholders})
-              AND event_type = 28
-            GROUP BY appid
-            """,
-            chunk,
-        ).fetchall()
-        for row in rows:
-            result[row[0]] = row[1]
+        
+        for attempt in range(1, DB_MAX_RETRIES + 1):
+            try:
+                rows = conn.execute(
+                    f"""
+                    SELECT appid, datetime(MAX(event_ts), 'unixepoch') AS last_dev_post_date
+                    FROM event_history
+                    WHERE appid IN ({placeholders})
+                      AND event_type = 28
+                    GROUP BY appid
+                    """,
+                    chunk,
+                ).fetchall()
+                for row in rows:
+                    result[row[0]] = row[1]
+                break
+            except Exception as e:
+                if attempt == DB_MAX_RETRIES:
+                    raise
+                log.warning("DB read error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
+                time.sleep(DB_RETRY_DELAY)
     for appid in appids:
         result.setdefault(appid, None)
     return result
@@ -329,32 +350,41 @@ def fetch_historical_build_gaps(conn, appids: list[int]) -> dict[int, list[int]]
     for i in range(0, len(appids), chunk_size):
         chunk = appids[i : i + chunk_size]
         placeholders = ",".join("?" * len(chunk))
-        rows = conn.execute(
-            f"""
-            SELECT appid, datetime(event_ts, 'unixepoch') AS event_date
-            FROM event_history
-            WHERE appid IN ({placeholders})
-              AND event_type IN (12, 13, 14)
-            ORDER BY appid, event_ts ASC
-            """,
-            chunk,
-        ).fetchall()
+        
+        for attempt in range(1, DB_MAX_RETRIES + 1):
+            try:
+                rows = conn.execute(
+                    f"""
+                    SELECT appid, datetime(event_ts, 'unixepoch') AS event_date
+                    FROM event_history
+                    WHERE appid IN ({placeholders})
+                      AND event_type IN (12, 13, 14)
+                    ORDER BY appid, event_ts ASC
+                    """,
+                    chunk,
+                ).fetchall()
 
-        for appid, events in groupby(rows, key=lambda r: r[0]):
-            dates = []
-            for row in events:
-                try:
-                    dates.append(
-                        datetime.fromisoformat(row[1]).replace(tzinfo=timezone.utc)
-                    )
-                except (ValueError, TypeError):
-                    continue
-            gaps = [
-                (dates[j] - dates[j - 1]).days
-                for j in range(1, len(dates))
-                if (dates[j] - dates[j - 1]).days > 0
-            ]
-            result[appid] = gaps
+                for appid, events in groupby(rows, key=lambda r: r[0]):
+                    dates = []
+                    for row in events:
+                        try:
+                            dates.append(
+                                datetime.fromisoformat(row[1]).replace(tzinfo=timezone.utc)
+                            )
+                        except (ValueError, TypeError):
+                            continue
+                    gaps = [
+                        (dates[j] - dates[j - 1]).days
+                        for j in range(1, len(dates))
+                        if (dates[j] - dates[j - 1]).days > 0
+                    ]
+                    result[appid] = gaps
+                break
+            except Exception as e:
+                if attempt == DB_MAX_RETRIES:
+                    raise
+                log.warning("DB read error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
+                time.sleep(DB_RETRY_DELAY)
 
     return result
 
@@ -384,14 +414,22 @@ def fetch_games_v2(conn, appid_filter: int | None = None, delta: bool = False) -
         where += " AND appid = ?"
         params.append(appid_filter)
 
-    rows = conn.execute(
-        f"""
-        SELECT appid, ea_start_date, graduation_date
-        FROM games_v2
-        {where}
-        """,
-        params,
-    ).fetchall()
+    for attempt in range(1, DB_MAX_RETRIES + 1):
+        try:
+            rows = conn.execute(
+                f"""
+                SELECT appid, ea_start_date, graduation_date
+                FROM games_v2
+                {where}
+                """,
+                params,
+            ).fetchall()
+            break
+        except Exception as e:
+            if attempt == DB_MAX_RETRIES:
+                raise
+            log.warning("DB fetch_games_v2 error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
+            time.sleep(DB_RETRY_DELAY)
 
     return [
         {"appid": r[0], "ea_start_date": r[1], "graduation_date": r[2]}
@@ -404,38 +442,70 @@ def fetch_games_v2(conn, appid_filter: int | None = None, delta: bool = False) -
 # ---------------------------------------------------------------------------
 
 def write_outcomes_v2(conn, decisions: list[dict], dry_run: bool = False):
-    existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(games_v2)").fetchall()}
+    existing_cols = set()
+    for attempt in range(1, DB_MAX_RETRIES + 1):
+        try:
+            existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(games_v2)").fetchall()}
+            break
+        except Exception as e:
+            if attempt == DB_MAX_RETRIES:
+                raise
+            log.warning("DB PRAGMA read error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
+            time.sleep(DB_RETRY_DELAY)
+            
     if "abandoned_date" not in existing_cols:
         if not dry_run:
-            conn.execute("ALTER TABLE games_v2 ADD COLUMN abandoned_date TEXT")
-            conn.commit()
+            for attempt in range(1, DB_MAX_RETRIES + 1):
+                try:
+                    conn.execute("ALTER TABLE games_v2 ADD COLUMN abandoned_date TEXT")
+                    conn.commit()
+                    break
+                except Exception as e:
+                    if attempt == DB_MAX_RETRIES:
+                        raise
+                    log.warning("DB ALTER TABLE error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
+                    time.sleep(DB_RETRY_DELAY)
             log.info("Added column games_v2.abandoned_date")
         else:
             log.info("[DRY RUN] Would add column games_v2.abandoned_date")
 
     updated = 0
-    for d in decisions:
-        if dry_run:
+    if not dry_run:
+        chunk_size = 500
+        for i in range(0, len(decisions), chunk_size):
+            chunk = decisions[i : i + chunk_size]
+            update_tuples = [
+                (d["outcome"], d["outcome_date"], d["outcome_source"], d["abandoned_date"], d["appid"])
+                for d in chunk
+            ]
+            for attempt in range(1, DB_MAX_RETRIES + 1):
+                try:
+                    conn.executemany(
+                        """
+                        UPDATE games_v2
+                        SET outcome        = ?,
+                            outcome_date   = ?,
+                            outcome_source = ?,
+                            abandoned_date = ?
+                        WHERE appid = ?
+                        """,
+                        update_tuples,
+                    )
+                    conn.commit()
+                    break
+                except Exception as e:
+                    if attempt == DB_MAX_RETRIES:
+                        raise
+                    log.warning("DB write batch error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
+                    time.sleep(DB_RETRY_DELAY)
+            updated += len(chunk)
+        log.info("games_v2: wrote %d outcome labels", updated)
+    else:
+        for d in decisions:
             log.info(
                 "[DRY RUN] appid=%-10s  %-17s  source=%-26s  %s",
                 d["appid"], d["outcome"], d["outcome_source"], d["reason"],
             )
-            continue
-        conn.execute(
-            """
-            UPDATE games_v2
-            SET outcome        = ?,
-                outcome_date   = ?,
-                outcome_source = ?,
-                abandoned_date = ?
-            WHERE appid = ?
-            """,
-            (d["outcome"], d["outcome_date"], d["outcome_source"], d["abandoned_date"], d["appid"]),
-        )
-        updated += 1
-    if not dry_run:
-        conn.commit()
-        log.info("games_v2: wrote %d outcome labels", updated)
 
 
 # ---------------------------------------------------------------------------
