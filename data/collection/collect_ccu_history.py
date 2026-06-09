@@ -62,7 +62,7 @@ load_dotenv()
 DB_URL = os.getenv("TURSO_URL")
 DB_AUTH = os.getenv("TURSO_AUTH_TOKEN")
 REQUEST_DELAY = float(os.getenv("CCU_REQUEST_DELAY", "2.0"))   # Steam Charts is sensitive
-REVIEW_API_DELAY = float(os.getenv("REVIEW_API_DELAY", "0.5"))
+REVIEW_API_DELAY = float(os.getenv("REVIEW_API_DELAY", "1.5"))
 
 MIN_EA_AGE_DAYS = 90
 DELTA_GRADUATION_DAYS = 90
@@ -170,7 +170,7 @@ def get_candidates(conn: libsql.Connection, delta: bool = False) -> list[dict]:
 
 def get_already_collected(conn: libsql.Connection) -> set[int]:
     rows = conn.execute(
-        "SELECT appid FROM ccu_availability"
+        "SELECT appid FROM ccu_availability WHERE appid"
     ).fetchall()
     return {r[0] for r in rows}
 
@@ -259,7 +259,7 @@ def get_review_count(appid: int, session: requests.Session) -> int | None:
             params={
                 "json": "1",
                 "language": "all",
-                "purchase_type": "all",
+                "purchase_type": "steam",
                 "num_per_page": "0",   # metadata only, no review text needed
             },
             timeout=10,
