@@ -151,9 +151,14 @@ def ensure_live_scores_table(conn: libsql.Connection) -> None:
             player_retention    REAL,
             dev_engagement      REAL,
             sentiment           REAL,
-            price_market        REAL
+            price_market        REAL,
+            shap_json           TEXT
         )
     """)
+    try:
+        conn.execute("ALTER TABLE live_scores ADD COLUMN shap_json TEXT")
+    except Exception:
+        pass  # Column likely already exists
     conn.commit()
     log.info("live_scores table ready")
 
@@ -194,8 +199,9 @@ def upsert_score(conn: libsql.Connection, score: dict) -> None:
             p_distressed, is_distressed, l1_state,
             ml_eligible, model_version,
             null_features, review_count_at_T,
-            update_health, player_retention, dev_engagement, sentiment, price_market
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            update_health, player_retention, dev_engagement, sentiment, price_market,
+            shap_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         score["appid"],
         score["scored_at"],
@@ -212,6 +218,7 @@ def upsert_score(conn: libsql.Connection, score: dict) -> None:
         score["dev_engagement"],
         score["sentiment"],
         score["price_market"],
+        json.dumps(score["top25_shap"]) if score.get("top25_shap") else None,
     ))
 
 
@@ -261,6 +268,26 @@ def load_model_artifacts(version: str) -> tuple[xgb.Booster, list[str], list[str
         len(feature_cols), len(genre_cols), threshold,
     )
     return booster, feature_cols, genre_cols, threshold
+
+
+def load_shap_features(version: str) -> list[str]:
+    """
+    Load the top-25 feature list for SHAP vector extraction.
+    Returns an empty list if the file is not found.
+    """
+    top25_path = MODEL_DIR / f"shap_top25_{version}.json"
+    if top25_path.exists():
+        with open(top25_path) as f:
+            _top25_meta = json.load(f)
+        features = _top25_meta.get("features", [])
+        log.info(
+            "Top-25 SHAP features loaded (covers %.1f%% variance)",
+            _top25_meta.get("cumulative_variance_pct", 0.0),
+        )
+        return features
+    else:
+        log.warning("shap_top25_%s.json not found — shap_json will not be computed", version)
+        return []
 
 
 # ---------------------------------------------------------------------------
@@ -387,6 +414,7 @@ def score_game(
     genre_cols: list[str],
     threshold: float,
     model_version: str,
+    top25_features: list[str],
 ) -> dict:
     """
     Take a pre-computed live_snapshots feature row and produce a score record.
@@ -449,6 +477,7 @@ def score_game(
     p_distressed: float | None  = None
     is_distressed: int | None   = None
     null_features: list[str]    = []
+    top25_shap: dict | None     = None
 
     if ml_eligible:
         # Genre one-hot encoding (decision 24)
@@ -471,6 +500,17 @@ def score_game(
             "appid %-10d  p=%.4f  distressed=%d  nulls=%d  l1=%s",
             appid, p_distressed, is_distressed, len(null_features), l1_state,
         )
+
+        # ── SHAP vector for Zilliz ────────────────────────────────────────────
+        if top25_features:
+            # pred_contribs returns (1, n_features + 1) — last col is bias term
+            contributions = booster.predict(dmat, pred_contribs=True)
+            shap_row = contributions[0, :-1]                   # shape: (n_features,)
+
+            # Map feature name → shap value, then filter to top 25
+            all_shap = dict(zip(all_feature_cols, shap_row.tolist()))
+            top25_shap = {f: all_shap[f] for f in top25_features if f in all_shap}
+        # ─────────────────────────────────────────────────────────────────────
     else:
         log.debug(
             "appid %-10d  ml_ineligible (reviews=%d)  l1=%s",
@@ -493,6 +533,7 @@ def score_game(
         "dev_engagement":   dev_engagement,
         "sentiment":        sentiment,
         "price_market":     price_market,
+        "top25_shap":       top25_shap,
     }
 
 
@@ -528,6 +569,8 @@ def main() -> None:
         log.error("%s", e)
         return
 
+    top25_features = load_shap_features(args.model)
+
     # The model artifact is the absolute source of truth for feature ordering.
     # Recombining feature_cols + genre_cols manually can cause ordering mismatches.
     if booster.feature_names:
@@ -562,6 +605,7 @@ def main() -> None:
                 genre_cols=genre_cols,
                 threshold=threshold,
                 model_version=args.model,
+                top25_features=top25_features,
             )
 
             if not args.dry_run:

@@ -613,15 +613,15 @@ def evaluate(
     log.info("  Data-Driven Lift   (holdout)   : %+.4f", test_prauc - baseline_prauc_test)
     
     res = {
-        "oof_auc":    oof_auc,
-        "oof_prauc":  oof_prauc,
-        "test_auc":   test_auc,
-        "test_prauc": test_prauc,
-        "threshold":  threshold,
-        "lift_oof":   oof_prauc  - baseline_prauc,
-        "lift_test":  test_prauc - baseline_prauc_test,
+        "oof_auc":    float(oof_auc),
+        "oof_prauc":  float(oof_prauc),
+        "test_auc":   float(test_auc),
+        "test_prauc": float(test_prauc),
+        "threshold":  float(threshold),
+        "lift_oof":   float(oof_prauc  - baseline_prauc),
+        "lift_test":  float(test_prauc - baseline_prauc_test),
         "tp": int(tp), "fp": int(fp), "tn": int(tn), "fn": int(fn),
-        "precision": precision, "recall": recall, "f1": f1,
+        "precision": float(precision), "recall": float(recall), "f1": float(f1),
     }
 
     if time_bounded_eval:
@@ -644,10 +644,10 @@ def evaluate(
         log.info("Time-Bounded Scorecard baseline        : %.4f", baseline_prauc_fast)
         log.info("Time-Bounded Data-Driven Lift        : %+.4f", oof_prauc_fast - baseline_prauc_fast)
         
-        res["oof_auc_fast"] = oof_auc_fast
-        res["oof_prauc_fast"] = oof_prauc_fast
-        res["lift_oof_fast"] = oof_prauc_fast - baseline_prauc_fast
-        res["holdout_horizon_days"] = holdout_horizon
+        res["oof_auc_fast"] = float(oof_auc_fast)
+        res["oof_prauc_fast"] = float(oof_prauc_fast)
+        res["lift_oof_fast"] = float(oof_prauc_fast - baseline_prauc_fast)
+        res["holdout_horizon_days"] = float(holdout_horizon)
 
     log.info("-" * 60)
 
@@ -681,9 +681,28 @@ def run_shap(model, X_sample: pd.DataFrame, feature_names: list[str]):
         index=feature_names
     ).sort_values(ascending=False)
 
-    log.info("Top 15 features by mean |SHAP|:")
-    for feat, val in mean_abs_shap.head(15).items():
-        log.info("  %-45s %.5f", feat, val)
+    log.info("Top 25 features by mean |SHAP|:")
+    cumulative_variance = mean_abs_shap.cumsum() / mean_abs_shap.sum()
+    for i, (feat, val) in enumerate(mean_abs_shap.head(25).items()):
+        log.info(
+            "  %2d. %-45s %.5f  (cumulative variance: %.1f%%)",
+            i + 1, feat, val, cumulative_variance.iloc[i] * 100
+        )
+ 
+    # 5. Export top 25 feature names — canonical order for Zilliz vectors
+    # inference.py loads this to know which features to extract and in what order
+    top25 = mean_abs_shap.head(25).index.tolist()
+    top25_path = OUTPUT_DIR / f"shap_top25_{MODEL_VERSION}.json"
+    with open(top25_path, "w") as f:
+        json.dump({
+            "model_version": MODEL_VERSION,
+            "feature_count": 25,
+            "cumulative_variance_pct": float(round(
+                cumulative_variance.iloc[24] * 100, 2
+            )),
+            "features": top25,           # ordered by mean |SHAP|, index = vector position
+        }, f, indent=2)
+    log.info("Top 25 features exported → %s", top25_path)
 
     # 5. Save the exact payload the SHAP plotting library will need later
     shap_path = OUTPUT_DIR / f"shap_{MODEL_VERSION}.pkl"
@@ -824,7 +843,7 @@ def write_run_log(metrics: dict, df_train_val, df_test, feature_names, best_iter
         "train_val_games": df_train_val["appid"].nunique(),
         "test_snapshots":  len(df_test),
         "test_games":      df_test["appid"].nunique(),
-        "cv_best_iters":   best_iters,
+        "cv_best_iters":   [int(i) for i in best_iters],
         **metrics,
     }
 
