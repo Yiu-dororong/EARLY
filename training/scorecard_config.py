@@ -340,7 +340,7 @@ for _dim, _groups in DIMENSION_FEATURES.items():
 STATE_THRESHOLDS = [
     (0.55, "Healthy"),
     (0.42, "Watch"),
-    (0.00, "At risk"),
+    (0.00, "At Risk"),
 ]
 
 # ---------------------------------------------------------------------------

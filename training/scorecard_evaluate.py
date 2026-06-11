@@ -144,16 +144,16 @@ def analyse_distribution(df: pd.DataFrame) -> None:
         log.info("  %-20s %5d  (%5.1f%%)  %s", state, count, pct, bar)
 
     # Pareto skew warning
-    at_risk_pct = 100 * dist.get("At risk", 0) / total
+    at_risk_pct = 100 * dist.get("At Risk", 0) / total
     if at_risk_pct > 60:
         log.warning(
-            "⚠ Pareto skew detected: %.1f%% of snapshots are At risk. "
+            "⚠ Pareto skew detected: %.1f%% of snapshots are At Risk. "
             "Consider raising STATE_THRESHOLDS or revisiting FEATURE_SCALES caps.",
             at_risk_pct,
         )
 
     # Hard abandon overrides
-    hard_abandon_mask = (df["l1_state"] == "At risk") & (df["l1_composite_score"] == 0.0)
+    hard_abandon_mask = (df["l1_state"] == "At Risk") & (df["l1_composite_score"] == 0.0)
     n_hard_snaps = hard_abandon_mask.sum()
     n_hard_games = df.loc[hard_abandon_mask, "appid"].nunique()
     log.info("")
@@ -226,7 +226,7 @@ def analyse_outcome_agreement(df: pd.DataFrame) -> None:
         pct_success  = 100 * n_success  / n
         pct_abandoned = 100 * n_abandoned / n
 
-        # Agreement: Healthy/Watch should → SUCCESS, At risk → ABANDONED
+        # Agreement: Healthy/Watch should → SUCCESS, At Risk → ABANDONED
         if state in ("Healthy", "Watch"):
             agreement = pct_success
             expected  = "SUCCESS"
@@ -454,7 +454,7 @@ def calibration_recommendations(sc_df: pd.DataFrame, raw_df: pd.DataFrame) -> No
     current_thresholds_str = " / ".join(f"{t:.2f}" for t, _ in STATE_THRESHOLDS[:-1])
     log.info("  Current thresholds : %s", current_thresholds_str)
     log.info("  Suggested Q3/Q2    : %.2f / %.2f", q3, q2)
-    log.info("  (Ensures ~25%% Healthy, ~25%% Watch, ~50%% At risk)")
+    log.info("  (Ensures ~25%% Healthy, ~25%% Watch, ~50%% At Risk)")
     log.info("  Update STATE_THRESHOLDS in scorecard_config.py if needed.")
 
     if recs:

@@ -327,7 +327,7 @@ def classify_state(composite: float | None) -> str:
     for threshold, label in STATE_THRESHOLDS:
         if composite >= threshold:
             return label
-    return "At risk"
+    return "At Risk"
 
 
 # ---------------------------------------------------------------------------
@@ -363,7 +363,7 @@ def compute_scorecard(row: dict) -> dict:
 
     # ---- Hard override -----------------------------------------------------
     if check_hard_abandon(row):
-        result["l1_state"] = "At risk"
+        result["l1_state"] = "At Risk"
         result["l1_composite_score"] = 0.0
         return result
 
@@ -535,7 +535,7 @@ def run(dry_run: bool, appid: int | None, limit: int | None) -> None:
         state = res["l1_state"]
         state_dist[state] = state_dist.get(state, 0) + 1
 
-        if state == "At risk" and res["l1_composite_score"] == 0.0:
+        if state == "At Risk" and res["l1_composite_score"] == 0.0:
             hard_overrides += 1
             hard_override_appids.add(res["appid"])
 
