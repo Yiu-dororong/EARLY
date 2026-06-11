@@ -24,7 +24,7 @@ Usage:
   python train_xgboost.py --time-bounded-eval # time-bounded baseline evaluation
   python train_xgboost.py --tune --n-trials 50 # Initialize an Optuna study with your specified search space.
                                                 Automatically generate interactive Plotly HTML visualizations for the Optimization History and Hyperparameter Importances, 
-                                                saving them directly into your models/ directory!
+                                                saving them directly into your outputs/ directory!
                           --ignore-tuned 
 """
 
@@ -815,11 +815,14 @@ def run_tuning(df_train_val: pd.DataFrame, scale_pos_weight: float, n_trials: in
 
     # Visualizations
     try:
+        out_dir = Path("outputs")
+        out_dir.mkdir(exist_ok=True)
+
         fig_history = vis.plot_optimization_history(study)
         fig_importances = vis.plot_param_importances(study)
         
-        history_path = OUTPUT_DIR / f"optuna_history_{MODEL_VERSION}.html"
-        importances_path = OUTPUT_DIR / f"optuna_importances_{MODEL_VERSION}.html"
+        history_path = out_dir / f"optuna_history_{MODEL_VERSION}.html"
+        importances_path = out_dir / f"optuna_importances_{MODEL_VERSION}.html"
         
         fig_history.write_html(str(history_path))
         fig_importances.write_html(str(importances_path))
