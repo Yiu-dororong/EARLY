@@ -138,6 +138,8 @@ def ensure_live_scores_table(conn: libsql.Connection) -> None:
     conn.execute("""
         CREATE TABLE IF NOT EXISTS live_scores (
             appid               INTEGER PRIMARY KEY,
+            snapshot_date       TEXT,
+            primary_genre       TEXT,
             scored_at           INTEGER NOT NULL,
             ea_age_days         INTEGER,
             p_distressed        REAL,
@@ -155,10 +157,6 @@ def ensure_live_scores_table(conn: libsql.Connection) -> None:
             shap_json           TEXT
         )
     """)
-    try:
-        conn.execute("ALTER TABLE live_scores ADD COLUMN shap_json TEXT")
-    except Exception:
-        pass  # Column likely already exists
     conn.commit()
     log.info("live_scores table ready")
 
@@ -195,15 +193,17 @@ def load_latest_live_snapshots(
 def upsert_score(conn: libsql.Connection, score: dict) -> None:
     conn.execute("""
         INSERT OR REPLACE INTO live_scores (
-            appid, scored_at, ea_age_days,
+            appid, snapshot_date, primary_genre, scored_at, ea_age_days,
             p_distressed, is_distressed, l1_state,
             ml_eligible, model_version,
             null_features, review_count_at_T,
             update_health, player_retention, dev_engagement, sentiment, price_market,
             shap_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         score["appid"],
+        score["snapshot_date"],
+        score["primary_genre"],
         score["scored_at"],
         score["ea_age_days"],
         score["p_distressed"],
@@ -422,6 +422,8 @@ def score_game(
     Returns a score dict ready for upsert_score(), or raises on unrecoverable error.
     """
     appid     = features["appid"]
+    snapshot_date = features.get("snapshot_date")
+    primary_genre = features.get("primary_genre")
     scored_at = int(datetime.now(timezone.utc).timestamp())
     ea_age_days = features.get("ea_age_days", 0)
 
@@ -519,6 +521,8 @@ def score_game(
 
     return {
         "appid":            appid,
+        "snapshot_date":    snapshot_date,
+        "primary_genre":    primary_genre,
         "scored_at":        scored_at,
         "ea_age_days":      ea_age_days,
         "p_distressed":     p_distressed,
