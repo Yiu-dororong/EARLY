@@ -19,6 +19,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
+from utils.langfuse_client import generation_span
 
 
 class CriticState(TypedDict):
@@ -106,7 +107,6 @@ def _llm_call(system: str, prompt: str, span_name: str, trace: Any) -> tuple[str
     """Run one LLM call with a Langfuse span. Returns (content, error)."""
     llm = _get_llm()
     try:
-        from utils.langfuse_client import generation_span
         ctx = generation_span(trace, name=span_name, model="llama-3.3-70b-versatile", input_data=prompt)
     except Exception:
         ctx = nullcontext(None)

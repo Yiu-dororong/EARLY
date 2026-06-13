@@ -25,6 +25,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
+from utils.langfuse_client import generation_span
 
 
 # ---------------------------------------------------------------------------
@@ -135,7 +136,6 @@ def assess_update(state: ForensicState) -> dict:
     # Langfuse span — graceful no-op if unavailable
     trace = state.get("trace")
     try:
-        from utils.langfuse_client import generation_span
         ctx = generation_span(trace, name="forensic_llm", model="llama-3.3-70b-versatile", input_data=prompt)
     except Exception:
         ctx = nullcontext(None)

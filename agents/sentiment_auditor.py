@@ -22,6 +22,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
+from utils.langfuse_client import generation_span
 
 MAX_RECENT_REVIEWS = 25
 MAX_OLDER_REVIEWS  = 15
@@ -123,7 +124,6 @@ def analyse_sentiment(state: SentimentState) -> dict:
 
     trace = state.get("trace")
     try:
-        from utils.langfuse_client import generation_span
         ctx = generation_span(trace, name="auditor_llm", model="llama-3.1-8b-instant", input_data=prompt)
     except Exception:
         ctx = nullcontext(None)
