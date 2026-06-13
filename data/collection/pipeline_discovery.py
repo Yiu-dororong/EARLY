@@ -126,16 +126,38 @@ def init_schema(conn):
     log.info("Schema initialised.")
 
 
-def load_existing_games(conn) -> dict:
-    rows = conn.execute("SELECT appid, currently_in_ea FROM games_v2").fetchall()
-    return {r[0]: r[1] for r in rows}
+def load_existing_games(conn) -> tuple[dict, libsql.Connection]:
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            rows = conn.execute("SELECT appid, currently_in_ea FROM games_v2").fetchall()
+            return {r[0]: r[1] for r in rows}, conn
+        except Exception as e:
+            if attempt == MAX_RETRIES:
+                raise
+            log.warning(f"DB load_existing_games error attempt {attempt}: {e} — retrying in {RETRY_DELAY}s")
+            time.sleep(RETRY_DELAY)
+            try: conn.close()
+            except Exception: pass
+            conn = get_conn()
+    return {}, conn
 
 
-def get_last_run_ts(conn) -> int:
-    row = conn.execute(
-        "SELECT value FROM run_meta WHERE key = 'last_run_ts'"
-    ).fetchone()
-    return int(row[0]) if row else 0
+def get_last_run_ts(conn) -> tuple[int, libsql.Connection]:
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            row = conn.execute(
+                "SELECT value FROM run_meta WHERE key = 'last_run_ts'"
+            ).fetchone()
+            return int(row[0]) if row else 0, conn
+        except Exception as e:
+            if attempt == MAX_RETRIES:
+                raise
+            log.warning(f"DB get_last_run_ts error attempt {attempt}: {e} — retrying in {RETRY_DELAY}s")
+            time.sleep(RETRY_DELAY)
+            try: conn.close()
+            except Exception: pass
+            conn = get_conn()
+    return 0, conn
 
 
 def save_run_ts(conn, ts: int):
@@ -147,12 +169,16 @@ def save_run_ts(conn, ts: int):
                 (str(ts),),
             )
             conn.commit()
-            return
+            return conn
         except Exception as e:
             if attempt == MAX_RETRIES:
                 raise
             log.warning(f"DB save_run_ts error attempt {attempt}: {e} — retrying in {RETRY_DELAY}s")
             time.sleep(RETRY_DELAY)
+            try: conn.close()
+            except Exception: pass
+            conn = get_conn()
+    return conn
 
 
 def log_step(conn, appid, step, status, message=""):
@@ -164,12 +190,16 @@ def log_step(conn, appid, step, status, message=""):
                 (appid, datetime.now(timezone.utc).isoformat(), step, status, message),
             )
             conn.commit()
-            return
+            return conn
         except Exception as e:
             if attempt == MAX_RETRIES:
                 raise
             log.warning(f"DB log_step error attempt {attempt} for appid {appid}: {e} — retrying in {RETRY_DELAY}s")
             time.sleep(RETRY_DELAY)
+            try: conn.close()
+            except Exception: pass
+            conn = get_conn()
+    return conn
 
 
 def upsert_game(conn, row: dict):
@@ -186,12 +216,16 @@ def upsert_game(conn, row: dict):
         try:
             conn.execute(sql, list(row.values()))
             conn.commit()
-            return
+            return conn
         except Exception as e:
             if attempt == MAX_RETRIES:
                 raise
             log.warning(f"DB upsert error attempt {attempt} for appid {row.get('appid')}: {e} — retrying in {RETRY_DELAY}s")
             time.sleep(RETRY_DELAY)
+            try: conn.close()
+            except Exception: pass
+            conn = get_conn()
+    return conn
 
 
 # ── HTTP ──────────────────────────────────────────────────────────────────────
@@ -382,7 +416,7 @@ def fetch_ea_start(appid: int) -> int | None:
     return data.get("results", {}).get("start_date")
 
 
-def check_and_update_graduation(conn, appid: int, name: str) -> str:
+def check_and_update_graduation(conn, appid: int, name: str) -> tuple[str, libsql.Connection]:
     """
     Checks appdetails for graduation.
     Returns status: "GRADUATED", "STILL_EA", "ERROR", "DELISTED"
@@ -392,12 +426,12 @@ def check_and_update_graduation(conn, appid: int, name: str) -> str:
 
     if not data or str(appid) not in data:
         log.warning(f"  ERROR — Failed to fetch appdetails for {appid}")
-        return "ERROR"
+        return "ERROR", conn
 
     app_data = data[str(appid)]
     if not app_data.get("success"):
         log.warning(f"  WARNING — appdetails success=false for {appid} (possibly delisted)")
-        return "DELISTED"
+        return "DELISTED", conn
 
     info = app_data.get("data", {})
 
@@ -429,11 +463,14 @@ def check_and_update_graduation(conn, appid: int, name: str) -> str:
                     raise
                 log.warning(f"DB update error attempt {attempt} for appid {appid}: {e} — retrying in {RETRY_DELAY}s")
                 time.sleep(RETRY_DELAY)
+                try: conn.close()
+                except Exception: pass
+                conn = get_conn()
 
-        log_step(conn, appid, "check_graduated", "GRADUATED", f"graduation_date={graduation_date}")
-        return "GRADUATED"
+        conn = log_step(conn, appid, "check_graduated", "GRADUATED", f"graduation_date={graduation_date}")
+        return "GRADUATED", conn
     
-    return "STILL_EA"
+    return "STILL_EA", conn
 
 
 # ── Step 4: Check Graduated Games ─────────────────────────────────────────────
@@ -442,7 +479,18 @@ def run_check_graduated(dry_run: bool = False):
     init_schema(conn)
 
     # Select all current EA appids from the database
-    rows = conn.execute("SELECT appid, name, ea_start_ts FROM games_v2 WHERE currently_in_ea = 1").fetchall()
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            rows = conn.execute("SELECT appid, name, ea_start_ts FROM games_v2 WHERE currently_in_ea = 1").fetchall()
+            break
+        except Exception as e:
+            if attempt == MAX_RETRIES:
+                raise
+            log.warning(f"DB load check_graduated error attempt {attempt}: {e} — retrying in {RETRY_DELAY}s")
+            time.sleep(RETRY_DELAY)
+            try: conn.close()
+            except Exception: pass
+            conn = get_conn()
 
     log.info(f"Found {len(rows)} active EA games to check for graduation.")
 
@@ -455,7 +503,7 @@ def run_check_graduated(dry_run: bool = False):
 
     for i, (appid, name, ea_start_ts) in enumerate(rows, 1):
         log.info(f"[{i}/{len(rows)}] Checking graduation status for appid={appid} name={name!r}")
-        res = check_and_update_graduation(conn, appid, name)
+        res, conn = check_and_update_graduation(conn, appid, name)
         if res == "GRADUATED":
             graduated_count += 1
         elif res == "ERROR":
@@ -480,14 +528,25 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
     to_check_graduation = []
 
     if retry_errors:
-        rows = conn.execute(
-            "SELECT appid, name, last_modified_steam FROM games_v2 WHERE eligibility_status = 'ERROR'"
-        ).fetchall()
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                rows = conn.execute(
+                    "SELECT appid, name, last_modified_steam FROM games_v2 WHERE eligibility_status = 'ERROR'"
+                ).fetchall()
+                break
+            except Exception as e:
+                if attempt == MAX_RETRIES:
+                    raise
+                log.warning(f"DB load errors attempt {attempt}: {e} — retrying in {RETRY_DELAY}s")
+                time.sleep(RETRY_DELAY)
+                try: conn.close()
+                except Exception: pass
+                conn = get_conn()
         to_process = [{"appid": r[0], "name": r[1], "last_modified": r[2]} for r in rows]
         log.info(f"Retry errors run — Found {len(to_process)} games with ERROR status to retry.")
     else:
-        existing_games = load_existing_games(conn)
-        last_run_ts = 0 if force_bootstrap else get_last_run_ts(conn)
+        existing_games, conn = load_existing_games(conn)
+        last_run_ts, conn = (0, conn) if force_bootstrap else get_last_run_ts(conn)
 
         if last_run_ts == 0:
             log.info("Bootstrap run — fetching full app list.")
@@ -558,8 +617,8 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
         if status == "ERROR":
             stats["errors"] += 1
             log.warning(f"  ERROR — {meta.get('notes', 'appdetails failed')}")
-            log_step(conn, appid, "eligibility", "ERROR", meta.get("notes", ""))
-            upsert_game(conn, {
+            conn = log_step(conn, appid, "eligibility", "ERROR", meta.get("notes", ""))
+            conn = upsert_game(conn, {
                 **base_row,
                 "eligibility_status": "ERROR",
                 "notes": meta.get("notes", ""),
@@ -569,15 +628,15 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
         if status == "SKIP_NOT_GAME":
             stats["skip_not_game"] += 1
             log.info(f"  SKIP_NOT_GAME ({meta.get('type')}) — {meta.get('name', app_name)}")
-            log_step(conn, appid, "eligibility", status, meta.get("type", ""))
-            upsert_game(conn, {**base_row, "eligibility_status": status})
+            conn = log_step(conn, appid, "eligibility", status, meta.get("type", ""))
+            conn = upsert_game(conn, {**base_row, "eligibility_status": status})
             continue
 
         if status == "SKIP_FREE":
             stats["skip_free"] += 1
             log.info(f"  SKIP_FREE — {meta.get('name', app_name)}")
-            log_step(conn, appid, "eligibility", status, "free or zero price")
-            upsert_game(conn, {**base_row, "eligibility_status": status})
+            conn = log_step(conn, appid, "eligibility", status, "free or zero price")
+            conn = upsert_game(conn, {**base_row, "eligibility_status": status})
             continue
 
         if status == "SKIP_PRE_2022":
@@ -590,9 +649,9 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
                 f"  SKIP_PRE_2022 (release={meta['release_date_str']}) "
                 f"— {meta['name']}"
             )
-            log_step(conn, appid, "eligibility", "SKIP_PRE_2022",
+            conn = log_step(conn, appid, "eligibility", "SKIP_PRE_2022",
                      meta["release_date_str"])
-            upsert_game(conn, {
+            conn = upsert_game(conn, {
                 **base_row,
                 "ea_start_date":      ea_date_str,
                 "ea_start_ts":        meta["release_ts"],
@@ -611,8 +670,8 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
                 # No histogram + no EA genre = was never in EA
                 stats["skip_not_ea"] += 1
                 log.info(f"  SKIP_NOT_EA (graduated, no histogram) — {meta['name']}")
-                log_step(conn, appid, "histogram", "SKIP_NOT_EA", "")
-                upsert_game(conn, {
+                conn = log_step(conn, appid, "histogram", "SKIP_NOT_EA", "")
+                conn = upsert_game(conn, {
                     **base_row,
                     "eligibility_status": "SKIP_NOT_EA",
                 })
@@ -622,9 +681,9 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
                 # it accumulates reviews and histogram becomes available
                 stats["skip_no_histogram"] += 1
                 log.info(f"  SKIP_NO_HISTOGRAM (active EA, no reviews yet) — {meta['name']}")
-                log_step(conn, appid, "histogram", "SKIP_NO_HISTOGRAM",
+                conn = log_step(conn, appid, "histogram", "SKIP_NO_HISTOGRAM",
                          "active EA but no histogram yet")
-                upsert_game(conn, {
+                conn = upsert_game(conn, {
                     **base_row,
                     "eligibility_status": "SKIP_NO_HISTOGRAM",
                     "notes": "no histogram yet — retry on next run",
@@ -642,8 +701,8 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
                 f"  SKIP_PRE_2022 via histogram (ea_start={ea_date_str}) "
                 f"— {meta['name']}"
             )
-            log_step(conn, appid, "temporal_filter", "SKIP_PRE_2022", ea_date_str)
-            upsert_game(conn, {
+            conn = log_step(conn, appid, "temporal_filter", "SKIP_PRE_2022", ea_date_str)
+            conn = upsert_game(conn, {
                 **base_row,
                 "ea_start_date":      ea_date_str,
                 "ea_start_ts":        ea_start_ts,
@@ -672,14 +731,14 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
             + (f" | graduated={graduation_date}" if graduation_date else "")
         )
 
-        upsert_game(conn, {
+        conn = upsert_game(conn, {
             **base_row,
             "ea_start_date":      ea_date_str,
             "ea_start_ts":        ea_start_ts,
             "graduation_date":    graduation_date,
             "eligibility_status": "ELIGIBLE",
         })
-        log_step(
+        conn = log_step(
             conn, appid, "complete", "ELIGIBLE",
             f"ea_start={ea_date_str} graduated={graduation_date}",
         )
@@ -691,12 +750,12 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
             appid = app["appid"]
             name = app.get("name", "")
             log.info(f"[{i}/{len(to_check_graduation)}] Checking graduation status for appid={appid} name={name!r}")
-            res = check_and_update_graduation(conn, appid, name)
+            res, conn = check_and_update_graduation(conn, appid, name)
             if res == "GRADUATED":
                 stats["graduated_in_delta"] += 1
 
     if not retry_errors:
-        save_run_ts(conn, run_start_ts)
+        conn = save_run_ts(conn, run_start_ts)
 
     summary = (
         f"\n── Pipeline complete ──\n"

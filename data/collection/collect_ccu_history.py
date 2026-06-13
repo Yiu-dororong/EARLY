@@ -129,7 +129,7 @@ def ensure_tables(conn: libsql.Connection) -> None:
     log.info("ccu_history and ccu_availability tables ready")
 
 
-def get_candidates(conn: libsql.Connection, delta: bool = False) -> list[dict]:
+def get_candidates(conn: libsql.Connection, delta: bool = False) -> tuple[list[dict], libsql.Connection]:
     """
     Step 1: ELIGIBLE games with ea_age >= 90 days.
     Includes active EA and graduated games.
@@ -163,9 +163,19 @@ def get_candidates(conn: libsql.Connection, delta: bool = False) -> list[dict]:
         {delta_filter}
         ORDER BY g.appid
     """
-    rows = conn.execute(query, (min_age_ts,)).fetchall()
-
-    return [{"appid": r[0], "ea_start_date": r[1], "ea_start_ts": r[2], "review_count": r[4], "review_checked_at": r[5]} for r in rows]
+    for attempt in range(1, DB_MAX_RETRIES + 1):
+        try:
+            rows = conn.execute(query, (min_age_ts,)).fetchall()
+            return [{"appid": r[0], "ea_start_date": r[1], "ea_start_ts": r[2], "review_count": r[4], "review_checked_at": r[5]} for r in rows], conn
+        except Exception as e:
+            if attempt == DB_MAX_RETRIES:
+                raise
+            log.warning("DB read error attempt %d in get_candidates: %s - reconnecting", attempt, e)
+            time.sleep(DB_RETRY_DELAY)
+            try: conn.close()
+            except Exception: pass
+            conn = get_conn()
+    return [], conn
 
 
 def get_already_collected(conn: libsql.Connection) -> tuple[set[int], libsql.Connection]:
@@ -475,7 +485,7 @@ def main() -> None:
         candidates = [{"appid": args.appid, "ea_start_date": None, "ea_start_ts": None, "review_count": None, "review_checked_at": None}]
         log.info("Single-appid mode: %d", args.appid)
     else:
-        candidates = get_candidates(conn, delta=args.delta)
+        candidates, conn = get_candidates(conn, delta=args.delta)
         log.info(
             "Step 1 — EA age gate (>= %d days): %d candidates",
             MIN_EA_AGE_DAYS, len(candidates),

@@ -106,6 +106,9 @@ load_dotenv()
 DB_URL  = os.getenv("TURSO_URL", "")
 DB_AUTH = os.getenv("TURSO_AUTH_TOKEN", "")
 
+DB_MAX_RETRIES = 3
+DB_RETRY_DELAY = 5.0
+
 DEFAULT_MODEL_VERSION = "v1.3"
 
 # Dynamically locate the project root to ensure models directory is found regardless of cwd
@@ -164,7 +167,7 @@ def ensure_live_scores_table(conn: libsql.Connection) -> None:
 def load_latest_live_snapshots(
     conn: libsql.Connection,
     appid_filter: int | None,
-) -> list[dict]:
+) -> tuple[list[dict], libsql.Connection]:
     cols = conn.execute("PRAGMA table_info(live_snapshots)").fetchall()
     col_names = [c[1] for c in cols]
 
@@ -175,51 +178,72 @@ def load_latest_live_snapshots(
         where += " AND appid = ?"
         params.append(appid_filter)
 
-    rows = conn.execute(f"""
-        SELECT {','.join(col_names)}
-        FROM live_snapshots
-        {where}
-        AND snapshot_date = (
-            SELECT MAX(snapshot_date) FROM live_snapshots ls2 WHERE ls2.appid = live_snapshots.appid
-        )
-        ORDER BY appid
-    """, params).fetchall()
+    for attempt in range(1, DB_MAX_RETRIES + 1):
+        try:
+            rows = conn.execute(f"""
+                SELECT {','.join(col_names)}
+                FROM live_snapshots
+                {where}
+                AND snapshot_date = (
+                    SELECT MAX(snapshot_date) FROM live_snapshots ls2 WHERE ls2.appid = live_snapshots.appid
+                )
+                ORDER BY appid
+            """, params).fetchall()
 
-    return [
-        dict(zip(col_names, row)) for row in rows
-    ]
+            return [dict(zip(col_names, row)) for row in rows], conn
+        except Exception as e:
+            if attempt == DB_MAX_RETRIES:
+                raise
+            log.warning("DB read error in load_latest_live_snapshots: %s - reconnecting", e)
+            time.sleep(DB_RETRY_DELAY)
+            try: conn.close()
+            except Exception: pass
+            conn = get_conn()
+    return [], conn
 
 
-def upsert_score(conn: libsql.Connection, score: dict) -> None:
-    conn.execute("""
-        INSERT OR REPLACE INTO live_scores (
-            appid, snapshot_date, primary_genre, scored_at, ea_age_days,
-            p_distressed, is_distressed, l1_state,
-            ml_eligible, model_version,
-            null_features, review_count_at_T,
-            update_health, player_retention, dev_engagement, sentiment, price_market,
-            shap_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        score["appid"],
-        score["snapshot_date"],
-        score["primary_genre"],
-        score["scored_at"],
-        score["ea_age_days"],
-        score["p_distressed"],
-        score["is_distressed"],
-        score["l1_state"],
-        score["ml_eligible"],
-        score["model_version"],
-        json.dumps(score["null_features"]),
-        score["review_count_at_T"],
-        score["update_health"],
-        score["player_retention"],
-        score["dev_engagement"],
-        score["sentiment"],
-        score["price_market"],
-        json.dumps(score["top25_shap"]) if score.get("top25_shap") else None,
-    ))
+def upsert_score(conn: libsql.Connection, score: dict) -> libsql.Connection:
+    for attempt in range(1, DB_MAX_RETRIES + 1):
+        try:
+            conn.execute("""
+                INSERT OR REPLACE INTO live_scores (
+                    appid, snapshot_date, primary_genre, scored_at, ea_age_days,
+                    p_distressed, is_distressed, l1_state,
+                    ml_eligible, model_version,
+                    null_features, review_count_at_T,
+                    update_health, player_retention, dev_engagement, sentiment, price_market,
+                    shap_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                score["appid"],
+                score["snapshot_date"],
+                score["primary_genre"],
+                score["scored_at"],
+                score["ea_age_days"],
+                score["p_distressed"],
+                score["is_distressed"],
+                score["l1_state"],
+                score["ml_eligible"],
+                score["model_version"],
+                json.dumps(score["null_features"]),
+                score["review_count_at_T"],
+                score["update_health"],
+                score["player_retention"],
+                score["dev_engagement"],
+                score["sentiment"],
+                score["price_market"],
+                json.dumps(score["top25_shap"]) if score.get("top25_shap") else None,
+            ))
+            return conn
+        except Exception as e:
+            if attempt == DB_MAX_RETRIES:
+                raise
+            log.warning("DB write error in upsert_score: %s - reconnecting", e)
+            time.sleep(DB_RETRY_DELAY)
+            try: conn.close()
+            except Exception: pass
+            conn = get_conn()
+    return conn
 
 
 # ---------------------------------------------------------------------------
@@ -583,7 +607,7 @@ def main() -> None:
         all_feature_cols = feature_cols + genre_cols
 
     # Load pre-computed snapshot candidates
-    candidates = load_latest_live_snapshots(conn, args.appid)
+    candidates, conn = load_latest_live_snapshots(conn, args.appid)
     log.info(
         "Scoring %d STAYS_ACTIVE game%s with model xgb_%s (threshold=%.4f)",
         len(candidates), "s" if len(candidates) != 1 else "",
@@ -613,7 +637,7 @@ def main() -> None:
             )
 
             if not args.dry_run:
-                upsert_score(conn, score)
+                conn = upsert_score(conn, score)
 
             n_ok += 1
             if not score["ml_eligible"]:

@@ -188,7 +188,7 @@ def parse_developers(raw: str | None) -> list[str]:
 # Candidate discovery from games_v2
 # ---------------------------------------------------------------------------
 
-def discover_candidates(conn: libsql.Connection, delta: bool = False) -> list[tuple[int, str, date, bool]]:
+def discover_candidates(conn: libsql.Connection, delta: bool = False) -> tuple[list[tuple[int, str, date, bool]], libsql.Connection]:
     """
     Return (appid, developer_norm, ea_start_date, is_free) for all pre-2022
     EA games in games_v2 that share a dev with the active snapshot corpus,
@@ -196,75 +196,85 @@ def discover_candidates(conn: libsql.Connection, delta: bool = False) -> list[tu
 
     Uses games_v2 exclusively — no external API calls.
     """
-    # Active corpus: appids that have snapshots
-    snapshotted = {
-        r[0] for r in conn.execute("SELECT DISTINCT appid FROM snapshots").fetchall()
-    }
+    for attempt in range(1, DB_MAX_RETRIES + 1):
+        try:
+            # Active corpus: appids that have snapshots
+            snapshotted = {
+                r[0] for r in conn.execute("SELECT DISTINCT appid FROM snapshots").fetchall()
+            }
 
-    delta_filter = ""
-    if delta:
-        delta_filter = f"""
-          AND g.appid IN (
-              SELECT appid FROM games_v2 
-              WHERE currently_in_ea = 1 
-                 OR (currently_in_ea = 0 AND graduation_date IS NOT NULL AND graduation_date >= date('now', '-{DELTA_GRADUATION_DAYS} days'))
-          )
-        """
+            delta_filter = ""
+            if delta:
+                delta_filter = f"""
+                  AND g.appid IN (
+                      SELECT appid FROM games_v2 
+                      WHERE currently_in_ea = 1 
+                         OR (currently_in_ea = 0 AND graduation_date IS NOT NULL AND graduation_date >= date('now', '-{DELTA_GRADUATION_DAYS} days'))
+                  )
+                """
 
-    # Active corpus dev strings
-    active_devs: set[str] = set()
-    query = f"""
-        SELECT DISTINCT g.developers
-        FROM games_v2 g
-        WHERE g.appid IN (SELECT appid FROM ccu_availability WHERE ccu_available IN ('AVAILABLE', 'UNAVAILABLE'))
-          AND g.developers IS NOT NULL
-          {delta_filter}
-    """
-    for (raw,) in conn.execute(query).fetchall():
-        for d in parse_developers(raw):
-            active_devs.add(d)
+            # Active corpus dev strings
+            active_devs: set[str] = set()
+            query = f"""
+                SELECT DISTINCT g.developers
+                FROM games_v2 g
+                WHERE g.appid IN (SELECT appid FROM ccu_availability WHERE ccu_available IN ('AVAILABLE', 'UNAVAILABLE'))
+                  AND g.developers IS NOT NULL
+                  {delta_filter}
+            """
+            for (raw,) in conn.execute(query).fetchall():
+                for d in parse_developers(raw):
+                    active_devs.add(d)
 
-    if delta:
-        existing_devs = {r[0] for r in conn.execute("SELECT DISTINCT developer_norm FROM pre2022_ea_games").fetchall() if r[0]}
-        before_count = len(active_devs)
-        active_devs = active_devs - existing_devs
-        log.info("Delta filter: ignored %d already-processed developers (%d remaining)", before_count - len(active_devs), len(active_devs))
+            if delta:
+                existing_devs = {r[0] for r in conn.execute("SELECT DISTINCT developer_norm FROM pre2022_ea_games").fetchall() if r[0]}
+                before_count = len(active_devs)
+                active_devs = active_devs - existing_devs
+                log.info("Delta filter: ignored %d already-processed developers (%d remaining)", before_count - len(active_devs), len(active_devs))
 
-    log.info("Active corpus: %d games, %d unique dev strings to process", len(snapshotted), len(active_devs))
+            log.info("Active corpus: %d games, %d unique dev strings to process", len(snapshotted), len(active_devs))
 
-    # All games in games_v2 with ea_start_date < 2022 that share a dev
-    all_rows = conn.execute("""
-        SELECT appid, developers, ea_start_date, is_free
-        FROM games_v2
-        WHERE ea_start_date IS NOT NULL
-          AND ea_start_date < '2022-01-01'
-    """).fetchall()
+            # All games in games_v2 with ea_start_date < 2022 that share a dev
+            all_rows = conn.execute("""
+                SELECT appid, developers, ea_start_date, is_free
+                FROM games_v2
+                WHERE ea_start_date IS NOT NULL
+                  AND ea_start_date < '2022-01-01'
+            """).fetchall()
 
-    candidates: list[tuple[int, str, date, bool]] = []
-    seen: set[int] = set()
+            candidates: list[tuple[int, str, date, bool]] = []
+            seen: set[int] = set()
 
-    for appid, developers, ea_start_date_str, is_free in all_rows:
-        if appid in snapshotted:
-            continue  # already handled by compute_dev_features.py
+            for appid, developers, ea_start_date_str, is_free in all_rows:
+                if appid in snapshotted:
+                    continue
 
-        ea_start = parse_date(ea_start_date_str)
-        if ea_start is None or ea_start >= PRE2022_CUTOFF:
-            continue
+                ea_start = parse_date(ea_start_date_str)
+                if ea_start is None or ea_start >= PRE2022_CUTOFF:
+                    continue
 
-        devs = parse_developers(developers)
-        matching_devs = [d for d in devs if d in active_devs]
-        if not matching_devs:
-            continue
+                devs = parse_developers(developers)
+                matching_devs = [d for d in devs if d in active_devs]
+                if not matching_devs:
+                    continue
 
-        if appid in seen:
-            continue
-        seen.add(appid)
+                if appid in seen:
+                    continue
+                seen.add(appid)
 
-        # Use first matching dev as the canonical developer_norm for this record
-        candidates.append((appid, matching_devs[0], ea_start, bool(is_free)))
+                candidates.append((appid, matching_devs[0], ea_start, bool(is_free)))
 
-    log.info("Candidates from games_v2: %d pre-2022 EA sibling games", len(candidates))
-    return candidates
+            log.info("Candidates from games_v2: %d pre-2022 EA sibling games", len(candidates))
+            return candidates, conn
+        except Exception as e:
+            if attempt == DB_MAX_RETRIES:
+                raise
+            log.warning("DB discover_candidates error attempt %d: %s - reconnecting", attempt, e)
+            time.sleep(DB_RETRY_DELAY)
+            try: conn.close()
+            except Exception: pass
+            conn = get_conn()
+    return [], conn
 
 
 # ---------------------------------------------------------------------------
@@ -454,7 +464,7 @@ def run(dry_run: bool, resume: bool, steam_sleep: float, delta: bool) -> None:
         already_collected, conn = load_already_collected(conn)
     else:
         already_collected = set()
-    candidates        = discover_candidates(conn, delta=delta)
+    candidates, conn  = discover_candidates(conn, delta=delta)
 
     if dry_run:
         log.info("Dry run — candidates found: %d. No API calls, no writes.", len(candidates))

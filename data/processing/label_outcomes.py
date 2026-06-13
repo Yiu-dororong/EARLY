@@ -254,7 +254,7 @@ def compute_outcome(
 # Data fetching helpers
 # ---------------------------------------------------------------------------
 
-def fetch_last_build_update_dates(conn, appids: list[int]) -> dict[int, str | None]:
+def fetch_last_build_update_dates(conn, appids: list[int]) -> tuple[dict[int, str | None], libsql.Connection]:
     cursor = conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='event_history'"
     )
@@ -263,7 +263,7 @@ def fetch_last_build_update_dates(conn, appids: list[int]) -> dict[int, str | No
             "event_history table not found — all last_build_update_dates will be NULL. "
             "Run collect_events.py first."
         )
-        return {appid: None for appid in appids}
+        return {appid: None for appid in appids}, conn
 
     result = {}
     chunk_size = 500
@@ -291,12 +291,15 @@ def fetch_last_build_update_dates(conn, appids: list[int]) -> dict[int, str | No
                     raise
                 log.warning("DB read error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
                 time.sleep(DB_RETRY_DELAY)
+                try: conn.close()
+                except Exception: pass
+                conn = get_conn()
     for appid in appids:
         result.setdefault(appid, None)
-    return result
+    return result, conn
 
 
-def fetch_last_dev_post_dates(conn, appids: list[int]) -> dict[int, str | None]:
+def fetch_last_dev_post_dates(conn, appids: list[int]) -> tuple[dict[int, str | None], libsql.Connection]:
     cursor = conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='event_history'"
     )
@@ -305,7 +308,7 @@ def fetch_last_dev_post_dates(conn, appids: list[int]) -> dict[int, str | None]:
             "event_history table not found — last_dev_post_dates will be NULL. "
             "EXIT_SILENT cannot be distinguished from STAYS_ACTIVE."
         )
-        return {appid: None for appid in appids}
+        return {appid: None for appid in appids}, conn
 
     result = {}
     chunk_size = 500
@@ -333,17 +336,20 @@ def fetch_last_dev_post_dates(conn, appids: list[int]) -> dict[int, str | None]:
                     raise
                 log.warning("DB read error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
                 time.sleep(DB_RETRY_DELAY)
+                try: conn.close()
+                except Exception: pass
+                conn = get_conn()
     for appid in appids:
         result.setdefault(appid, None)
-    return result
+    return result, conn
 
 
-def fetch_historical_build_gaps(conn, appids: list[int]) -> dict[int, list[int]]:
+def fetch_historical_build_gaps(conn, appids: list[int]) -> tuple[dict[int, list[int]], libsql.Connection]:
     cursor = conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='event_history'"
     )
     if not cursor.fetchone():
-        return {appid: [] for appid in appids}
+        return {appid: [] for appid in appids}, conn
 
     result: dict[int, list[int]] = {appid: [] for appid in appids}
     chunk_size = 500
@@ -385,11 +391,14 @@ def fetch_historical_build_gaps(conn, appids: list[int]) -> dict[int, list[int]]
                     raise
                 log.warning("DB read error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
                 time.sleep(DB_RETRY_DELAY)
+                try: conn.close()
+                except Exception: pass
+                conn = get_conn()
 
-    return result
+    return result, conn
 
 
-def fetch_games_v2(conn, appid_filter: int | None = None, delta: bool = False) -> list[dict]:
+def fetch_games_v2(conn, appid_filter: int | None = None, delta: bool = False) -> tuple[list[dict], libsql.Connection]:
     delta_filter = ""
     if delta:
         delta_filter = f"AND (currently_in_ea = 1 OR (currently_in_ea = 0 AND graduation_date IS NOT NULL AND graduation_date >= date('now', '-{DELTA_GRADUATION_DAYS} days')))"
@@ -430,18 +439,21 @@ def fetch_games_v2(conn, appid_filter: int | None = None, delta: bool = False) -
                 raise
             log.warning("DB fetch_games_v2 error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
             time.sleep(DB_RETRY_DELAY)
+            try: conn.close()
+            except Exception: pass
+            conn = get_conn()
 
     return [
         {"appid": r[0], "ea_start_date": r[1], "graduation_date": r[2]}
         for r in rows
-    ]
+    ], conn
 
 
 # ---------------------------------------------------------------------------
 # Write helpers
 # ---------------------------------------------------------------------------
 
-def write_outcomes_v2(conn, decisions: list[dict], dry_run: bool = False):
+def write_outcomes_v2(conn, decisions: list[dict], dry_run: bool = False) -> libsql.Connection:
     existing_cols = set()
     for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
@@ -452,6 +464,9 @@ def write_outcomes_v2(conn, decisions: list[dict], dry_run: bool = False):
                 raise
             log.warning("DB PRAGMA read error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
             time.sleep(DB_RETRY_DELAY)
+            try: conn.close()
+            except Exception: pass
+            conn = get_conn()
             
     if "abandoned_date" not in existing_cols:
         if not dry_run:
@@ -465,6 +480,9 @@ def write_outcomes_v2(conn, decisions: list[dict], dry_run: bool = False):
                         raise
                     log.warning("DB ALTER TABLE error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
                     time.sleep(DB_RETRY_DELAY)
+                    try: conn.close()
+                    except Exception: pass
+                    conn = get_conn()
             log.info("Added column games_v2.abandoned_date")
         else:
             log.info("[DRY RUN] Would add column games_v2.abandoned_date")
@@ -498,6 +516,9 @@ def write_outcomes_v2(conn, decisions: list[dict], dry_run: bool = False):
                         raise
                     log.warning("DB write batch error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
                     time.sleep(DB_RETRY_DELAY)
+                    try: conn.close()
+                    except Exception: pass
+                    conn = get_conn()
             updated += len(chunk)
         log.info("games_v2: wrote %d outcome labels", updated)
     else:
@@ -506,6 +527,7 @@ def write_outcomes_v2(conn, decisions: list[dict], dry_run: bool = False):
                 "[DRY RUN] appid=%-10s  %-17s  source=%-26s  %s",
                 d["appid"], d["outcome"], d["outcome_source"], d["reason"],
             )
+    return conn
 
 
 # ---------------------------------------------------------------------------
@@ -545,7 +567,7 @@ def main():
     # ── Normal labelling pass ─────────────────────────────────────────────
     log.info("Fetching ELIGIBLE games from games_v2...")
     try:
-        games = fetch_games_v2(conn, appid_filter=args.appid, delta=args.delta)
+        games, conn = fetch_games_v2(conn, appid_filter=args.appid, delta=args.delta)
     except Exception as e:
         log.error("Could not fetch games_v2: %s", e)
         log.error("Has pipeline_discovery.py been run yet?")
@@ -558,9 +580,9 @@ def main():
         appids = [g["appid"] for g in games]
 
         log.info("Fetching event data from event_history...")
-        last_updates = fetch_last_build_update_dates(conn, appids)
-        last_posts   = fetch_last_dev_post_dates(conn, appids)
-        build_gaps_  = fetch_historical_build_gaps(conn, appids)
+        last_updates, conn = fetch_last_build_update_dates(conn, appids)
+        last_posts, conn   = fetch_last_dev_post_dates(conn, appids)
+        build_gaps_, conn  = fetch_historical_build_gaps(conn, appids)
 
         decisions = []
         for g in games:
@@ -576,7 +598,7 @@ def main():
             decisions.append(result)
 
         print_summary(decisions)
-        write_outcomes_v2(conn, decisions, dry_run=args.dry_run)
+        conn = write_outcomes_v2(conn, decisions, dry_run=args.dry_run)
 
     log.info("Done.")
 
