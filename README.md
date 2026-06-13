@@ -6,6 +6,11 @@ Planned Structure:
 
 ```
 early/
+├──.github/workflows
+│   ├── discover.yml
+│   ├── collect.yml
+│   └── score.yml
+│  
 ├──agents/
 │   ├── __init__.py
 │   ├── orchestrator.py       
@@ -14,17 +19,17 @@ early/
 │   └── critic_agent.py      
 │ 
 ├── api/                          # FastAPI serving layer
-│   ├── main.py
 │   ├── routers/
 │   │   ├── games.py            # GET /games/{appid}, POST /games/{appid}/analyse
-│   │   └── health.py
+│   │   ├── health.py
+│   │   └── search.py
 │   ├── services/
-│   │   ├── inference.py
-│   │   ├── scorecard.py
+│   │   ├── zilliz.py
 │   │   └── agents.py           # Thin adapter: calls agents.orchestrator.run_analysis()
-│   └── utils/
-│       ├── db.py
-│       └── cache.py
+│   ├── __init__.py
+│   ├── main.py
+│   ├── db.py
+│   └── schemas.py
 │
 ├── core/                         # Core business logic (shared)
 │   ├── builders/
@@ -32,7 +37,6 @@ early/
 │   │   └── feature_builder.py 
 │   ├── inference/
 │   │   └── inference.py            
-│   └── schemas/                   # XGBoost artifacts
 │
 ├── data/                         # Data pipeline scripts
 │   ├── collection/               # All collect_*.py files
@@ -47,12 +51,12 @@ early/
 │       ├── compute_genre_price_median    
 │       └── label_outcomes.py       
 │
-├── evaluation/                   # Training & evaluation
-│   ├── train_xgboost.py
+├── training/                   # Training & evaluation
 │   ├── scorecard.py
 │   ├── scorecard_config.py
 │   ├── scorecard_evaluate.py
-│   └── outputs/
+│   ├── seed_vector_db.py
+│   └── train_xgboost.py
 │
 ├── frontend/                     # Streamlit UI
 │   └── app.py
@@ -63,6 +67,7 @@ early/
 │   └── .env.example
 │
 ├── utils/                 # Small utilities
+│   ├── langfuse_client.py
 │   └── itad_client.py
 │
 ├── models/                       # ML artifacts
