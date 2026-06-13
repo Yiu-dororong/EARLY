@@ -103,7 +103,7 @@ def _get_llm() -> ChatGroq:
     return ChatGroq(model="llama-3.3-70b-versatile", temperature=0.3, max_tokens=512, api_key=api_key)
 
 
-def _llm_call(system: str, prompt: str, span_name: str, trace: Any) -> tuple[str | None, str | None]:
+async def _llm_call(system: str, prompt: str, span_name: str, trace: Any) -> tuple[str | None, str | None]:
     """Run one LLM call with a Langfuse span. Returns (content, error)."""
     llm = _get_llm()
     try:
@@ -112,8 +112,8 @@ def _llm_call(system: str, prompt: str, span_name: str, trace: Any) -> tuple[str
         ctx = nullcontext(None)
 
     try:
-        with ctx as span:
-            response: AIMessage = llm.invoke([SystemMessage(content=system), HumanMessage(content=prompt)])
+        async with ctx as span:
+            response: AIMessage = await llm.ainvoke([SystemMessage(content=system), HumanMessage(content=prompt)])
             content = response.content.strip()
             if span and hasattr(span, "set_output"):
                 span.set_output(content)
@@ -125,8 +125,8 @@ def _llm_call(system: str, prompt: str, span_name: str, trace: Any) -> tuple[str
         return None, f"{span_name} failed: {type(e).__name__}: {e}"
 
 
-def write_consumer_verdict(state: CriticState) -> dict:
-    content, error = _llm_call(
+async def write_consumer_verdict(state: CriticState) -> dict:
+    content, error = await _llm_call(
         CONSUMER_SYSTEM,
         f"{_context(state)}\n\nWrite the consumer verdict now.",
         "critic_consumer",
@@ -135,10 +135,10 @@ def write_consumer_verdict(state: CriticState) -> dict:
     return {"consumer_verdict": content, "error": error}
 
 
-def write_developer_brief(state: CriticState) -> dict:
+async def write_developer_brief(state: CriticState) -> dict:
     if state.get("error"):
         return {}
-    content, error = _llm_call(
+    content, error = await _llm_call(
         DEVELOPER_SYSTEM,
         f"{_context(state)}\n\nWrite the developer brief now.",
         "critic_developer",
@@ -191,7 +191,7 @@ class CriticResult:
         return self.error is None and self.consumer_verdict is not None
 
 
-def run_critic_agent(
+async def run_critic_agent(
     appid: int, game_name: str, snapshot_date: str, ea_age_days: int,
     l1_state: str, l1_composite_score: float,
     update_health: float | None = None, player_retention: float | None = None,
@@ -220,7 +220,7 @@ def run_critic_agent(
         "consumer_verdict": None, "developer_brief": None,
         "confidence_note": None, "error": None,
     }
-    final = get_graph().invoke(initial)
+    final = await get_graph().ainvoke(initial)
     return CriticResult(
         appid=appid, snapshot_date=snapshot_date,
         consumer_verdict=final.get("consumer_verdict"),

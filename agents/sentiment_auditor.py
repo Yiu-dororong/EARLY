@@ -117,7 +117,7 @@ def should_skip(state: SentimentState) -> str:
     return "end" if state.get("auditor_summary") is not None else "analyse"
 
 
-def analyse_sentiment(state: SentimentState) -> dict:
+async def analyse_sentiment(state: SentimentState) -> dict:
     llm    = _get_llm()
     prompt = _build_prompt(state)
     msgs   = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)]
@@ -129,8 +129,8 @@ def analyse_sentiment(state: SentimentState) -> dict:
         ctx = nullcontext(None)
 
     try:
-        with ctx as span:
-            response: AIMessage = llm.invoke(msgs)
+        async with ctx as span:
+            response: AIMessage = await llm.ainvoke(msgs)
             raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", response.content.strip(), flags=re.MULTILINE).strip()
             parsed = json.loads(raw)
 
@@ -188,7 +188,7 @@ class SentimentResult:
         return self.error is None and self.auditor_summary is not None
 
 
-def run_sentiment_auditor(
+async def run_sentiment_auditor(
     appid: int, game_name: str, snapshot_date: str,
     review_score_at_T: float, review_score_last_90d: float | None,
     review_count_at_T: int, recent_reviews: list[dict], older_reviews: list[dict],
@@ -203,7 +203,7 @@ def run_sentiment_auditor(
         "trace": trace, "theme_clusters": None, "sentiment_shift": None,
         "key_concerns": None, "auditor_summary": None, "error": None,
     }
-    final = get_graph().invoke(initial)
+    final = await get_graph().ainvoke(initial)
     return SentimentResult(
         appid=appid, snapshot_date=snapshot_date,
         theme_clusters=final.get("theme_clusters"),

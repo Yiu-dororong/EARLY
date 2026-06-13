@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ def get_langfuse():
         _langfuse = Langfuse(
             public_key=public_key,
             secret_key=secret_key,
-            base_url=base_url,
+            host=base_url,
         )
         logger.info("Langfuse client initialised (host=%s)", base_url)
     except ImportError:

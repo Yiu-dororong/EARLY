@@ -117,7 +117,7 @@ def _get_llm() -> ChatGroq:
 # Nodes
 # ---------------------------------------------------------------------------
 
-def assess_update(state: ForensicState) -> dict:
+async def assess_update(state: ForensicState) -> dict:
     body = state.get("announcement_body_stripped", "").strip()
     wc   = state.get("word_count", 0)
 
@@ -141,8 +141,8 @@ def assess_update(state: ForensicState) -> dict:
         ctx = nullcontext(None)
 
     try:
-        with ctx as span:
-            response: AIMessage = llm.invoke(messages_in)
+        async with ctx as span:
+            response: AIMessage = await llm.ainvoke(messages_in)
             raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", response.content.strip(), flags=re.MULTILINE).strip()
             parsed = json.loads(raw)
 
@@ -218,7 +218,7 @@ class ForensicResult:
         return self.error is None and self.update_substance_score is not None
 
 
-def run_forensic_agent(
+async def run_forensic_agent(
     appid: int, game_name: str, snapshot_date: str, event_type: int,
     announcement_title: str, announcement_body_stripped: str, word_count: int,
     ea_age_days: int, days_since_last_build_update: int, trace: Any | None = None,
@@ -233,7 +233,7 @@ def run_forensic_agent(
         "trace": trace, "update_substance_score": None,
         "fake_heartbeat_flag": None, "reasoning": None, "error": None,
     }
-    final = get_graph().invoke(initial)
+    final = await get_graph().ainvoke(initial)
     return ForensicResult(
         appid=appid, snapshot_date=snapshot_date,
         update_substance_score=final.get("update_substance_score"),

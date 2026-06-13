@@ -122,7 +122,7 @@ class AnalysisResult:
         return True
 
 
-def run_analysis(ctx: GameContext) -> AnalysisResult:
+async def run_analysis(ctx: GameContext) -> AnalysisResult:
     snap_date_str = ctx.snapshot_date.isoformat()
 
     result = AnalysisResult(
