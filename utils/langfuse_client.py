@@ -35,7 +35,7 @@ def get_langfuse():
 
     public_key  = os.getenv("LANGFUSE_PUBLIC_KEY")
     secret_key  = os.getenv("LANGFUSE_SECRET_KEY")
-    host        = os.getenv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com")
+    base_url    = os.getenv("LANGFUSE_BASE_URL", "https://us.cloud.langfuse.com")
 
     if not public_key or not secret_key:
         logger.warning("Langfuse env vars not set — tracing disabled")
@@ -47,9 +47,9 @@ def get_langfuse():
         _langfuse = Langfuse(
             public_key=public_key,
             secret_key=secret_key,
-            host=host,
+            base_url=base_url,
         )
-        logger.info("Langfuse client initialised (host=%s)", host)
+        logger.info("Langfuse client initialised (host=%s)", base_url)
     except ImportError:
         logger.warning("langfuse package not installed — tracing disabled")
         _langfuse = _NoOpLangfuse()
