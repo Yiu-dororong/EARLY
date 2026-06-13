@@ -175,15 +175,18 @@ class ForensicOutput(BaseModel):
     ran:                    bool
     update_substance_score: float | None
     fake_heartbeat_flag:    int | None
+    momentum:               str | None   # NEW
+    event_state_mismatch:   int | None   # NEW
     reasoning:              str | None
 
 
 class AuditorOutput(BaseModel):
-    ran:             bool
-    sentiment_shift: str | None
-    key_concerns:    list[str] | None
-    theme_clusters:  list[dict] | None
-    summary:         str | None
+    ran:                  bool
+    sentiment_shift:      str | None
+    sentiment_alignment:  str | None   # NEW
+    key_concerns:         list[str] | None
+    theme_clusters:       list[dict] | None
+    summary:              str | None
 
     @field_validator("key_concerns", mode="before")
     @classmethod
@@ -224,6 +227,7 @@ class AgentAnalysisResponse(BaseModel):
     analysed_at:     int | None         # Unix ts, None if never analysed
     trigger_reason:  str | None
     status:          str                # "ready" | "pending" | "not_eligible" | "never_run" | "error"
+    signal_alignment: str | None   # NEW — top-level triangulation verdict
     forensic:        ForensicOutput | None
     auditor:         AuditorOutput | None
     critic:          CriticOutput | None
