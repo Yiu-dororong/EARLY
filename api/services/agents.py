@@ -185,15 +185,16 @@ def _persist_result(
     db.execute("""
         INSERT OR REPLACE INTO agent_analysis (
             appid, snapshot_date, analysed_at, trigger_reason, l1_state_at_analysis,
-            forensic_ran, update_substance_score, fake_heartbeat_flag, forensic_reasoning,
-            auditor_ran, sentiment_shift, key_concerns, theme_clusters, auditor_summary,
-            critic_ran, consumer_verdict, developer_brief, confidence_note,
+            forensic_ran, update_substance_score, fake_heartbeat_flag, momentum, event_state_mismatch, forensic_reasoning,
+            auditor_ran, sentiment_shift, sentiment_alignment, key_concerns, theme_clusters, auditor_summary,
+            signal_alignment, critic_ran, consumer_verdict, developer_brief, confidence_note,
             error
         ) VALUES (
             ?, ?, ?, ?, ?,
-            ?, ?, ?, ?,
             ?, ?, ?, ?, ?,
             ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
             ?
         )
     """, (
@@ -206,14 +207,18 @@ def _persist_result(
         int(result.forensic_ran),
         forensic.update_substance_score if forensic else None,
         forensic.fake_heartbeat_flag if forensic else None,
+        forensic.momentum if forensic else None,
+        forensic.event_state_mismatch if forensic else None,
         forensic.reasoning if forensic else None,
         # Auditor
         int(result.auditor_ran),
         auditor.sentiment_shift if auditor else None,
+        auditor.sentiment_alignment if auditor else None,
         json.dumps(auditor.key_concerns) if auditor and auditor.key_concerns else None,
         json.dumps(auditor.theme_clusters) if auditor and auditor.theme_clusters else None,
         auditor.auditor_summary if auditor else None,
         # Critic
+        result.signal_alignment,
         int(result.critic_ran),
         critic.consumer_verdict if critic else None,
         critic.developer_brief if critic else None,

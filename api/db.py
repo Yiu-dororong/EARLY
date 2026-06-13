@@ -117,16 +117,20 @@ CREATE TABLE IF NOT EXISTS agent_analysis (
     forensic_ran            INTEGER NOT NULL DEFAULT 0,
     update_substance_score  REAL,
     fake_heartbeat_flag     INTEGER,
+    momentum                TEXT,
+    event_state_mismatch    INTEGER,
     forensic_reasoning      TEXT,
 
     -- Sentiment Auditor
     auditor_ran             INTEGER NOT NULL DEFAULT 0,
     sentiment_shift         TEXT,
+    sentiment_alignment     TEXT,
     key_concerns            TEXT,               -- JSON array of strings
     theme_clusters          TEXT,               -- JSON array of cluster dicts
     auditor_summary         TEXT,
 
     -- Critic Agent
+    signal_alignment        TEXT,
     critic_ran              INTEGER NOT NULL DEFAULT 0,
     consumer_verdict        TEXT,
     developer_brief         TEXT,
