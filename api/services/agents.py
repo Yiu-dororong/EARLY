@@ -29,7 +29,7 @@ import libsql
 
 from agents.orchestrator import (
     AnalysisResult,
-    BuildEvent,
+    AnnouncementEvent,
     GameContext,
     ScorecardResult,
     XGBoostResult,
@@ -129,7 +129,7 @@ def _fetch_game_meta(db: libsql.Connection, appid: int) -> dict:
     return {"name": row[0] if row else None, "ea_start_date": row[1] if row else None}
 
 
-def _fetch_build_events(db: libsql.Connection, appid: int) -> list[BuildEvent]:
+def _fetch_build_events(db: libsql.Connection, appid: int) -> list[AnnouncementEvent]:
     """Fetch build update events (type 12/13/14) sorted most recent first."""
     rows = db.execute("""
         SELECT event_type, event_name, announcement_body, word_count, event_ts
@@ -144,10 +144,10 @@ def _fetch_build_events(db: libsql.Connection, appid: int) -> list[BuildEvent]:
     for r in rows:
         try:
             posted = datetime.fromtimestamp(r[4], tz=timezone.utc).date()
-            events.append(BuildEvent(
+            events.append(AnnouncementEvent(
                 event_type=r[0],
-                announcement_title=r[1] or "",
-                announcement_body_stripped=strip_bbcode(r[2] or ""),
+                title=r[1] or "",
+                body_stripped=strip_bbcode(r[2] or ""),
                 word_count=r[3] or 0,
                 posted_at=posted,
             ))

@@ -19,7 +19,7 @@ from agents.orchestrator import (
     GameContext,
     ScorecardResult,
     XGBoostResult,
-    BuildEvent,
+    AnnouncementEvent,
     AnalysisResult,
     should_run_phase2,
 )
@@ -29,7 +29,7 @@ __all__ = [
     "GameContext",
     "ScorecardResult",
     "XGBoostResult",
-    "BuildEvent",
+    "AnnouncementEvent",
     "AnalysisResult",
     "should_run_phase2",
 ]
