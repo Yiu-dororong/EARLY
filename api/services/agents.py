@@ -18,6 +18,7 @@ Staleness policy:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -290,7 +291,7 @@ def trigger_analysis(db: libsql.Connection, appid: int, force: bool = False) -> 
             review_count_at_T=score.get("review_count_at_T") or 0,
         )
 
-        result = run_analysis(ctx)
+        result = asyncio.run(run_analysis(ctx))
         _persist_result(db, appid, result, trigger_reason, l1_state, snap_date)
 
         logger.info(
