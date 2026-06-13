@@ -79,17 +79,35 @@ def create_trace(
     """Create a top-level trace. Returns trace object (real or no-op)."""
     lf = get_langfuse()
     try:
-        return lf.trace(
+        t = lf.trace(
             name=name,
             user_id=str(appid),
             session_id=session_id,
             metadata=metadata or {},
             tags=[f"appid:{appid}"],
         )
+        return _SafeTraceWrapper(t)
     except Exception as e:
         logger.debug("Langfuse trace creation failed: %s", e)
         return _NoOpTrace()
 
+
+class _SafeTraceWrapper:
+    """Wraps a Langfuse trace to prevent LangGraph deepcopy from crashing on thread locks."""
+    def __init__(self, trace):
+        self._trace = trace
+        
+    def __deepcopy__(self, memo):
+        return self
+        
+    def generation(self, **kwargs):
+        return self._trace.generation(**kwargs)
+        
+    def span(self, **kwargs):
+        return self._trace.span(**kwargs)
+        
+    def update(self, **kwargs):
+        return self._trace.update(**kwargs)
 
 # ---------------------------------------------------------------------------
 # Generation span context manager
@@ -209,6 +227,7 @@ class _NoOpLangfuse:
 
 
 class _NoOpTrace:
+    def __deepcopy__(self, memo):     return self
     def generation(self, **kwargs):   return _NoOpSpan()
     def span(self, **kwargs):         return _NoOpSpan()
     def update(self, **kwargs):       pass
