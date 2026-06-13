@@ -43,6 +43,10 @@ def get_langfuse():
         return _langfuse
 
     try:
+        # Disable OpenTelemetry auto-configuration to force the use of the native TaskQueue.
+        # OTEL context propagation drops un-ended root spans when crossing asyncio/thread boundaries.
+        os.environ["LANGFUSE_AUTO_CONFIGURE_OPENTELEMETRY"] = "false"
+
         from langfuse import Langfuse
         _langfuse = Langfuse(
             public_key=public_key,
