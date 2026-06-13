@@ -7,6 +7,10 @@ Creates a top-level Langfuse trace per run_analysis() call and passes
 it down to each agent as a nested span.
 
 Trigger condition: l1_state in ("Watch", "At Risk")
+
+Forensic input: last 3 announcements (any event type) within 60 days —
+see agents/forensic_agent.py module docstring for rationale.
+Auditor receives l1_state for sentiment_alignment triangulation.
 """
 
 from __future__ import annotations
@@ -16,13 +20,17 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
-from agents.forensic_agent import ForensicResult, run_forensic_agent
+from agents.forensic_agent import (
+    AnnouncementInput,
+    ForensicResult,
+    LOOKBACK_DAYS,
+    MAX_EVENTS_CONSIDERED,
+    run_forensic_agent,
+)
 from agents.sentiment_auditor import SentimentResult, run_sentiment_auditor
 from agents.critic_agent import CriticResult, run_critic_agent
 
 logger = logging.getLogger(__name__)
-
-FORENSIC_LOOKBACK_DAYS = 30
 
 
 @dataclass
@@ -44,10 +52,11 @@ class XGBoostResult:
 
 
 @dataclass
-class BuildEvent:
+class AnnouncementEvent:
+    """Raw announcement from event_history — any event type."""
     event_type: int
-    announcement_title: str
-    announcement_body_stripped: str
+    title: str
+    body_stripped: str
     word_count: int
     posted_at: date
 
@@ -60,7 +69,8 @@ class GameContext:
     ea_age_days: int
     scorecard: ScorecardResult
     xgboost: XGBoostResult
-    recent_build_events: list[BuildEvent] = field(default_factory=list)
+    recent_announcements: list[AnnouncementEvent] = field(default_factory=list)
+    days_since_last_build_update: int = 9999
     recent_reviews: list[dict] = field(default_factory=list)
     older_reviews: list[dict] = field(default_factory=list)
     review_score_at_T: float = 0.0
@@ -73,12 +83,28 @@ def should_run_phase2(scorecard: ScorecardResult) -> bool:
     return scorecard.l1_state in ("Watch", "At Risk")
 
 
-def _find_recent_build_event(events: list[BuildEvent], snapshot_date: date) -> BuildEvent | None:
-    cutoff = snapshot_date - timedelta(days=FORENSIC_LOOKBACK_DAYS)
-    for event in events:
-        if event.event_type in (12, 13) and event.posted_at >= cutoff:
-            return event
-    return None
+def _select_announcements(
+    events: list[AnnouncementEvent],
+    snapshot_date: date,
+) -> list[AnnouncementInput]:
+    """
+    Select up to MAX_EVENTS_CONSIDERED announcements (any event type),
+    within LOOKBACK_DAYS of snapshot_date, most recent first.
+    """
+    cutoff = snapshot_date - timedelta(days=LOOKBACK_DAYS)
+    in_window = [e for e in events if e.posted_at >= cutoff]
+    in_window.sort(key=lambda e: e.posted_at, reverse=True)
+
+    selected = []
+    for e in in_window[:MAX_EVENTS_CONSIDERED]:
+        selected.append(AnnouncementInput(
+            event_type=e.event_type,
+            title=e.title,
+            body_stripped=e.body_stripped,
+            word_count=e.word_count,
+            days_ago=(snapshot_date - e.posted_at).days,
+        ))
+    return selected
 
 
 @dataclass
@@ -100,6 +126,12 @@ class AnalysisResult:
     def fake_heartbeat_flag(self) -> int | None:
         return self.forensic.fake_heartbeat_flag if self.forensic else None
     @property
+    def event_state_mismatch(self) -> int | None:
+        return self.forensic.event_state_mismatch if self.forensic else None
+    @property
+    def signal_alignment(self) -> str | None:
+        return self.critic.signal_alignment if self.critic else None
+    @property
     def consumer_verdict(self) -> str | None:
         return self.critic.consumer_verdict if self.critic else None
     @property
@@ -112,6 +144,9 @@ class AnalysisResult:
     def sentiment_shift(self) -> str | None:
         return self.auditor.sentiment_shift if self.auditor else None
     @property
+    def sentiment_alignment(self) -> str | None:
+        return self.auditor.sentiment_alignment if self.auditor else None
+    @property
     def key_concerns(self) -> list[str] | None:
         return self.auditor.key_concerns if self.auditor else None
     @property
@@ -122,7 +157,7 @@ class AnalysisResult:
         return True
 
 
-async def run_analysis(ctx: GameContext) -> AnalysisResult:
+def run_analysis(ctx: GameContext) -> AnalysisResult:
     snap_date_str = ctx.snapshot_date.isoformat()
 
     result = AnalysisResult(
@@ -139,7 +174,7 @@ async def run_analysis(ctx: GameContext) -> AnalysisResult:
     # --- Top-level Langfuse trace ---
     trace = None
     try:
-        from utils.langfuse_client import create_trace, flush
+        from utils.langfuse_client import create_trace
         trace = create_trace(
             name="phase2_analysis",
             appid=ctx.appid,
@@ -155,18 +190,18 @@ async def run_analysis(ctx: GameContext) -> AnalysisResult:
         logger.debug("Langfuse trace init failed: %s", e)
 
     # --- Forensic Agent ---
-    recent_build = _find_recent_build_event(ctx.recent_build_events, ctx.snapshot_date)
-    if recent_build:
-        logger.info("Forensic Agent: running for appid=%d", ctx.appid)
+    announcements = _select_announcements(ctx.recent_announcements, ctx.snapshot_date)
+    if announcements:
+        logger.info(
+            "Forensic Agent: running for appid=%d (%d announcements in last %dd)",
+            ctx.appid, len(announcements), LOOKBACK_DAYS,
+        )
         try:
-            forensic = await run_forensic_agent(
+            forensic = run_forensic_agent(
                 appid=ctx.appid, game_name=ctx.game_name, snapshot_date=snap_date_str,
-                event_type=recent_build.event_type,
-                announcement_title=recent_build.announcement_title,
-                announcement_body_stripped=recent_build.announcement_body_stripped,
-                word_count=recent_build.word_count,
                 ea_age_days=ctx.ea_age_days,
-                days_since_last_build_update=(ctx.snapshot_date - recent_build.posted_at).days,
+                days_since_last_build_update=ctx.days_since_last_build_update,
+                announcements=announcements,
                 trace=trace,
             )
             result.forensic = forensic
@@ -176,18 +211,19 @@ async def run_analysis(ctx: GameContext) -> AnalysisResult:
         except Exception as e:
             logger.error("Forensic exception appid=%d: %s", ctx.appid, e)
     else:
-        logger.info("Forensic skipped appid=%d (no build update in last %dd)", ctx.appid, FORENSIC_LOOKBACK_DAYS)
+        logger.info("Forensic skipped appid=%d (no announcements in last %dd)", ctx.appid, LOOKBACK_DAYS)
 
     # --- Sentiment Auditor ---
     if ctx.xgboost.ml_eligible:
         logger.info("Sentiment Auditor: running for appid=%d", ctx.appid)
         try:
-            auditor = await run_sentiment_auditor(
+            auditor = run_sentiment_auditor(
                 appid=ctx.appid, game_name=ctx.game_name, snapshot_date=snap_date_str,
                 review_score_at_T=ctx.review_score_at_T,
                 review_score_last_90d=ctx.review_score_last_90d,
                 review_count_at_T=ctx.review_count_at_T,
                 recent_reviews=ctx.recent_reviews, older_reviews=ctx.older_reviews,
+                l1_state=ctx.scorecard.l1_state,
                 trace=trace,
             )
             result.auditor = auditor
@@ -204,7 +240,7 @@ async def run_analysis(ctx: GameContext) -> AnalysisResult:
     try:
         forensic_res = result.forensic
         auditor_res  = result.auditor
-        critic = await run_critic_agent(
+        critic = run_critic_agent(
             appid=ctx.appid, game_name=ctx.game_name, snapshot_date=snap_date_str,
             ea_age_days=ctx.ea_age_days, l1_state=ctx.scorecard.l1_state,
             l1_composite_score=ctx.scorecard.composite_score,
@@ -215,10 +251,13 @@ async def run_analysis(ctx: GameContext) -> AnalysisResult:
             forensic_ran=result.forensic_ran and not (forensic_res and forensic_res.error),
             update_substance_score=forensic_res.update_substance_score if forensic_res else None,
             fake_heartbeat_flag=forensic_res.fake_heartbeat_flag if forensic_res else None,
+            momentum=forensic_res.momentum if forensic_res else None,
+            event_state_mismatch=forensic_res.event_state_mismatch if forensic_res else None,
             forensic_reasoning=forensic_res.reasoning if forensic_res else None,
             auditor_ran=result.auditor_ran and not (auditor_res and auditor_res.error),
             theme_clusters=auditor_res.theme_clusters if auditor_res else None,
             sentiment_shift=auditor_res.sentiment_shift if auditor_res else None,
+            sentiment_alignment=auditor_res.sentiment_alignment if auditor_res else None,
             key_concerns=auditor_res.key_concerns if auditor_res else None,
             auditor_summary=auditor_res.auditor_summary if auditor_res else None,
             trace=trace,

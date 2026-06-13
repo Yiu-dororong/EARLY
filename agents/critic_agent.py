@@ -2,8 +2,23 @@
 agents/critic_agent.py
 EARLY — Critic Agent (Phase 2, Layer 2)
 
-Synthesizes all signals into consumer_verdict and developer_brief.
-Two LLM calls, each traced as a separate Langfuse generation span.
+Synthesizes ML + Forensic + Auditor signals into:
+  - signal_alignment   ("aligned" | "conflicted" | "partial")
+  - consumer_verdict
+  - developer_brief
+  - confidence_note
+
+signal_alignment is computed deterministically (not by the LLM) from the
+three independent signals, BEFORE either verdict is written. Both verdicts
+are then told the alignment verdict explicitly, so they communicate it
+consistently rather than each agent guessing independently.
+
+Triangulation logic (signal_alignment):
+  - If forensic.event_state_mismatch == 1            → "conflicted"
+  - If auditor.sentiment_alignment == "conflicted"    → "conflicted"
+  - If forensic and auditor both ran and both report
+    no conflict                                       → "aligned"
+  - If forensic or auditor did not run                → "partial"
 
 Model: Groq llama-3.3-70b-versatile
 """
@@ -19,7 +34,6 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
-from utils.langfuse_client import generation_span
 
 
 class CriticState(TypedDict):
@@ -38,15 +52,23 @@ class CriticState(TypedDict):
     p_distressed: float | None
     is_distressed: int | None
     ml_eligible: bool
+    # Forensic
     forensic_ran: bool
     update_substance_score: float | None
     fake_heartbeat_flag: int | None
+    momentum: str | None
+    event_state_mismatch: int | None
     forensic_reasoning: str | None
+    # Auditor
     auditor_ran: bool
     theme_clusters: list[dict] | None
     sentiment_shift: str | None
+    sentiment_alignment: str | None
     key_concerns: list[str] | None
     auditor_summary: str | None
+    # Triangulation output
+    signal_alignment: str | None
+    # Verdicts
     trace: Any | None
     consumer_verdict: str | None
     developer_brief: str | None
@@ -55,24 +77,81 @@ class CriticState(TypedDict):
 
 
 CONSUMER_SYSTEM = """You are writing a risk assessment for a Steam player considering
-buying or continuing to play an Early Access game. Direct, honest, non-alarmist.
-2–4 sentences max. Lead with the most actionable signal. Do NOT mention model scores,
-numbers, or EARLY's internal metrics. Translate signals into plain language."""
+buying or continuing to play an Early Access game.
+
+You will be told a "signal alignment" verdict:
+  - "aligned"    — all available signals point the same direction. Be confident.
+  - "conflicted" — signals disagree (e.g. the activity metric looks fine but
+                   players report stalled development, or vice versa). Lead
+                   with this conflict — it's the most important thing the
+                   player needs to know, more important than any single score.
+  - "partial"    — some signals weren't available. Be appropriately tentative.
+
+Direct, honest, non-alarmist. 2-4 sentences max. Do NOT mention model scores,
+numbers, internal metric names, or the words "signal alignment"/"triangulation"
+themselves — translate into plain language a player would say to a friend."""
 
 DEVELOPER_SYSTEM = """You are writing a brief for the developer of an Early Access game.
-Respectful, specific, action-oriented. 3–5 sentences. Identify the 1–2 most important
-signals. Integrate player concerns from the Sentiment Auditor if present. End with one
-concrete actionable direction. Do NOT mention model names or ML scores."""
+
+You will be told a "signal alignment" verdict:
+  - "aligned"    — activity metrics and player sentiment agree. Confirm and move on.
+  - "conflicted" — activity metrics and player sentiment DISAGREE. This is the
+                   most actionable insight in the brief — name the specific
+                   discrepancy (e.g. "your update cadence looks active to the
+                   metric, but players report not seeing real changes" or the
+                   reverse) and suggest what might explain the gap.
+  - "partial"    — some signals unavailable, note what's missing.
+
+Respectful, specific, action-oriented. 3-5 sentences. End with one concrete
+actionable direction. Do NOT mention model names, ML scores, or say "signal
+alignment" — describe the actual discrepancy in plain terms."""
 
 
 def _fmt(v: float | None) -> str:
     return f"{v:.3f}" if v is not None else "N/A"
 
 
+# ---------------------------------------------------------------------------
+# Deterministic triangulation
+# ---------------------------------------------------------------------------
+
+def compute_signal_alignment(state: CriticState) -> str:
+    """
+    Decide signal_alignment BEFORE either verdict is written, from the
+    structured (non-LLM-prose) outputs of Forensic and Auditor.
+    """
+    forensic_ran = state.get("forensic_ran", False)
+    auditor_ran  = state.get("auditor_ran", False)
+
+    if not forensic_ran and not auditor_ran:
+        return "partial"
+
+    conflicts = []
+    if forensic_ran and state.get("event_state_mismatch") == 1:
+        conflicts.append("forensic")
+    if auditor_ran and state.get("sentiment_alignment") == "conflicted":
+        conflicts.append("auditor")
+
+    if conflicts:
+        return "conflicted"
+
+    if forensic_ran and auditor_ran:
+        return "aligned"
+
+    # Only one of the two ran, and it reported no conflict
+    return "partial"
+
+
+# ---------------------------------------------------------------------------
+# Context builder
+# ---------------------------------------------------------------------------
+
 def _context(state: CriticState) -> str:
     parts = [
         f"Game: {state['game_name']} (appid {state['appid']})",
         f"Snapshot: {state['snapshot_date']} | EA age: {state['ea_age_days']} days",
+        "",
+        f"SIGNAL ALIGNMENT: {state.get('signal_alignment', 'partial')}",
         "",
         f"Scorecard: {state['l1_state']} (composite {state['l1_composite_score']:.3f})",
         f"  Update Health: {_fmt(state.get('update_health'))}  Player Retention: {_fmt(state.get('player_retention'))}",
@@ -80,16 +159,39 @@ def _context(state: CriticState) -> str:
         "",
         f"ML: {'eligible' if state['ml_eligible'] else 'not eligible'}  P(distressed): {_fmt(state.get('p_distressed'))}",
     ]
+
     if state.get("forensic_ran"):
-        parts += ["", f"Forensic: substance={state.get('update_substance_score')}/10  fake_heartbeat={state.get('fake_heartbeat_flag')}",
-                  f"  {state.get('forensic_reasoning', '')}"]
+        mismatch = state.get("event_state_mismatch")
+        parts += [
+            "",
+            f"Forensic: substance={state.get('update_substance_score')}/10  "
+            f"fake_heartbeat={state.get('fake_heartbeat_flag')}  "
+            f"momentum={state.get('momentum')}  "
+            f"event_content_mismatch={mismatch}",
+            f"  {state.get('forensic_reasoning', '')}",
+        ]
+        if mismatch == 1:
+            parts.append(
+                "  >> NOTE: announcement type implies a build update, but content "
+                "does not support it — activity signal may be misleading."
+            )
     else:
-        parts += ["", "Forensic: did not run — no build update in last 30 days"]
+        parts += ["", "Forensic: did not run — no announcements in last 60 days"]
 
     if state.get("auditor_ran"):
-        parts += ["", f"Sentiment shift: {state.get('sentiment_shift')}",
-                  f"Key concerns: {'; '.join(state.get('key_concerns') or []) or 'none'}",
-                  f"Summary: {state.get('auditor_summary', '')}"]
+        alignment = state.get("sentiment_alignment")
+        parts += [
+            "",
+            f"Sentiment shift: {state.get('sentiment_shift')}  "
+            f"alignment_with_l1_state={alignment}",
+            f"Key concerns: {'; '.join(state.get('key_concerns') or []) or 'none'}",
+            f"Summary: {state.get('auditor_summary', '')}",
+        ]
+        if alignment == "conflicted":
+            parts.append(
+                f"  >> NOTE: player sentiment CONFLICTS with l1_state={state['l1_state']} "
+                f"— see summary above for the specific discrepancy."
+            )
     else:
         parts += ["", "Sentiment Auditor: did not run"]
 
@@ -103,17 +205,17 @@ def _get_llm() -> ChatGroq:
     return ChatGroq(model="llama-3.3-70b-versatile", temperature=0.3, max_tokens=512, api_key=api_key)
 
 
-async def _llm_call(system: str, prompt: str, span_name: str, trace: Any) -> tuple[str | None, str | None]:
-    """Run one LLM call with a Langfuse span. Returns (content, error)."""
+def _llm_call(system: str, prompt: str, span_name: str, trace: Any) -> tuple[str | None, str | None]:
     llm = _get_llm()
     try:
+        from utils.langfuse_client import generation_span
         ctx = generation_span(trace, name=span_name, model="llama-3.3-70b-versatile", input_data=prompt)
     except Exception:
         ctx = nullcontext(None)
 
     try:
-        async with ctx as span:
-            response: AIMessage = await llm.ainvoke([SystemMessage(content=system), HumanMessage(content=prompt)])
+        with ctx as span:
+            response: AIMessage = llm.invoke([SystemMessage(content=system), HumanMessage(content=prompt)])
             content = response.content.strip()
             if span and hasattr(span, "set_output"):
                 span.set_output(content)
@@ -125,8 +227,16 @@ async def _llm_call(system: str, prompt: str, span_name: str, trace: Any) -> tup
         return None, f"{span_name} failed: {type(e).__name__}: {e}"
 
 
-async def write_consumer_verdict(state: CriticState) -> dict:
-    content, error = await _llm_call(
+# ---------------------------------------------------------------------------
+# Nodes
+# ---------------------------------------------------------------------------
+
+def determine_alignment(state: CriticState) -> dict:
+    return {"signal_alignment": compute_signal_alignment(state)}
+
+
+def write_consumer_verdict(state: CriticState) -> dict:
+    content, error = _llm_call(
         CONSUMER_SYSTEM,
         f"{_context(state)}\n\nWrite the consumer verdict now.",
         "critic_consumer",
@@ -135,10 +245,10 @@ async def write_consumer_verdict(state: CriticState) -> dict:
     return {"consumer_verdict": content, "error": error}
 
 
-async def write_developer_brief(state: CriticState) -> dict:
+def write_developer_brief(state: CriticState) -> dict:
     if state.get("error"):
         return {}
-    content, error = await _llm_call(
+    content, error = _llm_call(
         DEVELOPER_SYSTEM,
         f"{_context(state)}\n\nWrite the developer brief now.",
         "critic_developer",
@@ -152,18 +262,22 @@ def add_confidence_note(state: CriticState) -> dict:
     if not state.get("ml_eligible"):
         notes.append("Score based on rule-based scorecard only — fewer than 50 reviews.")
     if not state.get("forensic_ran"):
-        notes.append("No build update in last 30 days at snapshot time.")
+        notes.append("No announcements in last 60 days at snapshot time.")
     if state.get("fake_heartbeat_flag") == 1:
         notes.append("Most recent update flagged as minimal content.")
+    if state.get("signal_alignment") == "conflicted":
+        notes.append("Independent signals disagree — see verdict for details.")
     return {"confidence_note": " | ".join(notes) if notes else None}
 
 
 def _build_graph() -> StateGraph:
     g = StateGraph(CriticState)
+    g.add_node("determine_alignment", determine_alignment)
     g.add_node("write_consumer_verdict", write_consumer_verdict)
     g.add_node("write_developer_brief", write_developer_brief)
     g.add_node("add_confidence_note", add_confidence_note)
-    g.set_entry_point("write_consumer_verdict")
+    g.set_entry_point("determine_alignment")
+    g.add_edge("determine_alignment", "write_consumer_verdict")
     g.add_edge("write_consumer_verdict", "write_developer_brief")
     g.add_edge("write_developer_brief", "add_confidence_note")
     g.add_edge("add_confidence_note", END)
@@ -181,6 +295,7 @@ def get_graph():
 class CriticResult:
     appid: int
     snapshot_date: str
+    signal_alignment: str | None
     consumer_verdict: str | None
     developer_brief: str | None
     confidence_note: str | None
@@ -191,7 +306,7 @@ class CriticResult:
         return self.error is None and self.consumer_verdict is not None
 
 
-async def run_critic_agent(
+def run_critic_agent(
     appid: int, game_name: str, snapshot_date: str, ea_age_days: int,
     l1_state: str, l1_composite_score: float,
     update_health: float | None = None, player_retention: float | None = None,
@@ -199,9 +314,11 @@ async def run_critic_agent(
     price_market: float | None = None, p_distressed: float | None = None,
     is_distressed: int | None = None, ml_eligible: bool = False,
     forensic_ran: bool = False, update_substance_score: float | None = None,
-    fake_heartbeat_flag: int | None = None, forensic_reasoning: str | None = None,
+    fake_heartbeat_flag: int | None = None, momentum: str | None = None,
+    event_state_mismatch: int | None = None, forensic_reasoning: str | None = None,
     auditor_ran: bool = False, theme_clusters: list[dict] | None = None,
-    sentiment_shift: str | None = None, key_concerns: list[str] | None = None,
+    sentiment_shift: str | None = None, sentiment_alignment: str | None = None,
+    key_concerns: list[str] | None = None,
     auditor_summary: str | None = None, trace: Any | None = None,
 ) -> CriticResult:
     initial: CriticState = {
@@ -213,16 +330,20 @@ async def run_critic_agent(
         "price_market": price_market, "p_distressed": p_distressed,
         "is_distressed": is_distressed, "ml_eligible": ml_eligible,
         "forensic_ran": forensic_ran, "update_substance_score": update_substance_score,
-        "fake_heartbeat_flag": fake_heartbeat_flag, "forensic_reasoning": forensic_reasoning,
+        "fake_heartbeat_flag": fake_heartbeat_flag, "momentum": momentum,
+        "event_state_mismatch": event_state_mismatch, "forensic_reasoning": forensic_reasoning,
         "auditor_ran": auditor_ran, "theme_clusters": theme_clusters,
-        "sentiment_shift": sentiment_shift, "key_concerns": key_concerns,
+        "sentiment_shift": sentiment_shift, "sentiment_alignment": sentiment_alignment,
+        "key_concerns": key_concerns,
         "auditor_summary": auditor_summary, "trace": trace,
+        "signal_alignment": None,
         "consumer_verdict": None, "developer_brief": None,
         "confidence_note": None, "error": None,
     }
-    final = await get_graph().ainvoke(initial)
+    final = get_graph().invoke(initial)
     return CriticResult(
         appid=appid, snapshot_date=snapshot_date,
+        signal_alignment=final.get("signal_alignment"),
         consumer_verdict=final.get("consumer_verdict"),
         developer_brief=final.get("developer_brief"),
         confidence_note=final.get("confidence_note"),
