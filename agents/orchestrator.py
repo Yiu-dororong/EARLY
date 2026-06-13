@@ -159,7 +159,7 @@ async def run_analysis(ctx: GameContext) -> AnalysisResult:
     if recent_build:
         logger.info("Forensic Agent: running for appid=%d", ctx.appid)
         try:
-            forensic = run_forensic_agent(
+            forensic = await run_forensic_agent(
                 appid=ctx.appid, game_name=ctx.game_name, snapshot_date=snap_date_str,
                 event_type=recent_build.event_type,
                 announcement_title=recent_build.announcement_title,
@@ -182,7 +182,7 @@ async def run_analysis(ctx: GameContext) -> AnalysisResult:
     if ctx.xgboost.ml_eligible:
         logger.info("Sentiment Auditor: running for appid=%d", ctx.appid)
         try:
-            auditor = run_sentiment_auditor(
+            auditor = await run_sentiment_auditor(
                 appid=ctx.appid, game_name=ctx.game_name, snapshot_date=snap_date_str,
                 review_score_at_T=ctx.review_score_at_T,
                 review_score_last_90d=ctx.review_score_last_90d,
@@ -204,7 +204,7 @@ async def run_analysis(ctx: GameContext) -> AnalysisResult:
     try:
         forensic_res = result.forensic
         auditor_res  = result.auditor
-        critic = run_critic_agent(
+        critic = await run_critic_agent(
             appid=ctx.appid, game_name=ctx.game_name, snapshot_date=snap_date_str,
             ea_age_days=ctx.ea_age_days, l1_state=ctx.scorecard.l1_state,
             l1_composite_score=ctx.scorecard.composite_score,
