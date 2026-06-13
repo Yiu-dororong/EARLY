@@ -113,8 +113,8 @@ class _SafeTraceWrapper:
 # Generation span context manager
 # ---------------------------------------------------------------------------
 
-@contextmanager
-def generation_span(
+@asynccontextmanager
+async def generation_span(
     trace,
     name: str,
     model: str,
@@ -191,8 +191,8 @@ class _GenerationSpanWrapper:
 # Scorecard span (no LLM — just latency + metadata)
 # ---------------------------------------------------------------------------
 
-@contextmanager
-def scorecard_span(trace, name: str, metadata: dict | None = None):
+@asynccontextmanager
+async def scorecard_span(trace, name: str, metadata: dict | None = None):
     """Lightweight span for non-LLM steps like scorecard computation."""
     span = None
     try:
