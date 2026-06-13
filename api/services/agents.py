@@ -218,7 +218,7 @@ def _persist_result(
         critic.developer_brief if critic else None,
         critic.confidence_note if critic else None,
         # Error
-        (forensic.error or auditor.error or (critic.error if critic else None)),
+        ((forensic.error if forensic else None) or (auditor.error if auditor else None) or (critic.error if critic else None)),
     ))
     db.commit()
 
