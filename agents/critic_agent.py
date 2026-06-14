@@ -27,86 +27,17 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Annotated, Any, TypedDict
+from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
-from langgraph.graph.message import add_messages
 from langchain_core.runnables import RunnableConfig
 
+from agents.states import CriticState
+from agents.prompts import CRITIC_CONSUMER_SYSTEM, CRITIC_DEVELOPER_SYSTEM
+
 MODEL_NAME = "llama-3.3-70b-versatile"
-
-
-class CriticState(TypedDict):
-    messages: Annotated[list, add_messages]
-    appid: int
-    game_name: str
-    snapshot_date: str
-    ea_age_days: int
-    l1_state: str
-    l1_composite_score: float
-    update_health: float | None
-    player_retention: float | None
-    dev_engagement: float | None
-    sentiment: float | None
-    price_market: float | None
-    p_distressed: float | None
-    is_distressed: int | None
-    ml_eligible: bool
-    # Forensic
-    forensic_ran: bool
-    update_substance_score: float | None
-    fake_heartbeat_flag: int | None
-    momentum: str | None
-    event_state_mismatch: int | None
-    forensic_reasoning: str | None
-    # Auditor
-    auditor_ran: bool
-    theme_clusters: list[dict] | None
-    sentiment_shift: str | None
-    sentiment_alignment: str | None
-    key_concerns: list[str] | None
-    auditor_summary: str | None
-    # Triangulation output
-    signal_alignment: str | None
-    # Verdicts
-    consumer_verdict: str | None
-    developer_brief: str | None
-    confidence_note: str | None
-    error_msg: str | None
-
-
-CONSUMER_SYSTEM = """You are writing a risk assessment for a Steam player considering
-buying or continuing to play an Early Access game.
-
-You will be told a "signal alignment" verdict:
-  - "aligned"    — all available signals point the same direction. Be confident.
-  - "conflicted" — signals disagree (e.g. the activity metric looks fine but
-                   players report stalled development, or vice versa). Lead
-                   with this conflict — it's the most important thing the
-                   player needs to know, more important than any single score.
-  - "partial"    — some signals weren't available. Be appropriately tentative.
-
-Direct, honest, non-alarmist. 2-4 sentences max. Do NOT mention model scores,
-numbers, internal metric names, or the words "signal alignment"/"triangulation"
-themselves — translate into plain language a player would say to a friend."""
-
-DEVELOPER_SYSTEM = """You are writing a brief for the developer of an Early Access game.
-
-You will be told a "signal alignment" verdict:
-  - "aligned"    — activity metrics and player sentiment agree. Confirm and move on.
-  - "conflicted" — activity metrics and player sentiment DISAGREE. This is the
-                   most actionable insight in the brief — name the specific
-                   discrepancy (e.g. "your update cadence looks active to the
-                   metric, but players report not seeing real changes" or the
-                   reverse) and suggest what might explain the gap.
-  - "partial"    — some signals unavailable, note what's missing.
-
-Respectful, specific, action-oriented. 3-5 sentences. End with one concrete
-actionable direction. Do NOT mention model names, ML scores, or say "signal
-alignment" — describe the actual discrepancy in plain terms."""
-
 
 def _fmt(v: float | None) -> str:
     return f"{v:.3f}" if v is not None else "N/A"
@@ -225,7 +156,7 @@ def determine_alignment(state: CriticState) -> dict:
 
 def write_consumer_verdict(state: CriticState, config: RunnableConfig) -> dict:
     content, error = _llm_call(
-        CONSUMER_SYSTEM,
+        CRITIC_CONSUMER_SYSTEM,
         f"{_context(state)}\n\nWrite the consumer verdict now.",
         config=config
     )
@@ -236,7 +167,7 @@ def write_developer_brief(state: CriticState, config: RunnableConfig) -> dict:
     if state.get("error_msg"):
         return {}
     content, error = _llm_call(
-        DEVELOPER_SYSTEM,
+        CRITIC_DEVELOPER_SYSTEM,
         f"{_context(state)}\n\nWrite the developer brief now.",
         config=config
     )

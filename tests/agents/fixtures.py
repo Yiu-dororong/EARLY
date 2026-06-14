@@ -7,7 +7,7 @@ build content, posted by a game whose ML-derived l1_state still looks
 "active" because an event was posted recently.
 """
 
-from agents.forensic_agent import AnnouncementInput
+from agents.states import AnnouncementInput
 
 
 # ---------------------------------------------------------------------------

@@ -38,7 +38,7 @@ BASE_KWARGS = dict(
 
 def test_alignment_conflicted_when_forensic_mismatch():
     """event_state_mismatch=1 → conflicted, regardless of auditor."""
-    from agents.critic_agent import CriticState
+    from agents.states import CriticState
     state: CriticState = {
         **{k: None for k in CriticState.__annotations__},
         "forensic_ran": True, "event_state_mismatch": 1,
@@ -49,7 +49,7 @@ def test_alignment_conflicted_when_forensic_mismatch():
 
 def test_alignment_conflicted_when_auditor_conflicts():
     """sentiment_alignment=conflicted → conflicted, even if forensic is fine."""
-    from agents.critic_agent import CriticState
+    from agents.states import CriticState
     state: CriticState = {
         **{k: None for k in CriticState.__annotations__},
         "forensic_ran": True, "event_state_mismatch": 0,
@@ -60,7 +60,7 @@ def test_alignment_conflicted_when_auditor_conflicts():
 
 def test_alignment_aligned_when_both_ran_no_conflict():
     """Both agents ran, no conflicts → aligned."""
-    from agents.critic_agent import CriticState
+    from agents.states import CriticState
     state: CriticState = {
         **{k: None for k in CriticState.__annotations__},
         "forensic_ran": True, "event_state_mismatch": 0,
@@ -71,7 +71,7 @@ def test_alignment_aligned_when_both_ran_no_conflict():
 
 def test_alignment_partial_when_only_one_ran():
     """Only forensic ran (auditor skipped) → partial."""
-    from agents.critic_agent import CriticState
+    from agents.states import CriticState
     state: CriticState = {
         **{k: None for k in CriticState.__annotations__},
         "forensic_ran": True, "event_state_mismatch": 0,
@@ -81,7 +81,7 @@ def test_alignment_partial_when_only_one_ran():
 
 
 def test_alignment_partial_when_neither_ran():
-    from agents.critic_agent import CriticState
+    from agents.states import CriticState
     state: CriticState = {
         **{k: None for k in CriticState.__annotations__},
         "forensic_ran": False, "event_state_mismatch": None,

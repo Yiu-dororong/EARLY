@@ -29,14 +29,15 @@ import json
 import os
 import re
 from dataclasses import dataclass
-from typing import Annotated, Any, TypedDict
-from pydantic import BaseModel, Field
+from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
-from langgraph.graph.message import add_messages
 from langchain_core.runnables import RunnableConfig
+
+from agents.states import AnnouncementInput, ForensicState, ForensicOutputModel
+from agents.prompts import FORENSIC_SYSTEM_PROMPT
 
 # Lookback window — see design note in module docstring
 MAX_EVENTS_CONSIDERED = 3
@@ -44,107 +45,6 @@ LOOKBACK_DAYS         = 60
 MAX_BODY_CHARS        = 600   # per-event truncation to bound total prompt size
 
 MODEL_NAME = "meta-llama/llama-4-scout-17b-16e-instruct"
-
-
-# ---------------------------------------------------------------------------
-# State
-# ---------------------------------------------------------------------------
-
-class AnnouncementInput(TypedDict):
-    event_type: int
-    title: str
-    body_stripped: str
-    word_count: int
-    days_ago: int
-
-
-class ForensicState(TypedDict):
-    messages: Annotated[list, add_messages]
-    appid: int
-    game_name: str
-    snapshot_date: str
-    ea_age_days: int
-    days_since_last_build_update: int
-    announcements: list[AnnouncementInput]   # most recent first, up to MAX_EVENTS_CONSIDERED
-    update_substance_score: float | None
-    fake_heartbeat_flag: int | None
-    momentum: str | None
-    event_state_mismatch: int | None
-    reasoning: str | None
-    error_msg: str | None
-
-
-class ForensicOutputModel(BaseModel):
-    update_substance_score: float
-    fake_heartbeat_flag: int
-    momentum: str
-    event_state_mismatch: int
-    reasoning: str
-
-
-# ---------------------------------------------------------------------------
-# Prompts
-# ---------------------------------------------------------------------------
-
-SYSTEM_PROMPT = """You are the Forensic Agent for EARLY, a system that predicts
-whether Steam Early Access games will be abandoned before reaching 1.0 release.
-
-You will be shown the last few announcements posted by a developer, most
-recent first. Your job has TWO parts:
-
-PART 1 — SUBSTANCE of the MOST RECENT announcement (index 1):
-  update_substance_score (0 to 10):
-    0–2 : Empty heartbeat. No concrete content.
-    3–4 : Minimal. One vague fix or non-specific mention.
-    5–6 : Moderate. A few concrete changes, but shallow.
-    7–8 : Solid. Multiple specific, concrete changes with detail.
-    9–10: Exceptional. Detailed, comprehensive, technically specific.
-
-  fake_heartbeat_flag: 1 if announcement #1 is a deliberate minimal post with
-  no real development substance (resets visibility, says nothing). 0 otherwise.
-
-PART 2 — MOMENTUM across ALL announcements shown:
-  momentum: one of
-    "consistent_progress" — multiple posts each with real content, suggests
-                            active iteration (even if individually small —
-                            several hotfixes in sequence is a GOOD sign)
-    "single_update"       — only one post available, can't assess pattern
-    "declining"           — earlier posts had substance, recent ones don't
-    "hollow_pattern"       — most/all posts in the window are low-substance
-                            announcements regardless of type
-
-PART 3 — TRIANGULATION (event_state_mismatch):
-  Steam event types (12=minor build, 13=regular update, 14=major update) are
-  ANNOUNCEMENT CATEGORIES — they do NOT prove a build was actually shipped.
-  A developer can post a "Major Update" announcement that is pure marketing
-  with zero development content.
-
-  event_state_mismatch = 1 if:
-    - The event type suggests a build update (12/13/14) BUT the body content
-      contains no actual build/patch evidence (no version numbers, no
-      changelog, no specific technical changes) — i.e. the announcement
-      TYPE implies activity that the CONTENT does not support.
-  event_state_mismatch = 0 if:
-    - The content is consistent with its event type (a build-type post that
-      actually describes build changes), OR
-    - The post is honestly framed as non-build news (community update,
-      roadmap discussion) without claiming to be a build.
-
-RULES:
-- Score on content quality and specificity, NOT word count alone.
-- Do not penalize non-English changelogs — score what you can read.
-- Empty body after stripping: score = 0, fake_heartbeat_flag = 1.
-- If only 1 announcement provided: momentum = "single_update".
-
-OUTPUT FORMAT — JSON only, no markdown fences:
-{
-  "update_substance_score": <float 0.0-10.0>,
-  "fake_heartbeat_flag": <0 or 1>,
-  "momentum": "<consistent_progress|single_update|declining|hollow_pattern>",
-  "event_state_mismatch": <0 or 1>,
-  "reasoning": "<2-3 sentences covering substance, momentum, and mismatch>"
-}"""
-
 
 def _event_label(event_type: int) -> str:
     return {
@@ -224,7 +124,7 @@ def assess_updates(state: ForensicState, config: RunnableConfig) -> dict:
 
     llm    = _get_llm().with_structured_output(ForensicOutputModel, method="json_mode")
     prompt = _build_user_prompt(state)
-    messages_in = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)]
+    messages_in = [SystemMessage(content=FORENSIC_SYSTEM_PROMPT), HumanMessage(content=prompt)]
 
     try:
         parsed = llm.invoke(messages_in, config=config)

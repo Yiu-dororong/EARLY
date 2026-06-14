@@ -21,8 +21,8 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
+from agents.states import AnnouncementInput
 from agents.forensic_agent import (
-    AnnouncementInput,
     ForensicResult,
     LOOKBACK_DAYS,
     MAX_EVENTS_CONSIDERED,
