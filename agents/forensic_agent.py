@@ -19,7 +19,7 @@ Triangulation note:
   but the actual content says otherwise. This is the signal the Critic
   Agent uses to override or soften the ML-derived l1_state.
 
-Model: Groq llama-3.3-70b-versatile
+Model: Groq meta-llama/llama-4-scout-17b-16e-instruct
 Tracing: Langfuse generation span (optional, no-op if disabled)
 """
 

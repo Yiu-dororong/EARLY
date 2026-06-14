@@ -11,7 +11,7 @@ Triangulation addition:
   months, content drought" → sentiment_alignment="conflicted". This is
   the review-side half of the triangulation the Critic Agent synthesizes.
 
-Model: Groq llama-3.3-70b-versatile
+Model: Groq meta-llama/llama-4-scout-17b-16e-instruct
 Tracing: Langfuse generation span
 """
 

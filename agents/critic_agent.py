@@ -35,7 +35,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langchain_core.runnables import RunnableConfig
 
-MODEL_NAME = "meta-llama/llama-4-scout-17b-16e-instruct"
+MODEL_NAME = "llama-3.3-70b-versatile"
 
 
 class CriticState(TypedDict):
