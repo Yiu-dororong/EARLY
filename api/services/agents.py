@@ -317,10 +317,9 @@ def trigger_analysis(db: libsql.Connection, appid: int, force: bool = False) -> 
         trigger_reason = "user_request" if force else reason
 
         meta        = _fetch_game_meta(db, appid)
-        announcements, days_since_last_build = _fetch_announcements(db, appid, snap_ts)
         snap_ts     = score["scored_at"]
         snap_date   = score.get("snapshot_date") or datetime.fromtimestamp(snap_ts, tz=timezone.utc).strftime("%Y-%m-%d")
-
+        announcements, days_since_last_build = _fetch_announcements(db, appid, snap_ts)
         recent_reviews, older_reviews = fetch_reviews_for_auditor(
         appid,
         n_recent=MAX_REVIEWS_PER_WINDOW,   # existing constant, default 50 — see note below
