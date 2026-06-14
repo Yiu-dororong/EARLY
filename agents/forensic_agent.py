@@ -217,8 +217,8 @@ def assess_updates(state: ForensicState) -> dict:
     try:
         from utils.langfuse_client import generation_span
         ctx = generation_span(trace, name="forensic_llm", model="llama-3.3-70b-versatile", input_data=prompt)
-        if ctx is None:
-            ctx = nullcontext(None)
+        if not hasattr(ctx, "__enter__"):
+            ctx = nullcontext(ctx)
     except Exception:
         ctx = nullcontext(None)
 

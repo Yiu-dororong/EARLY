@@ -210,8 +210,8 @@ def _llm_call(system: str, prompt: str, span_name: str, trace: Any) -> tuple[str
     try:
         from utils.langfuse_client import generation_span
         ctx = generation_span(trace, name=span_name, model="llama-3.3-70b-versatile", input_data=prompt)
-        if ctx is None:
-            ctx = nullcontext(None)
+        if not hasattr(ctx, "__enter__"):
+            ctx = nullcontext(ctx)
     except Exception:
         ctx = nullcontext(None)
 
