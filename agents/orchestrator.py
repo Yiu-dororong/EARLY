@@ -174,9 +174,8 @@ def run_analysis(ctx: GameContext) -> AnalysisResult:
     # --- Top-level Langfuse trace ---
     trace = None
     try:
-        from utils.langfuse_client import create_trace
-        trace = create_trace(
-            name="phase2_analysis",
+        from utils.langfuse_client import get_callback_handler
+        trace = get_callback_handler(
             appid=ctx.appid,
             session_id=ctx.session_id,
             metadata={
@@ -269,12 +268,5 @@ def run_analysis(ctx: GameContext) -> AnalysisResult:
     except Exception as e:
         logger.error("Critic exception appid=%d: %s", ctx.appid, e)
 
-    # Flush Langfuse events
-    try:
-        if trace:
-            from utils.langfuse_client import flush
-            flush()
-    except Exception:
-        pass
 
     return result

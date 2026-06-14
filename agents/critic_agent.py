@@ -26,7 +26,6 @@ Model: Groq llama-3.3-70b-versatile
 from __future__ import annotations
 
 import os
-from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import Annotated, Any, TypedDict
 
@@ -69,7 +68,6 @@ class CriticState(TypedDict):
     # Triangulation output
     signal_alignment: str | None
     # Verdicts
-    trace: Any | None
     consumer_verdict: str | None
     developer_brief: str | None
     confidence_note: str | None
@@ -205,26 +203,13 @@ def _get_llm() -> ChatGroq:
     return ChatGroq(model="llama-3.3-70b-versatile", temperature=0.3, max_tokens=512, api_key=api_key)
 
 
-def _llm_call(system: str, prompt: str, span_name: str, trace: Any) -> tuple[str | None, str | None]:
+def _llm_call(system: str, prompt: str) -> tuple[str | None, str | None]:
     llm = _get_llm()
     try:
-        from utils.langfuse_client import generation_span
-        ctx = generation_span(trace, name=span_name, model="llama-3.3-70b-versatile", input_data=prompt)
-    except Exception:
-        ctx = nullcontext(None)
-
-    try:
-        with ctx as span:
-            response: AIMessage = llm.invoke([SystemMessage(content=system), HumanMessage(content=prompt)])
-            content = response.content.strip()
-            if span and hasattr(span, "set_output"):
-                span.set_output(content)
-                usage = getattr(response, "usage_metadata", None)
-                if usage:
-                    span.set_usage(input_tokens=usage.get("input_tokens"), output_tokens=usage.get("output_tokens"))
-            return content, None
+        response: AIMessage = llm.invoke([SystemMessage(content=system), HumanMessage(content=prompt)])
+        return response.content.strip(), None
     except Exception as e:
-        return None, f"{span_name} failed: {type(e).__name__}: {e}"
+        return None, f"LLM call failed: {type(e).__name__}: {e}"
 
 
 # ---------------------------------------------------------------------------
@@ -238,9 +223,7 @@ def determine_alignment(state: CriticState) -> dict:
 def write_consumer_verdict(state: CriticState) -> dict:
     content, error = _llm_call(
         CONSUMER_SYSTEM,
-        f"{_context(state)}\n\nWrite the consumer verdict now.",
-        "critic_consumer",
-        state.get("trace"),
+        f"{_context(state)}\n\nWrite the consumer verdict now."
     )
     return {"consumer_verdict": content, "error": error}
 
@@ -250,9 +233,7 @@ def write_developer_brief(state: CriticState) -> dict:
         return {}
     content, error = _llm_call(
         DEVELOPER_SYSTEM,
-        f"{_context(state)}\n\nWrite the developer brief now.",
-        "critic_developer",
-        state.get("trace"),
+        f"{_context(state)}\n\nWrite the developer brief now."
     )
     return {"developer_brief": content, "error": error}
 
@@ -335,12 +316,13 @@ def run_critic_agent(
         "auditor_ran": auditor_ran, "theme_clusters": theme_clusters,
         "sentiment_shift": sentiment_shift, "sentiment_alignment": sentiment_alignment,
         "key_concerns": key_concerns,
-        "auditor_summary": auditor_summary, "trace": trace,
+        "auditor_summary": auditor_summary,
         "signal_alignment": None,
         "consumer_verdict": None, "developer_brief": None,
         "confidence_note": None, "error": None,
     }
-    final = get_graph().invoke(initial)
+    config = {"callbacks": [trace]} if trace else {}
+    final = get_graph().invoke(initial, config=config)
     return CriticResult(
         appid=appid, snapshot_date=snapshot_date,
         signal_alignment=final.get("signal_alignment"),

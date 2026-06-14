@@ -20,7 +20,6 @@ from __future__ import annotations
 import json
 import os
 import re
-from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import Annotated, Any, TypedDict
 
@@ -45,7 +44,6 @@ class SentimentState(TypedDict):
     recent_reviews: list[dict]
     older_reviews: list[dict]
     l1_state: str | None              # NEW — for triangulation
-    trace: Any | None
     theme_clusters: list[dict] | None
     sentiment_shift: str | None
     sentiment_alignment: str | None   # NEW
@@ -150,37 +148,23 @@ def analyse_sentiment(state: SentimentState) -> dict:
     prompt = _build_prompt(state)
     msgs   = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)]
 
-    trace = state.get("trace")
     try:
-        from utils.langfuse_client import generation_span
-        ctx = generation_span(trace, name="auditor_llm", model="llama-3.1-8b-instant", input_data=prompt)
-    except Exception:
-        ctx = nullcontext(None)
+        response: AIMessage = llm.invoke(msgs)
+        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", response.content.strip(), flags=re.MULTILINE).strip()
+        parsed = json.loads(raw)
 
-    try:
-        with ctx as span:
-            response: AIMessage = llm.invoke(msgs)
-            raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", response.content.strip(), flags=re.MULTILINE).strip()
-            parsed = json.loads(raw)
+        alignment = parsed.get("sentiment_alignment", "insufficient_data")
+        if alignment not in ("aligned", "conflicted", "insufficient_data"):
+            alignment = "insufficient_data"
 
-            if span and hasattr(span, "set_output"):
-                span.set_output(raw)
-                usage = getattr(response, "usage_metadata", None)
-                if usage:
-                    span.set_usage(input_tokens=usage.get("input_tokens"), output_tokens=usage.get("output_tokens"))
-
-            alignment = parsed.get("sentiment_alignment", "insufficient_data")
-            if alignment not in ("aligned", "conflicted", "insufficient_data"):
-                alignment = "insufficient_data"
-
-            return {
-                "theme_clusters": parsed.get("theme_clusters", []),
-                "sentiment_shift": parsed.get("sentiment_shift", "insufficient_data"),
-                "sentiment_alignment": alignment,
-                "key_concerns": parsed.get("key_concerns", []),
-                "auditor_summary": parsed.get("auditor_summary", ""),
-                "error": None, "messages": [response],
-            }
+        return {
+            "theme_clusters": parsed.get("theme_clusters", []),
+            "sentiment_shift": parsed.get("sentiment_shift", "insufficient_data"),
+            "sentiment_alignment": alignment,
+            "key_concerns": parsed.get("key_concerns", []),
+            "auditor_summary": parsed.get("auditor_summary", ""),
+            "error": None, "messages": [response],
+        }
 
     except json.JSONDecodeError as e:
         return {"theme_clusters": None, "sentiment_shift": None, "sentiment_alignment": None,
@@ -238,11 +222,12 @@ def run_sentiment_auditor(
         "review_count_at_T": review_count_at_T,
         "recent_reviews": recent_reviews or [], "older_reviews": older_reviews or [],
         "l1_state": l1_state,
-        "trace": trace, "theme_clusters": None, "sentiment_shift": None,
+        "theme_clusters": None, "sentiment_shift": None,
         "sentiment_alignment": None,
         "key_concerns": None, "auditor_summary": None, "error": None,
     }
-    final = get_graph().invoke(initial)
+    config = {"callbacks": [trace]} if trace else {}
+    final = get_graph().invoke(initial, config=config)
     return SentimentResult(
         appid=appid, snapshot_date=snapshot_date,
         theme_clusters=final.get("theme_clusters"),

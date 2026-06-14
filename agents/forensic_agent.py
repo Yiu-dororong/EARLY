@@ -28,7 +28,6 @@ from __future__ import annotations
 import json
 import os
 import re
-from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import Annotated, Any, TypedDict
 
@@ -63,7 +62,6 @@ class ForensicState(TypedDict):
     ea_age_days: int
     days_since_last_build_update: int
     announcements: list[AnnouncementInput]   # most recent first, up to MAX_EVENTS_CONSIDERED
-    trace: Any | None
     update_substance_score: float | None
     fake_heartbeat_flag: int | None
     momentum: str | None
@@ -213,39 +211,25 @@ def assess_updates(state: ForensicState) -> dict:
     prompt = _build_user_prompt(state)
     messages_in = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)]
 
-    trace = state.get("trace")
     try:
-        from utils.langfuse_client import generation_span
-        ctx = generation_span(trace, name="forensic_llm", model="llama-3.3-70b-versatile", input_data=prompt)
-    except Exception:
-        ctx = nullcontext(None)
+        response: AIMessage = llm.invoke(messages_in)
+        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", response.content.strip(), flags=re.MULTILINE).strip()
+        parsed = json.loads(raw)
 
-    try:
-        with ctx as span:
-            response: AIMessage = llm.invoke(messages_in)
-            raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", response.content.strip(), flags=re.MULTILINE).strip()
-            parsed = json.loads(raw)
+        score = max(0.0, min(10.0, float(parsed["update_substance_score"])))
+        momentum = parsed.get("momentum", "single_update")
+        if momentum not in ("consistent_progress", "single_update", "declining", "hollow_pattern"):
+            momentum = "single_update"
 
-            if span and hasattr(span, "set_output"):
-                span.set_output(raw)
-                usage = getattr(response, "usage_metadata", None)
-                if usage:
-                    span.set_usage(input_tokens=usage.get("input_tokens"), output_tokens=usage.get("output_tokens"))
-
-            score = max(0.0, min(10.0, float(parsed["update_substance_score"])))
-            momentum = parsed.get("momentum", "single_update")
-            if momentum not in ("consistent_progress", "single_update", "declining", "hollow_pattern"):
-                momentum = "single_update"
-
-            return {
-                "update_substance_score": score,
-                "fake_heartbeat_flag": int(bool(parsed["fake_heartbeat_flag"])),
-                "momentum": momentum,
-                "event_state_mismatch": int(bool(parsed.get("event_state_mismatch", 0))),
-                "reasoning": str(parsed.get("reasoning", "")),
-                "error": None,
-                "messages": [response],
-            }
+        return {
+            "update_substance_score": score,
+            "fake_heartbeat_flag": int(bool(parsed["fake_heartbeat_flag"])),
+            "momentum": momentum,
+            "event_state_mismatch": int(bool(parsed.get("event_state_mismatch", 0))),
+            "reasoning": str(parsed.get("reasoning", "")),
+            "error": None,
+            "messages": [response],
+        }
 
     except json.JSONDecodeError as e:
         return {"update_substance_score": None, "fake_heartbeat_flag": None, "momentum": None,
@@ -329,12 +313,12 @@ def run_forensic_agent(
         "snapshot_date": snapshot_date, "ea_age_days": ea_age_days,
         "days_since_last_build_update": days_since_last_build_update,
         "announcements": announcements[:MAX_EVENTS_CONSIDERED],
-        "trace": trace,
         "update_substance_score": None, "fake_heartbeat_flag": None,
         "momentum": None, "event_state_mismatch": None,
         "reasoning": None, "error": None,
     }
-    final = get_graph().invoke(initial)
+    config = {"callbacks": [trace]} if trace else {}
+    final = get_graph().invoke(initial, config=config)
     return ForensicResult(
         appid=appid, snapshot_date=snapshot_date,
         update_substance_score=final.get("update_substance_score"),
