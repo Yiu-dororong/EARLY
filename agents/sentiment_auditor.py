@@ -27,6 +27,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
+from langchain_core.runnables import RunnableConfig
 
 MAX_RECENT_REVIEWS = 25
 MAX_OLDER_REVIEWS  = 15
@@ -143,13 +144,13 @@ def should_skip(state: SentimentState) -> str:
     return "end" if state.get("auditor_summary") is not None else "analyse"
 
 
-def analyse_sentiment(state: SentimentState) -> dict:
+def analyse_sentiment(state: SentimentState, config: RunnableConfig) -> dict:
     llm    = _get_llm()
     prompt = _build_prompt(state)
     msgs   = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)]
 
     try:
-        response: AIMessage = llm.invoke(msgs)
+        response: AIMessage = llm.invoke(msgs, config=config)
         raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", response.content.strip(), flags=re.MULTILINE).strip()
         parsed = json.loads(raw)
 

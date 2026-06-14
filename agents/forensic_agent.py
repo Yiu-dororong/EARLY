@@ -35,6 +35,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
+from langchain_core.runnables import RunnableConfig
 
 # Lookback window — see design note in module docstring
 MAX_EVENTS_CONSIDERED = 3
@@ -177,7 +178,7 @@ def _get_llm() -> ChatGroq:
 # Nodes
 # ---------------------------------------------------------------------------
 
-def assess_updates(state: ForensicState) -> dict:
+def assess_updates(state: ForensicState, config: RunnableConfig) -> dict:
     announcements = state.get("announcements", [])
 
     # Fast-path: no announcements at all (shouldn't normally reach here —
@@ -212,7 +213,7 @@ def assess_updates(state: ForensicState) -> dict:
     messages_in = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)]
 
     try:
-        response: AIMessage = llm.invoke(messages_in)
+        response: AIMessage = llm.invoke(messages_in, config=config)
         raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", response.content.strip(), flags=re.MULTILINE).strip()
         parsed = json.loads(raw)
 

@@ -33,6 +33,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
+from langchain_core.runnables import RunnableConfig
 
 
 class CriticState(TypedDict):
@@ -203,10 +204,10 @@ def _get_llm() -> ChatGroq:
     return ChatGroq(model="llama-3.3-70b-versatile", temperature=0.3, max_tokens=512, api_key=api_key)
 
 
-def _llm_call(system: str, prompt: str) -> tuple[str | None, str | None]:
+def _llm_call(system: str, prompt: str, config: RunnableConfig) -> tuple[str | None, str | None]:
     llm = _get_llm()
     try:
-        response: AIMessage = llm.invoke([SystemMessage(content=system), HumanMessage(content=prompt)])
+        response: AIMessage = llm.invoke([SystemMessage(content=system), HumanMessage(content=prompt)], config=config)
         return response.content.strip(), None
     except Exception as e:
         return None, f"LLM call failed: {type(e).__name__}: {e}"
@@ -220,20 +221,22 @@ def determine_alignment(state: CriticState) -> dict:
     return {"signal_alignment": compute_signal_alignment(state)}
 
 
-def write_consumer_verdict(state: CriticState) -> dict:
+def write_consumer_verdict(state: CriticState, config: RunnableConfig) -> dict:
     content, error = _llm_call(
         CONSUMER_SYSTEM,
-        f"{_context(state)}\n\nWrite the consumer verdict now."
+        f"{_context(state)}\n\nWrite the consumer verdict now.",
+        config=config
     )
     return {"consumer_verdict": content, "error": error}
 
 
-def write_developer_brief(state: CriticState) -> dict:
+def write_developer_brief(state: CriticState, config: RunnableConfig) -> dict:
     if state.get("error"):
         return {}
     content, error = _llm_call(
         DEVELOPER_SYSTEM,
-        f"{_context(state)}\n\nWrite the developer brief now."
+        f"{_context(state)}\n\nWrite the developer brief now.",
+        config=config
     )
     return {"developer_brief": content, "error": error}
 
