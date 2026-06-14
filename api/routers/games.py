@@ -126,9 +126,14 @@ def list_games(
             ls.ml_eligible,
             ls.review_count_at_T,
             ls.snapshot_date,
-            g.outcome
+            g.outcome,
+            (
+                (ls.p_distressed * 100.0) +                  -- Weighting Risk heavily
+                (LOG(MAX(ls.review_count_at_T, 1)) * 20.0) - -- Log scale for popularity (caps massive outliers)
+                (ls.ea_age_days * 0.05)                      -- Penalty multiplier for older games
+            ) AS triage_priority_score
         {base_query}
-        ORDER BY ls.p_distressed DESC NULLS LAST
+        ORDER BY triage_priority_score DESC NULLS LAST
         LIMIT ? OFFSET ?
     """, params + [limit, offset]).fetchall()
 
