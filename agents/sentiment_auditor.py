@@ -22,6 +22,7 @@ import os
 import re
 from dataclasses import dataclass
 from typing import Annotated, Any, TypedDict
+from pydantic import BaseModel, Field
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
@@ -52,6 +53,19 @@ class SentimentState(TypedDict):
     auditor_summary: str | None
     error_msg: str | None
 
+
+class ThemeClusterModel(BaseModel):
+    theme: str
+    valence: str
+    frequency: str
+    representative_quote: str | None
+
+class SentimentOutputModel(BaseModel):
+    theme_clusters: list[ThemeClusterModel]
+    sentiment_shift: str
+    sentiment_alignment: str
+    key_concerns: list[str]
+    auditor_summary: str
 
 SYSTEM_PROMPT = """You are the Sentiment Auditor for EARLY, a Steam Early Access
 health prediction system. Analyze player reviews and identify structural sentiment
@@ -145,31 +159,31 @@ def should_skip(state: SentimentState) -> str:
 
 
 def analyse_sentiment(state: SentimentState, config: RunnableConfig) -> dict:
-    llm    = _get_llm()
+    llm    = _get_llm().with_structured_output(SentimentOutputModel)
     prompt = _build_prompt(state)
     msgs   = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)]
 
     try:
-        response: AIMessage = llm.invoke(msgs, config=config)
-        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", response.content.strip(), flags=re.MULTILINE).strip()
-        parsed = json.loads(raw)
+        parsed = llm.invoke(msgs, config=config)
+        if not parsed:
+            raise ValueError("Model failed to return structured output.")
 
-        alignment = parsed.get("sentiment_alignment", "insufficient_data")
+        alignment = parsed.sentiment_alignment
         if alignment not in ("aligned", "conflicted", "insufficient_data"):
             alignment = "insufficient_data"
 
+        # Safely extract dicts for the graph state (handles Pydantic v1 vs v2)
+        clusters = [c.model_dump() if hasattr(c, 'model_dump') else c.dict() for c in parsed.theme_clusters]
+
         return {
-            "theme_clusters": parsed.get("theme_clusters", []),
-            "sentiment_shift": parsed.get("sentiment_shift", "insufficient_data"),
+            "theme_clusters": clusters,
+            "sentiment_shift": parsed.sentiment_shift or "insufficient_data",
             "sentiment_alignment": alignment,
-            "key_concerns": parsed.get("key_concerns", []),
-            "auditor_summary": parsed.get("auditor_summary", ""),
-            "error_msg": None, "messages": [response],
+            "key_concerns": parsed.key_concerns or [],
+            "auditor_summary": parsed.auditor_summary or "",
+            "error_msg": None,
         }
 
-    except json.JSONDecodeError as e:
-        return {"theme_clusters": None, "sentiment_shift": None, "sentiment_alignment": None,
-                "key_concerns": None, "auditor_summary": None, "error_msg": f"JSON parse error: {e}"}
     except Exception as e:
         return {"theme_clusters": None, "sentiment_shift": None, "sentiment_alignment": None,
                 "key_concerns": None, "auditor_summary": None,

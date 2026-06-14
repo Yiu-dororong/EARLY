@@ -30,6 +30,7 @@ import os
 import re
 from dataclasses import dataclass
 from typing import Annotated, Any, TypedDict
+from pydantic import BaseModel, Field
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
@@ -69,6 +70,14 @@ class ForensicState(TypedDict):
     event_state_mismatch: int | None
     reasoning: str | None
     error_msg: str | None
+
+
+class ForensicOutputModel(BaseModel):
+    update_substance_score: float
+    fake_heartbeat_flag: int
+    momentum: str
+    event_state_mismatch: int
+    reasoning: str
 
 
 # ---------------------------------------------------------------------------
@@ -208,33 +217,29 @@ def assess_updates(state: ForensicState, config: RunnableConfig) -> dict:
                 "error_msg": None,
             }
 
-    llm    = _get_llm()
+    llm    = _get_llm().with_structured_output(ForensicOutputModel)
     prompt = _build_user_prompt(state)
     messages_in = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)]
 
     try:
-        response: AIMessage = llm.invoke(messages_in, config=config)
-        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", response.content.strip(), flags=re.MULTILINE).strip()
-        parsed = json.loads(raw)
+        parsed = llm.invoke(messages_in, config=config)
+        if not parsed:
+            raise ValueError("Model failed to return structured output.")
 
-        score = max(0.0, min(10.0, float(parsed["update_substance_score"])))
-        momentum = parsed.get("momentum", "single_update")
+        score = max(0.0, min(10.0, float(parsed.update_substance_score)))
+        momentum = parsed.momentum
         if momentum not in ("consistent_progress", "single_update", "declining", "hollow_pattern"):
             momentum = "single_update"
 
         return {
             "update_substance_score": score,
-            "fake_heartbeat_flag": int(bool(parsed["fake_heartbeat_flag"])),
+            "fake_heartbeat_flag": int(bool(parsed.fake_heartbeat_flag)),
             "momentum": momentum,
-            "event_state_mismatch": int(bool(parsed.get("event_state_mismatch", 0))),
-            "reasoning": str(parsed.get("reasoning", "")),
+            "event_state_mismatch": int(bool(parsed.event_state_mismatch)),
+            "reasoning": str(parsed.reasoning or ""),
             "error_msg": None,
-            "messages": [response],
         }
 
-    except json.JSONDecodeError as e:
-        return {"update_substance_score": None, "fake_heartbeat_flag": None, "momentum": None,
-                "event_state_mismatch": None, "reasoning": None, "error_msg": f"JSON parse error: {e}"}
     except Exception as e:
         return {"update_substance_score": None, "fake_heartbeat_flag": None, "momentum": None,
                 "event_state_mismatch": None, "reasoning": None,
