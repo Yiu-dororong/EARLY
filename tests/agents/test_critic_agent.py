@@ -11,7 +11,7 @@ Run:
 import pytest
 from deepeval import assert_test
 from deepeval.metrics import GEval
-from deepeval.test_case import LLMTestCase, LLMTestCaseParams
+from deepeval.test_case import LLMTestCase, SingleTurnParams
 
 from agents.critic_agent import CriticResult, compute_signal_alignment, run_critic_agent
 from tests.agents.eval_llm import DeepEvalGroqAdapter
@@ -128,7 +128,7 @@ def test_conflicted_verdict_mentions_discrepancy():
             "A verdict that only reports the negative score without noting that the "
             "activity signals may be misleading should FAIL."
         ),
-        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT],
+        evaluation_params=[SingleTurnParams.ACTUAL_OUTPUT],
         threshold=0.7,
     )
     test_case = LLMTestCase(
@@ -156,11 +156,16 @@ def test_verdict_no_internal_metric_names():
 
     forbidden_terms = [
         "p_distressed", "l1_state", "signal_alignment", "triangulation",
-        "composite_score", "ml_eligible", "EARLY", "XGBoost", "SHAP",
+        "composite_score", "ml_eligible", "XGBoost", "SHAP",
     ]
 
     full_output = f"{result.consumer_verdict or ''}\n{result.developer_brief or ''}"
     found = [t for t in forbidden_terms if t.lower() in full_output.lower()]
+
+    # Exact match for EARLY to avoid false positives with "Early Access"
+    if "EARLY" in full_output:
+        found.append("EARLY")
+
     assert not found, f"Internal metric names found in verdict: {found}"
 
 
@@ -195,7 +200,7 @@ def test_aligned_healthy_signal_verdict_is_positive():
             "all positive signals' should FAIL. The verdict should communicate "
             "that the evidence suggests healthy, active development."
         ),
-        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT],
+        evaluation_params=[SingleTurnParams.ACTUAL_OUTPUT],
         threshold=0.7,
     )
     test_case = LLMTestCase(
@@ -231,7 +236,7 @@ def test_developer_brief_ends_with_action():
             "delay'. Vague endings like 'focus on communication' or 'keep up the "
             "good work' without specific guidance should FAIL."
         ),
-        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT],
+        evaluation_params=[SingleTurnParams.ACTUAL_OUTPUT],
         threshold=0.7,
     )
     test_case = LLMTestCase(

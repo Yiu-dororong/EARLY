@@ -11,7 +11,7 @@ Run:
 import pytest
 from deepeval import assert_test
 from deepeval.metrics import GEval
-from deepeval.test_case import LLMTestCase, LLMTestCaseParams
+from deepeval.test_case import LLMTestCase, SingleTurnParams
 
 from agents.sentiment_auditor import run_sentiment_auditor
 from tests.agents.eval_llm import DeepEvalGroqAdapter
@@ -117,7 +117,7 @@ def test_auditor_summary_mentions_conflict():
             "A summary that merely lists negative themes without connecting them to "
             "the health classification mismatch should FAIL."
         ),
-        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT],
+        evaluation_params=[SingleTurnParams.ACTUAL_OUTPUT],
         threshold=0.7,
     )
 
@@ -156,7 +156,7 @@ def test_key_concerns_are_actionable():
             "Vague concerns like 'players are unhappy' or 'game has bugs' should FAIL. "
             "Each concern should be under 15 words."
         ),
-        evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT],
+        evaluation_params=[SingleTurnParams.ACTUAL_OUTPUT],
         threshold=0.7,
     )
 
