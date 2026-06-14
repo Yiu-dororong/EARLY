@@ -162,7 +162,7 @@ def should_skip(state: SentimentState) -> str:
 
 
 def analyse_sentiment(state: SentimentState, config: RunnableConfig) -> dict:
-    llm    = _get_llm().with_structured_output(SentimentOutputModel)
+    llm    = _get_llm().with_structured_output(SentimentOutputModel, method="json_mode")
     prompt = _build_prompt(state)
     msgs   = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)]
 

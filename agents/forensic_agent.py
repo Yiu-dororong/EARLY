@@ -147,9 +147,12 @@ OUTPUT FORMAT — JSON only, no markdown fences:
 
 
 def _event_label(event_type: int) -> str:
-    return {12: "Minor build update", 13: "Regular update", 14: "Major update"}.get(
-        event_type, f"Unknown type {event_type}"
-    )
+    return {
+        12: "Minor build update", 
+        13: "Regular update", 
+        14: "Major update",
+        28: "News/Announcement"
+    }.get(event_type, f"Unknown type {event_type}")
 
 
 def _build_user_prompt(state: ForensicState) -> str:
@@ -219,7 +222,7 @@ def assess_updates(state: ForensicState, config: RunnableConfig) -> dict:
                 "error_msg": None,
             }
 
-    llm    = _get_llm().with_structured_output(ForensicOutputModel)
+    llm    = _get_llm().with_structured_output(ForensicOutputModel, method="json_mode")
     prompt = _build_user_prompt(state)
     messages_in = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)]
 
