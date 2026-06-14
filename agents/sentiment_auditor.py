@@ -154,8 +154,6 @@ def analyse_sentiment(state: SentimentState) -> dict:
     try:
         from utils.langfuse_client import generation_span
         ctx = generation_span(trace, name="auditor_llm", model="llama-3.1-8b-instant", input_data=prompt)
-        if not hasattr(ctx, "__enter__"):
-            ctx = nullcontext(ctx)
     except Exception:
         ctx = nullcontext(None)
 

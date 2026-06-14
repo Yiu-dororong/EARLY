@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
-from contextlib import asynccontextmanager
+from contextlib import contextmanager
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -117,8 +117,8 @@ class _SafeTraceWrapper:
 # Generation span context manager
 # ---------------------------------------------------------------------------
 
-@asynccontextmanager
-async def generation_span(
+@contextmanager
+def generation_span(
     trace,
     name: str,
     model: str,
@@ -195,8 +195,8 @@ class _GenerationSpanWrapper:
 # Scorecard span (no LLM — just latency + metadata)
 # ---------------------------------------------------------------------------
 
-@asynccontextmanager
-async def scorecard_span(trace, name: str, metadata: dict | None = None):
+@contextmanager
+def scorecard_span(trace, name: str, metadata: dict | None = None):
     """Lightweight span for non-LLM steps like scorecard computation."""
     span = None
     try:
