@@ -351,6 +351,7 @@ def trigger_analysis(db: libsql.Connection, appid: int, force: bool = False) -> 
             review_score_at_T=0.0,   # not stored in live_scores; auditor handles gracefully
             review_score_last_90d=None,
             review_count_at_T=score.get("review_count_at_T") or 0,
+            session_id=f"analysis-{appid}-{int(time.time())}"
         )
 
         result = run_analysis(ctx)
