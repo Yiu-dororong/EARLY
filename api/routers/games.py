@@ -90,7 +90,7 @@ def list_games(
         params.append(min_reviews)
     if search_name is not None:
         filters.append("g.name LIKE ?")
-        params.append(f"'%{search_name}%'")
+        params.append(f"%{search_name}%")
 
     where = ("WHERE " + " AND ".join(filters)) if filters else ""
 
