@@ -22,6 +22,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -46,32 +48,68 @@ TARGET_UNIQUE    = 5      # unique games to return after dedup
 # ---------------------------------------------------------------------------
 
 _client = None
+_reconnect_lock = threading.Lock()
 
 
-def get_client():
-    global _client
-    if _client is not None:
-        return _client
+class ResilientZilliz:
+    def _reconnect(self) -> None:
+        global _client
+        with _reconnect_lock:
+            try:
+                if _client is not None:
+                    _client.close()
+            except Exception:
+                pass
 
-    uri   = os.getenv("ZILLIZ_URI")
-    token = os.getenv("ZILLIZ_TOKEN")
+            uri   = os.getenv("ZILLIZ_URI")
+            token = os.getenv("ZILLIZ_TOKEN")
 
-    if not uri or not token:
-        logger.warning("ZILLIZ_URI/ZILLIZ_TOKEN not set — Zilliz disabled")
+            if not uri or not token:
+                logger.warning("ZILLIZ_URI/ZILLIZ_TOKEN not set — Zilliz disabled")
+                _client = None
+                return
+
+            try:
+                from pymilvus import MilvusClient
+                _client = MilvusClient(uri=uri, token=token)
+                logger.info("Zilliz client initialised/reconnected (uri=%s)", uri)
+            except ImportError:
+                logger.warning("pymilvus not installed — Zilliz disabled")
+                _client = None
+            except Exception as e:
+                logger.error("Zilliz connection failed: %s", e)
+                _client = None
+
+    def _execute_with_retry(self, operation: str, *args, **kwargs):
+        global _client
+        for attempt in range(1, 4):
+            try:
+                if _client is None:
+                    self._reconnect()
+                if _client is None:
+                    raise RuntimeError("Zilliz client not available")
+                
+                method = getattr(_client, operation)
+                return method(*args, **kwargs)
+            except Exception as e:
+                if attempt == 3:
+                    raise
+                logger.warning("Zilliz '%s' error (attempt %d): %s — reconnecting", operation, attempt, e)
+                time.sleep(1)
+                self._reconnect()
+
+    def search(self, *args, **kwargs): return self._execute_with_retry("search", *args, **kwargs)
+    def upsert(self, *args, **kwargs): return self._execute_with_retry("upsert", *args, **kwargs)
+    def has_collection(self, *args, **kwargs): return self._execute_with_retry("has_collection", *args, **kwargs)
+    def create_schema(self, *args, **kwargs): return self._execute_with_retry("create_schema", *args, **kwargs)
+    def prepare_index_params(self, *args, **kwargs): return self._execute_with_retry("prepare_index_params", *args, **kwargs)
+    def create_collection(self, *args, **kwargs): return self._execute_with_retry("create_collection", *args, **kwargs)
+
+
+def get_client() -> ResilientZilliz | None:
+    if not os.getenv("ZILLIZ_URI") or not os.getenv("ZILLIZ_TOKEN"):
         return None
-
-    try:
-        from pymilvus import MilvusClient
-        _client = MilvusClient(uri=uri, token=token)
-        logger.info("Zilliz client initialised (uri=%s)", uri)
-    except ImportError:
-        logger.warning("pymilvus not installed — Zilliz disabled")
-        return None
-    except Exception as e:
-        logger.error("Zilliz connection failed: %s", e)
-        return None
-
-    return _client
+    return ResilientZilliz()
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +127,7 @@ def ensure_collection() -> bool:
         return False
 
     try:
-        from pymilvus import DataType, MilvusClient
+        from pymilvus import DataType
 
         if client.has_collection(COLLECTION_NAME):
             logger.info("Collection '%s' already exists", COLLECTION_NAME)
@@ -241,7 +279,7 @@ def search_similar(
         ]
 
         for i, filter_expr in enumerate(passes, 1):
-            results = _run_search(client, vector, filter_expr, limit=TOP_K_QUERY)
+            results = _run_search(vector, filter_expr, limit=TOP_K_QUERY)
             unique  = _deduplicate(results, n_results)
 
             if len(unique) >= n_results:
@@ -258,7 +296,7 @@ def search_similar(
 
         # Return whatever we have after all passes
         return _deduplicate(
-            _run_search(client, vector, passes[-1], limit=TOP_K_QUERY),
+            _run_search(vector, passes[-1], limit=TOP_K_QUERY),
             n_results,
         )
 
@@ -287,7 +325,11 @@ def _build_filter(
     return " and ".join(parts)
 
 
-def _run_search(client, vector: list[float], filter_expr: str, limit: int) -> list[dict]:
+def _run_search(vector: list[float], filter_expr: str, limit: int) -> list[dict]:
+    client = get_client()
+    if client is None:
+        return []
+
     try:
         results = client.search(
             collection_name=COLLECTION_NAME,
