@@ -35,7 +35,7 @@ from agents.orchestrator import (
     XGBoostResult,
     run_analysis,
 )
-
+from agents.forensic_agent import LOOKBACK_DAYS
 from api.services.reviews import fetch_reviews_for_auditor
 
 logger = logging.getLogger(__name__)
@@ -45,9 +45,6 @@ MAX_REVIEWS_PER_WINDOW = 20  # cap reviews fetched per window
 
 # Days since last build-type event when none found in DB
 _NO_BUILD_SENTINEL = 9999
- 
-# How far back to fetch announcements for the forensic window
-_ANNOUNCEMENT_FETCH_DAYS = 90
 
 # ---------------------------------------------------------------------------
 # Text processing helpers
@@ -153,7 +150,7 @@ def _fetch_announcements(
  
         announcements:
             List of AnnouncementEvent, all event types, within
-            _ANNOUNCEMENT_FETCH_DAYS of snap_ts, sorted most recent first.
+            LOOKBACK_DAYS of snap_ts, sorted most recent first.
             The orchestrator's _select_announcements() will trim this to
             the last 3 within the 60-day forensic window.
  
@@ -164,7 +161,7 @@ def _fetch_announcements(
             a depot build was actually shipped (see Never Mourn case).
     """
     snapshot_date = datetime.fromtimestamp(snap_ts, tz=timezone.utc).date()
-    cutoff_ts     = snap_ts - (_ANNOUNCEMENT_FETCH_DAYS * 86400)
+    cutoff_ts     = snap_ts - (LOOKBACK_DAYS * 86400)
  
     # ── Query 1: recent announcements (all types, within fetch window) ──────
     rows = db.execute("""
