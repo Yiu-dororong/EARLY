@@ -37,7 +37,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "HEAD"],
     allow_headers=["*"],
 )
 
@@ -46,6 +46,7 @@ app.include_router(games.router, prefix="/games")
 app.include_router(search_router, prefix="/search")
 
 @app.get("/")
+@app.head("/")
 async def root():
     return {
         "api_name": "EARLY API",
