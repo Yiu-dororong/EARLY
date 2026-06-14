@@ -64,8 +64,9 @@ def list_games(
     currently_in_ea: int | None = Query(None, description="1 = active EA only"),
     outcome:         str | None = Query(None, description="EXIT_SUCCESS | EXIT_ABANDONED | EXIT_SILENT | STAYS_ACTIVE"),
     min_reviews:     int | None = Query(None, description="Minimum review_count_at_T"),
+    search_name:     str | None = Query(None, description="Search by game name"),
     offset:          int = Query(0, ge=0),
-    limit:           int = Query(50, ge=1, le=200),
+    limit:           int = Query(50, ge=1, le=5000),
 ):
     db = get_db()
 
@@ -87,6 +88,9 @@ def list_games(
     if min_reviews is not None:
         filters.append("ls.review_count_at_T >= ?")
         params.append(min_reviews)
+    if search_name is not None:
+        filters.append("g.name LIKE ?")
+        params.append(f"%{search_name}%")
 
     where = ("WHERE " + " AND ".join(filters)) if filters else ""
 
