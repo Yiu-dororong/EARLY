@@ -33,12 +33,19 @@ Usage:
 import argparse
 import logging
 import os
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
 
 import libsql
 import pandas as pd
+import sys
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from training.scorecard_config import (
     CONFIG_VERSION,
@@ -182,7 +189,7 @@ def analyse_distribution(df: pd.DataFrame) -> None:
 # 2. Outcome Agreement
 # ---------------------------------------------------------------------------
 
-def analyse_outcome_agreement(df: pd.DataFrame) -> None:
+def analyse_outcome_agreement(df: pd.DataFrame) -> dict:
     log.info("")
     log.info("=" * 60)
     log.info("2. OUTCOME AGREEMENT")
@@ -199,7 +206,7 @@ def analyse_outcome_agreement(df: pd.DataFrame) -> None:
     final = final[final["outcome"].notna() & (final["outcome"] != "STAYS_ACTIVE")]
     if final.empty:
         log.info("No graduated games (EXIT_SUCCESS / EXIT_ABANDONED) found yet.")
-        return
+        return {}
 
     total_graduated = len(final)
     log.info("Graduated games: %d", total_graduated)
@@ -214,6 +221,7 @@ def analyse_outcome_agreement(df: pd.DataFrame) -> None:
     calibration_warnings = []
     prev_pct_abandoned = -1.0
     prev_state = None
+    state_agreement = {}
 
     for state in state_order:
         subset = final[final["l1_state"] == state]
@@ -253,6 +261,14 @@ def analyse_outcome_agreement(df: pd.DataFrame) -> None:
             
         prev_pct_abandoned = pct_abandoned
         prev_state = state
+        
+        state_agreement[state] = {
+            "n_games": int(n),
+            "success_rate": float(pct_success / 100.0),
+            "abandoned_rate": float(pct_abandoned / 100.0),
+            "agreement_rate": float(agreement / 100.0),
+            "expected_outcome": expected
+        }
 
     if calibration_warnings:
         log.warning("")
@@ -317,11 +333,13 @@ def analyse_outcome_agreement(df: pd.DataFrame) -> None:
     except ImportError:
         log.warning("Plotly/numpy not installed. Skipping visualization. (Run: pip install plotly numpy)")
 
+    return state_agreement
+
 # ---------------------------------------------------------------------------
 # 3. Dimension Health
 # ---------------------------------------------------------------------------
 
-def analyse_dimensions(sc_df: pd.DataFrame, raw_df: pd.DataFrame) -> None:
+def analyse_dimensions(sc_df: pd.DataFrame, raw_df: pd.DataFrame) -> dict:
     log.info("")
     log.info("=" * 60)
     log.info("3. DIMENSION HEALTH")
@@ -342,6 +360,7 @@ def analyse_dimensions(sc_df: pd.DataFrame, raw_df: pd.DataFrame) -> None:
              "Dimension", "mean", "p25", "p50", "p75", "null%")
     log.info("-" * 65)
 
+    dim_stats = {}
     for dim, col in dim_score_cols.items():
         s     = sc_df[col].dropna()
         null_pct = 100 * sc_df[col].isna().mean()
@@ -352,6 +371,13 @@ def analyse_dimensions(sc_df: pd.DataFrame, raw_df: pd.DataFrame) -> None:
                  dim,
                  s.mean(), s.quantile(0.25), s.median(), s.quantile(0.75),
                  null_pct)
+        dim_stats[dim] = {
+            "mean": float(s.mean()),
+            "p25": float(s.quantile(0.25)),
+            "p50": float(s.median()),
+            "p75": float(s.quantile(0.75)),
+            "null_pct": float(null_pct)
+        }
 
     # Per-feature null rates
     log.info("")
@@ -383,6 +409,8 @@ def analyse_dimensions(sc_df: pd.DataFrame, raw_df: pd.DataFrame) -> None:
     log.info("Null feature count per snapshot (p50/p90/max):")
     nc = sc_df["null_feature_count"]
     log.info("  p50=%.0f  p90=%.0f  max=%.0f", nc.median(), nc.quantile(0.9), nc.max())
+
+    return dim_stats
 
 
 # ---------------------------------------------------------------------------
@@ -493,9 +521,21 @@ def run(snapshot_pct: str | None) -> None:
         return
 
     analyse_distribution(sc_df)
-    analyse_outcome_agreement(sc_df)
-    analyse_dimensions(sc_df, raw_df)
+    state_agreement = analyse_outcome_agreement(sc_df)
+    dim_stats = analyse_dimensions(sc_df, raw_df)
     calibration_recommendations(sc_df, raw_df)
+
+    # Export stats to JSON for the frontend
+    export_data = {
+        "config_version": CONFIG_VERSION,
+        "state_agreement": state_agreement,
+        "dimension_stats": dim_stats
+    }
+    os.makedirs("models", exist_ok=True)
+    out_path = os.path.join("models", f"scorecard_stats_{CONFIG_VERSION}.json")
+    with open(out_path, "w") as f:
+        json.dump(export_data, f, indent=2)
+    log.info("Exported scorecard stats to %s", out_path)
 
     conn.close()
 
