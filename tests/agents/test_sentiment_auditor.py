@@ -12,9 +12,9 @@ import pytest
 from deepeval import assert_test
 from deepeval.metrics import GEval
 from deepeval.test_case import LLMTestCase, LLMTestCaseParams
-from langchain_groq import ChatGroq
 
 from agents.sentiment_auditor import run_sentiment_auditor
+from tests.agents.eval_llm import DeepEvalGroqAdapter
 from tests.agents.fixtures import (
     ALIGNED_REVIEWS_OLDER,
     ALIGNED_REVIEWS_RECENT,
@@ -108,7 +108,7 @@ def test_auditor_summary_mentions_conflict():
 
     metric = GEval(
         name="ConflictArticulation",
-        model=ChatGroq(model="llama-3.3-70b-versatile", temperature=0.0),
+        model=DeepEvalGroqAdapter(model_name="llama-3.3-70b-versatile", temperature=0.0),
         criteria=(
             "The summary must explicitly state that player reviews CONTRADICT or "
             "CONFLICT with the stated health classification. It should describe "
@@ -148,7 +148,7 @@ def test_key_concerns_are_actionable():
 
     metric = GEval(
         name="ConcernSpecificity",
-        model=ChatGroq(model="llama-3.3-70b-versatile", temperature=0.0),
+        model=DeepEvalGroqAdapter(model_name="llama-3.3-70b-versatile", temperature=0.0),
         criteria=(
             "Each concern should identify a SPECIFIC, ACTIONABLE issue a developer "
             "can address — e.g. 'No response to bug reports in forum' or "
