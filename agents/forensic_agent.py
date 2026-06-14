@@ -68,7 +68,7 @@ class ForensicState(TypedDict):
     momentum: str | None
     event_state_mismatch: int | None
     reasoning: str | None
-    error: str | None
+    error_msg: str | None
 
 
 # ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ def assess_updates(state: ForensicState, config: RunnableConfig) -> dict:
             "momentum": "hollow_pattern",
             "event_state_mismatch": 0,
             "reasoning": "No announcements found in the lookback window.",
-            "error": None,
+            "error_msg": None,
         }
 
     # Fast-path: single announcement with empty body
@@ -205,7 +205,7 @@ def assess_updates(state: ForensicState, config: RunnableConfig) -> dict:
                 "momentum": "single_update",
                 "event_state_mismatch": mismatch,
                 "reasoning": "Empty body after BBCode strip — no content to assess.",
-                "error": None,
+                "error_msg": None,
             }
 
     llm    = _get_llm()
@@ -228,21 +228,21 @@ def assess_updates(state: ForensicState, config: RunnableConfig) -> dict:
             "momentum": momentum,
             "event_state_mismatch": int(bool(parsed.get("event_state_mismatch", 0))),
             "reasoning": str(parsed.get("reasoning", "")),
-            "error": None,
+            "error_msg": None,
             "messages": [response],
         }
 
     except json.JSONDecodeError as e:
         return {"update_substance_score": None, "fake_heartbeat_flag": None, "momentum": None,
-                "event_state_mismatch": None, "reasoning": None, "error": f"JSON parse error: {e}"}
+                "event_state_mismatch": None, "reasoning": None, "error_msg": f"JSON parse error: {e}"}
     except Exception as e:
         return {"update_substance_score": None, "fake_heartbeat_flag": None, "momentum": None,
                 "event_state_mismatch": None, "reasoning": None,
-                "error": f"LLM call failed: {type(e).__name__}: {e}"}
+                "error_msg": f"LLM call failed: {type(e).__name__}: {e}"}
 
 
 def validate_output(state: ForensicState) -> dict:
-    if state.get("error"):
+    if state.get("error_msg"):
         return {}
     score = state["update_substance_score"]
     flag  = state["fake_heartbeat_flag"]
@@ -316,7 +316,7 @@ def run_forensic_agent(
         "announcements": announcements[:MAX_EVENTS_CONSIDERED],
         "update_substance_score": None, "fake_heartbeat_flag": None,
         "momentum": None, "event_state_mismatch": None,
-        "reasoning": None, "error": None,
+        "reasoning": None, "error_msg": None,
     }
     config = {"callbacks": [trace]} if trace else {}
     final = get_graph().invoke(initial, config=config)
@@ -326,5 +326,5 @@ def run_forensic_agent(
         fake_heartbeat_flag=final.get("fake_heartbeat_flag"),
         momentum=final.get("momentum"),
         event_state_mismatch=final.get("event_state_mismatch"),
-        reasoning=final.get("reasoning"), error=final.get("error"),
+        reasoning=final.get("reasoning"), error=final.get("error_msg"),
     )

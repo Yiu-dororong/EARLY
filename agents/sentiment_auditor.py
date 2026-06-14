@@ -50,7 +50,7 @@ class SentimentState(TypedDict):
     sentiment_alignment: str | None   # NEW
     key_concerns: list[str] | None
     auditor_summary: str | None
-    error: str | None
+    error_msg: str | None
 
 
 SYSTEM_PROMPT = """You are the Sentiment Auditor for EARLY, a Steam Early Access
@@ -135,7 +135,7 @@ def check_eligibility(state: SentimentState) -> dict:
         return {
             "theme_clusters": [], "sentiment_shift": "insufficient_data",
             "sentiment_alignment": "insufficient_data",
-            "key_concerns": [], "auditor_summary": "No reviews available.", "error": None,
+            "key_concerns": [], "auditor_summary": "No reviews available.", "error_msg": None,
         }
     return {}
 
@@ -164,16 +164,16 @@ def analyse_sentiment(state: SentimentState, config: RunnableConfig) -> dict:
             "sentiment_alignment": alignment,
             "key_concerns": parsed.get("key_concerns", []),
             "auditor_summary": parsed.get("auditor_summary", ""),
-            "error": None, "messages": [response],
+            "error_msg": None, "messages": [response],
         }
 
     except json.JSONDecodeError as e:
         return {"theme_clusters": None, "sentiment_shift": None, "sentiment_alignment": None,
-                "key_concerns": None, "auditor_summary": None, "error": f"JSON parse error: {e}"}
+                "key_concerns": None, "auditor_summary": None, "error_msg": f"JSON parse error: {e}"}
     except Exception as e:
         return {"theme_clusters": None, "sentiment_shift": None, "sentiment_alignment": None,
                 "key_concerns": None, "auditor_summary": None,
-                "error": f"LLM call failed: {type(e).__name__}: {e}"}
+                "error_msg": f"LLM call failed: {type(e).__name__}: {e}"}
 
 
 def _build_graph() -> StateGraph:
@@ -225,7 +225,7 @@ def run_sentiment_auditor(
         "l1_state": l1_state,
         "theme_clusters": None, "sentiment_shift": None,
         "sentiment_alignment": None,
-        "key_concerns": None, "auditor_summary": None, "error": None,
+        "key_concerns": None, "auditor_summary": None, "error_msg": None,
     }
     config = {"callbacks": [trace]} if trace else {}
     final = get_graph().invoke(initial, config=config)
@@ -236,5 +236,5 @@ def run_sentiment_auditor(
         sentiment_alignment=final.get("sentiment_alignment"),
         key_concerns=final.get("key_concerns"),
         auditor_summary=final.get("auditor_summary"),
-        error=final.get("error"),
+        error=final.get("error_msg"),
     )

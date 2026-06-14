@@ -72,7 +72,7 @@ class CriticState(TypedDict):
     consumer_verdict: str | None
     developer_brief: str | None
     confidence_note: str | None
-    error: str | None
+    error_msg: str | None
 
 
 CONSUMER_SYSTEM = """You are writing a risk assessment for a Steam player considering
@@ -227,18 +227,18 @@ def write_consumer_verdict(state: CriticState, config: RunnableConfig) -> dict:
         f"{_context(state)}\n\nWrite the consumer verdict now.",
         config=config
     )
-    return {"consumer_verdict": content, "error": error}
+    return {"consumer_verdict": content, "error_msg": error}
 
 
 def write_developer_brief(state: CriticState, config: RunnableConfig) -> dict:
-    if state.get("error"):
+    if state.get("error_msg"):
         return {}
     content, error = _llm_call(
         DEVELOPER_SYSTEM,
         f"{_context(state)}\n\nWrite the developer brief now.",
         config=config
     )
-    return {"developer_brief": content, "error": error}
+    return {"developer_brief": content, "error_msg": error}
 
 
 def add_confidence_note(state: CriticState) -> dict:
@@ -322,7 +322,7 @@ def run_critic_agent(
         "auditor_summary": auditor_summary,
         "signal_alignment": None,
         "consumer_verdict": None, "developer_brief": None,
-        "confidence_note": None, "error": None,
+        "confidence_note": None, "error_msg": None,
     }
     config = {"callbacks": [trace]} if trace else {}
     final = get_graph().invoke(initial, config=config)
@@ -332,5 +332,5 @@ def run_critic_agent(
         consumer_verdict=final.get("consumer_verdict"),
         developer_brief=final.get("developer_brief"),
         confidence_note=final.get("confidence_note"),
-        error=final.get("error"),
+        error=final.get("error_msg"),
     )
