@@ -102,6 +102,7 @@ Produce:
 
 RULES:
 - representative_quote must come verbatim from provided reviews (under 60 chars) or be null.
+- If representative_quote is NOT in English, you MUST provide an English translation in quote_translation.
 - IMPORTANT: Carefully escape any double quotes inside your quote to maintain valid JSON.
 
 # Quantifier & Scale Rules

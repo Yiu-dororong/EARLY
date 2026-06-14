@@ -72,7 +72,7 @@ class ThemeClusterModel(BaseModel):
     valence: str
     frequency: str
     representative_quote: str | None
-    quote_translation: str | None = None
+    quote_translation: str | None
 
 
 class SentimentOutputModel(BaseModel):
