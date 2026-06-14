@@ -15,6 +15,7 @@ Auditor receives l1_state for sentiment_alignment triangulation.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from dataclasses import dataclass, field
 from datetime import date, timedelta
@@ -183,7 +184,6 @@ def run_analysis(ctx: GameContext) -> AnalysisResult:
     except Exception as e:
         logger.debug("Langfuse trace init failed: %s", e)
 
-    import contextlib
     with contextlib.ExitStack() as stack:
         if langfuse_client and trace:
             from langfuse import propagate_attributes
