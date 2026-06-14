@@ -43,6 +43,11 @@ logger = logging.getLogger(__name__)
 STALE_DAYS = 14          # re-run analysis if older than this
 MAX_REVIEWS_PER_WINDOW = 20  # cap reviews fetched per window
 
+# Days since last build-type event when none found in DB
+_NO_BUILD_SENTINEL = 9999
+ 
+# How far back to fetch announcements for the forensic window
+_ANNOUNCEMENT_FETCH_DAYS = 90
 
 # ---------------------------------------------------------------------------
 # Text processing helpers
@@ -129,22 +134,53 @@ def _fetch_game_meta(db: libsql.Connection, appid: int) -> dict:
     return {"name": row[0] if row else None, "ea_start_date": row[1] if row else None}
 
 
-def _fetch_build_events(db: libsql.Connection, appid: int) -> list[AnnouncementEvent]:
-    """Fetch build update events (type 12/13/14) sorted most recent first."""
+def _fetch_announcements(
+    db,
+    appid: int,
+    snap_ts: int,
+) -> tuple[list, int]:
+    """
+    Fetch recent announcements for the Forensic Agent and compute
+    days_since_last_build_update.
+ 
+    Args:
+        db:       libsql connection
+        appid:    Steam appid
+        snap_ts:  Unix timestamp of the scoring snapshot (used as "now")
+ 
+    Returns:
+        (announcements, days_since_last_build_update)
+ 
+        announcements:
+            List of AnnouncementEvent, all event types, within
+            _ANNOUNCEMENT_FETCH_DAYS of snap_ts, sorted most recent first.
+            The orchestrator's _select_announcements() will trim this to
+            the last 3 within the 60-day forensic window.
+ 
+        days_since_last_build_update:
+            Days between snap_ts and the most recent type-12/13/14 event.
+            9999 if no build-type event exists in the DB for this game.
+            This is the best available proxy — event types don't confirm
+            a depot build was actually shipped (see Never Mourn case).
+    """
+    snapshot_date = datetime.fromtimestamp(snap_ts, tz=timezone.utc).date()
+    cutoff_ts     = snap_ts - (_ANNOUNCEMENT_FETCH_DAYS * 86400)
+ 
+    # ── Query 1: recent announcements (all types, within fetch window) ──────
     rows = db.execute("""
         SELECT event_type, event_name, announcement_body, word_count, event_ts
         FROM event_history
         WHERE appid = ?
-          AND event_type IN (12, 13)
+          AND event_ts >= ?
         ORDER BY event_ts DESC
-        LIMIT 10
-    """, (appid,)).fetchall()
-
-    events = []
+        LIMIT 20
+    """, (appid, cutoff_ts)).fetchall()
+ 
+    announcements = []
     for r in rows:
         try:
             posted = datetime.fromtimestamp(r[4], tz=timezone.utc).date()
-            events.append(AnnouncementEvent(
+            announcements.append(AnnouncementEvent(
                 event_type=r[0],
                 title=r[1] or "",
                 body_stripped=strip_bbcode(r[2] or ""),
@@ -153,7 +189,29 @@ def _fetch_build_events(db: libsql.Connection, appid: int) -> list[AnnouncementE
             ))
         except (ValueError, TypeError, OSError):
             continue
-    return events
+ 
+    # ── Query 2: days since last build-type event (no date limit) ───────────
+    # Separate query so we get the correct staleness even when the most
+    # recent build event is older than _ANNOUNCEMENT_FETCH_DAYS.
+    build_row = db.execute("""
+        SELECT event_ts
+        FROM event_history
+        WHERE appid = ?
+          AND event_type IN (12, 13, 14)
+        ORDER BY event_ts DESC
+        LIMIT 1
+    """, (appid,)).fetchone()
+ 
+    if build_row and build_row[0]:
+        try:
+            last_build_date = datetime.fromtimestamp(build_row[0], tz=timezone.utc).date()
+            days_since_last_build_update = (snapshot_date - last_build_date).days
+        except (ValueError, TypeError, OSError):
+            days_since_last_build_update = _NO_BUILD_SENTINEL
+    else:
+        days_since_last_build_update = _NO_BUILD_SENTINEL
+ 
+    return announcements, days_since_last_build_update
 
 
 def _fetch_existing_analysis(db: libsql.Connection, appid: int) -> dict | None:
@@ -259,7 +317,7 @@ def trigger_analysis(db: libsql.Connection, appid: int, force: bool = False) -> 
         trigger_reason = "user_request" if force else reason
 
         meta        = _fetch_game_meta(db, appid)
-        build_events = _fetch_build_events(db, appid)
+        announcements, days_since_last_build = _fetch_announcements(db, appid, snap_ts)
         snap_ts     = score["scored_at"]
         snap_date   = score.get("snapshot_date") or datetime.fromtimestamp(snap_ts, tz=timezone.utc).strftime("%Y-%m-%d")
 
@@ -288,7 +346,8 @@ def trigger_analysis(db: libsql.Connection, appid: int, force: bool = False) -> 
                 p_distressed=score.get("p_distressed"),
                 is_distressed=score.get("is_distressed"),
             ),
-            recent_build_events=build_events,
+            recent_announcements=announcements,
+            days_since_last_build_update=days_since_last_build,
             recent_reviews=recent_reviews,
             older_reviews=older_reviews,
             review_score_at_T=0.0,   # not stored in live_scores; auditor handles gracefully
