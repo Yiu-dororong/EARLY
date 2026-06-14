@@ -175,16 +175,7 @@ def run_analysis(ctx: GameContext) -> AnalysisResult:
     trace = None
     try:
         from utils.langfuse_client import get_callback_handler
-        trace = get_callback_handler(
-            appid=ctx.appid,
-            session_id=ctx.session_id,
-            metadata={
-                "l1_state": ctx.scorecard.l1_state,
-                "composite_score": ctx.scorecard.composite_score,
-                "ml_eligible": ctx.xgboost.ml_eligible,
-                "ea_age_days": ctx.ea_age_days,
-            },
-        )
+        trace = get_callback_handler()
     except Exception as e:
         logger.debug("Langfuse trace init failed: %s", e)
 
@@ -267,6 +258,5 @@ def run_analysis(ctx: GameContext) -> AnalysisResult:
             logger.warning("Critic error appid=%d: %s", ctx.appid, critic.error)
     except Exception as e:
         logger.error("Critic exception appid=%d: %s", ctx.appid, e)
-
 
     return result
