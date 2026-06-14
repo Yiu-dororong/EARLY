@@ -101,7 +101,14 @@ def list_games(
         {where}
     """
 
-    (total,) = db.execute(f"SELECT COUNT(*) {base_query}", params).fetchone()
+    # Calculate the exact breakdown of L1 states across the entire filtered dataset
+    state_rows = db.execute(f"""
+        SELECT ls.l1_state, COUNT(*)
+        {base_query}
+        GROUP BY ls.l1_state
+    """, params).fetchall()
+    state_counts = {r[0]: r[1] for r in state_rows}
+    total = sum(state_counts.values())
 
     rows = db.execute(f"""
         SELECT
@@ -130,7 +137,13 @@ def list_games(
         for r in rows
     ]
 
-    return GameListResponse(total=total, offset=offset, limit=limit, items=items)
+    return GameListResponse(
+        total=total, 
+        offset=offset, 
+        limit=limit, 
+        items=items,
+        state_counts=state_counts
+    )
 
 
 # ---------------------------------------------------------------------------

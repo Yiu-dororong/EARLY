@@ -47,7 +47,7 @@ class GameListResponse(BaseModel):
     offset: int
     limit:  int
     items:  list[GameSummary]
-
+    state_counts: dict[str, int] = {}  
 
 # ---------------------------------------------------------------------------
 # /games/{appid}/score

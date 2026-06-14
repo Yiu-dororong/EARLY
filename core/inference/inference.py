@@ -140,7 +140,7 @@ def get_conn() -> libsql.Connection:
 def ensure_live_scores_table(conn: libsql.Connection) -> None:
     conn.execute("""
         CREATE TABLE IF NOT EXISTS live_scores (
-            appid               INTEGER PRIMARY KEY,
+            appid               INTEGER,
             snapshot_date       TEXT,
             primary_genre       TEXT,
             scored_at           INTEGER NOT NULL,
@@ -157,7 +157,8 @@ def ensure_live_scores_table(conn: libsql.Connection) -> None:
             dev_engagement      REAL,
             sentiment           REAL,
             price_market        REAL,
-            shap_json           TEXT
+            shap_json           TEXT,
+            PRIMARY KEY (appid, scored_at)
         )
     """)
     conn.commit()
