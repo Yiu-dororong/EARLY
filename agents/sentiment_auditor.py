@@ -11,7 +11,7 @@ Triangulation addition:
   months, content drought" → sentiment_alignment="conflicted". This is
   the review-side half of the triangulation the Critic Agent synthesizes.
 
-Model: Groq llama-3.1-8b-instant
+Model: Groq llama-3.3-70b-versatile
 Tracing: Langfuse generation span
 """
 
@@ -33,6 +33,8 @@ from langchain_core.runnables import RunnableConfig
 MAX_RECENT_REVIEWS = 25
 MAX_OLDER_REVIEWS  = 15
 MAX_REVIEW_CHARS   = 300
+
+MODEL_NAME = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 
 class SentimentState(TypedDict):
@@ -96,6 +98,7 @@ Produce:
    reviews say) — this is the most important thing to surface.
 
 representative_quote must come verbatim from provided reviews (under 60 chars) or be null.
+IMPORTANT: Carefully escape any double quotes inside your quote to maintain valid JSON.
 If fewer than 5 total reviews: return empty clusters, insufficient_data for both
 sentiment_shift and sentiment_alignment, and note sparsity.
 
@@ -140,7 +143,7 @@ def _get_llm() -> ChatGroq:
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise EnvironmentError("GROQ_API_KEY not set")
-    return ChatGroq(model="llama-3.1-8b-instant", temperature=0.0, max_tokens=1024, api_key=api_key)
+    return ChatGroq(model=MODEL_NAME, temperature=0.0, max_tokens=1024, api_key=api_key)
 
 
 def check_eligibility(state: SentimentState) -> dict:

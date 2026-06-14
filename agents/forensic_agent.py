@@ -43,6 +43,8 @@ MAX_EVENTS_CONSIDERED = 3
 LOOKBACK_DAYS         = 60
 MAX_BODY_CHARS        = 600   # per-event truncation to bound total prompt size
 
+MODEL_NAME = "meta-llama/llama-4-scout-17b-16e-instruct"
+
 
 # ---------------------------------------------------------------------------
 # State
@@ -180,7 +182,7 @@ def _get_llm() -> ChatGroq:
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise EnvironmentError("GROQ_API_KEY not set")
-    return ChatGroq(model="llama-3.3-70b-versatile", temperature=0.0, max_tokens=350, api_key=api_key)
+    return ChatGroq(model=MODEL_NAME, temperature=0.0, max_tokens=350, api_key=api_key)
 
 
 # ---------------------------------------------------------------------------

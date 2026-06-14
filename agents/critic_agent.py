@@ -35,6 +35,8 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langchain_core.runnables import RunnableConfig
 
+MODEL_NAME = "meta-llama/llama-4-scout-17b-16e-instruct"
+
 
 class CriticState(TypedDict):
     messages: Annotated[list, add_messages]
@@ -201,7 +203,7 @@ def _get_llm() -> ChatGroq:
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise EnvironmentError("GROQ_API_KEY not set")
-    return ChatGroq(model="llama-3.3-70b-versatile", temperature=0.3, max_tokens=512, api_key=api_key)
+    return ChatGroq(model=MODEL_NAME, temperature=0.3, max_tokens=512, api_key=api_key)
 
 
 def _llm_call(system: str, prompt: str, config: RunnableConfig) -> tuple[str | None, str | None]:
