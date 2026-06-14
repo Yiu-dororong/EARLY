@@ -8,7 +8,7 @@ it down to each agent as a nested span.
 
 Trigger condition: l1_state in ("Watch", "At Risk")
 
-Forensic input: last 3 announcements (any event type) within 60 days —
+Forensic input: last 3 announcements (any event type) within N days —
 see agents/forensic_agent.py module docstring for rationale.
 Auditor receives l1_state for sentiment_alignment triangulation.
 """
@@ -89,12 +89,14 @@ def _select_announcements(
     snapshot_date: date,
 ) -> list[AnnouncementInput]:
     """
-    Select up to MAX_EVENTS_CONSIDERED announcements (any event type),
-    within LOOKBACK_DAYS of snapshot_date, most recent first.
+    Return announcements within last year(LOOKBACK_DAYS), capped at MAX_EVENTS_CONSIDERED.
+    Sorted: most recent first, major type preferred as tiebreaker.
+    No hard date cutoff — days_ago in the prompt communicates staleness.
     """
+
     cutoff = snapshot_date - timedelta(days=LOOKBACK_DAYS)
     in_window = [e for e in events if e.posted_at >= cutoff]
-    in_window.sort(key=lambda e: e.posted_at, reverse=True)
+    in_window.sort(key=lambda e: (e.posted_at, e.event_type // 28), reverse=True) # News < Update
 
     selected = []
     for e in in_window[:MAX_EVENTS_CONSIDERED]:

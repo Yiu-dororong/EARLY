@@ -2,7 +2,7 @@
 agents/forensic_agent.py
 EARLY — Forensic Agent (Phase 2, Layer 2)
 
-Analyzes the last 3 announcements within 60 days of snapshot to produce:
+Analyzes the last 3 announcements within 180 days of snapshot to produce:
   - update_substance_score  (0–10)  — substance of the MOST RECENT post
   - fake_heartbeat_flag     (0/1)   — most recent post is a hollow heartbeat
   - momentum                (str)   — pattern across all posts in the window
@@ -41,7 +41,7 @@ from agents.prompts import FORENSIC_SYSTEM_PROMPT
 
 # Lookback window — see design note in module docstring
 MAX_EVENTS_CONSIDERED = 3
-LOOKBACK_DAYS         = 60
+LOOKBACK_DAYS         = 365
 MAX_BODY_CHARS        = 600   # per-event truncation to bound total prompt size
 
 MODEL_NAME = "meta-llama/llama-4-scout-17b-16e-instruct"
