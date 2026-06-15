@@ -159,6 +159,7 @@ def ensure_live_scores_table(conn: libsql.Connection) -> None:
             price_market                    REAL,
             shap_json                       TEXT,
             days_since_last_build_update    INTEGER,
+            l1_composite_score              REAL,
             PRIMARY KEY (appid, scored_at)
         )
     """)
@@ -214,8 +215,8 @@ def upsert_score(conn: libsql.Connection, score: dict) -> libsql.Connection:
                     ml_eligible, model_version,
                     null_features, review_count_at_T,
                     update_health, player_retention, dev_engagement, sentiment, price_market,
-                    shap_json, days_since_last_build_update
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    shap_json, days_since_last_build_update, l1_composite_score
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 score["appid"],
                 score["snapshot_date"],
@@ -236,6 +237,7 @@ def upsert_score(conn: libsql.Connection, score: dict) -> libsql.Connection:
                 score["price_market"],
                 json.dumps(score["top25_shap"]) if score.get("top25_shap") else None,
                 score["days_since_last_build_update"],
+                score["l1_composite_score"],
             ))
             return conn
         except Exception as e:
@@ -480,6 +482,7 @@ def score_game(
         dev_engagement = l1_result.get("l1_dev_engagement_score")
         sentiment = l1_result.get("l1_sentiment_score")
         price_market = l1_result.get("l1_price_market_score")
+        l1_composite_score = l1_result.get("l1_composite_score")
 
         # Inject scores back into features dict using column names from build_snapshots.py
         features["l1_composite_score"] = l1_result.get("l1_composite_score")
@@ -498,6 +501,7 @@ def score_game(
         dev_engagement = None
         sentiment = None
         price_market = None
+        l1_composite_score = None
 
     review_count = features.get("review_count_at_T") or 0
     ml_eligible  = features.get("ml_eligible", 0)
@@ -566,6 +570,7 @@ def score_game(
         "price_market":     price_market,
         "top25_shap":       top25_shap,
         "days_since_last_build_update": features.get("days_since_last_build_update"),
+        "l1_composite_score": l1_composite_score,
     }
 
 

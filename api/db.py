@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS live_scores (
     sentiment           REAL,
     price_market        REAL,
     days_since_last_build_update INTEGER,
+    l1_composite_score  REAL,
     PRIMARY KEY (appid, scored_at)
 )
 """
