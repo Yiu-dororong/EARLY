@@ -134,11 +134,6 @@ def list_games(
             LEFT JOIN games_v2 g ON g.appid = ls.appid
             {where}
         ),
-        state_agg AS (
-            SELECT IFNULL(l1_state, 'Unknown') AS state, COUNT(*) as cnt
-            FROM base
-            GROUP BY l1_state
-        ),
         page AS (
             SELECT *
             FROM base
@@ -146,8 +141,7 @@ def list_games(
             LIMIT ? OFFSET ?
         )
         SELECT
-            (SELECT SUM(cnt) FROM state_agg) AS total,
-            (SELECT json_group_object(state, cnt) FROM state_agg) AS state_counts,
+            (SELECT COUNT(*) FROM base) AS total,
             (SELECT json_group_array(json_object(
                 'appid', appid,
                 'name', name,
@@ -167,8 +161,7 @@ def list_games(
     row = db.execute(query, params + [limit, offset]).fetchone()
     
     total = row[0] or 0
-    state_counts = json.loads(row[1] or "{}")
-    items_json = json.loads(row[2] or "[]")
+    items_json = json.loads(row[1] or "[]")
 
     items = [GameSummary(**item) for item in items_json]
 
@@ -176,8 +169,7 @@ def list_games(
         total=total,
         offset=offset,
         limit=limit,
-        items=items,
-        state_counts=state_counts
+        items=items
     )
 
 

@@ -48,7 +48,6 @@ class GameListResponse(BaseModel):
     offset: int
     limit:  int
     items:  list[GameSummary]
-    state_counts: dict[str, int] = {}  
 
 # ---------------------------------------------------------------------------
 # /games/{appid}/score
@@ -253,6 +252,8 @@ class PipelineHealth(BaseModel):
     games_scored_this_week: int
     games_total:            int
     at_risk_count:          int
+    watch_count:            int
+    healthy_count:          int
     null_rate_warning:      list[str]
 
 

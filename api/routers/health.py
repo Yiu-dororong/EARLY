@@ -4,6 +4,7 @@ api/routers/health.py
 GET /health — pipeline heartbeat.
 """
 
+import json
 import time
 
 from fastapi import APIRouter, HTTPException
@@ -34,64 +35,66 @@ _MONITORED_FEATURES = [
 def get_health():
     db = get_db()
 
-    # Last scored_at and total game count
-    row = db.execute("""
-        SELECT MAX(scored_at), COUNT(DISTINCT appid)
-        FROM live_scores
-    """).fetchone()
+    cutoff_7d = int(time.time()) - _STALE_THRESHOLD_SECS
 
-    if not row or row[1] == 0:
+    # Single combined query restricted to the latest snapshot batch
+    query = """
+        WITH latest_batch AS (
+            SELECT * FROM live_scores
+            WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM live_scores)
+        ),
+        deduped AS (
+            SELECT * FROM latest_batch
+            WHERE (appid, scored_at) IN (
+                SELECT appid, MAX(scored_at) FROM latest_batch GROUP BY appid
+            )
+        ),
+        state_agg AS (
+            SELECT IFNULL(l1_state, 'Unknown') AS state, COUNT(*) as cnt
+            FROM deduped
+            GROUP BY l1_state
+        )
+        SELECT
+            MAX(scored_at) AS last_scored_at,
+            SUM(CASE WHEN scored_at >= ? THEN 1 ELSE 0 END) AS games_scored_this_week,
+            (SELECT json_group_object(state, cnt) FROM state_agg) AS state_counts,
+            SUM(CASE WHEN p_distressed IS NULL THEN 1 ELSE 0 END) AS null_p_distressed,
+            SUM(CASE WHEN update_health IS NULL THEN 1 ELSE 0 END) AS null_update_health,
+            SUM(CASE WHEN player_retention IS NULL THEN 1 ELSE 0 END) AS null_player_retention,
+            SUM(CASE WHEN dev_engagement IS NULL THEN 1 ELSE 0 END) AS null_dev_engagement,
+            SUM(CASE WHEN sentiment IS NULL THEN 1 ELSE 0 END) AS null_sentiment,
+            SUM(CASE WHEN price_market IS NULL THEN 1 ELSE 0 END) AS null_price_market
+        FROM deduped
+    """
+
+    row = db.execute(query, (cutoff_7d,)).fetchone()
+
+    if not row or row[0] is None:
         return PipelineHealth(
             status="empty",
             last_scored_at=None,
             games_scored_this_week=0,
             games_total=0,
             at_risk_count=0,
+            watch_count=0,
+            healthy_count=0,
             null_rate_warning=[],
         )
 
-    last_scored_at, games_total = row
+    last_scored_at = row[0]
+    games_scored_this_week = row[1] or 0
 
-    # Games scored in the last week
-    cutoff_7d = int(time.time()) - _STALE_THRESHOLD_SECS
-    (games_scored_this_week,) = db.execute("""
-        SELECT COUNT(DISTINCT appid)
-        FROM live_scores
-        WHERE scored_at >= ?
-    """, (cutoff_7d,)).fetchone()
-
-    # At Risk count (latest score per game)
-    (at_risk_count,) = db.execute("""
-        SELECT COUNT(*)
-        FROM (
-            SELECT appid, MAX(scored_at) AS latest
-            FROM live_scores
-            GROUP BY appid
-        ) latest_scores
-        JOIN live_scores ls
-          ON ls.appid = latest_scores.appid
-         AND ls.scored_at = latest_scores.latest
-        WHERE ls.l1_state = 'At Risk'
-    """).fetchone()
+    state_counts = json.loads(row[2] or "{}")
+    games_total = sum(state_counts.values())
 
     # Null rate check on monitored features
-    null_warnings: list[str] = []
-    for col in _MONITORED_FEATURES:
-        try:
-            total_row = db.execute("""
-                SELECT COUNT(*), SUM(CASE WHEN {col} IS NULL THEN 1 ELSE 0 END)
-                FROM (
-                    SELECT appid, MAX(scored_at) AS latest
-                    FROM live_scores GROUP BY appid
-                ) ls
-                JOIN live_scores s ON s.appid = ls.appid AND s.scored_at = ls.latest
-            """.replace("{col}", col)).fetchone()
-            if total_row and total_row[0] > 0:
-                null_rate = (total_row[1] or 0) / total_row[0]
-                if null_rate > _NULL_RATE_WARN:
-                    null_warnings.append(f"{col} ({null_rate:.1%} null)")
-        except Exception:
-            pass  # column may not exist in older schema versions
+    null_warnings = []
+    for i, col in enumerate(_MONITORED_FEATURES):
+        null_count = row[3 + i] or 0
+        if games_total > 0:
+            null_rate = null_count / games_total
+            if null_rate > _NULL_RATE_WARN:
+                null_warnings.append(f"{col} ({null_rate:.1%} null)")
 
     # Staleness
     age_secs = int(time.time()) - last_scored_at
@@ -102,6 +105,8 @@ def get_health():
         last_scored_at=last_scored_at,
         games_scored_this_week=games_scored_this_week,
         games_total=games_total,
-        at_risk_count=at_risk_count,
+        at_risk_count=state_counts.get("At Risk", 0),
+        watch_count=state_counts.get("Watch", 0),
+        healthy_count=state_counts.get("Healthy", 0),
         null_rate_warning=null_warnings,
     )
