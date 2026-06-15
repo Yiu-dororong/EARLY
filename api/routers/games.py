@@ -133,9 +133,12 @@ def list_games(
             g.outcome,
             ls.days_since_last_build_update,
             (
-                (ls.p_distressed * 100.0) +                  -- Weighting Risk heavily
-                (LOG(MAX(ls.review_count_at_T, 1)) * 20.0) - -- Log scale for popularity (caps massive outliers)
-                (ls.ea_age_days * 0.05)                      -- Penalty multiplier for older games
+                (
+                    (ls.p_distressed * 100.0) +                  -- Weighting Risk heavily
+                    (LOG(MAX(ls.review_count_at_T, 1)) * 20.0) - -- Log scale for popularity (caps massive outliers)
+                    (ls.ea_age_days * 0.05)                      -- Penalty multiplier for older games
+                )*                    
+                (ls.days_since_last_build_update * 0.1)          -- Penalty multiplier for stale builds
             ) AS triage_priority_score
         {base_query}
         ORDER BY triage_priority_score DESC NULLS LAST
