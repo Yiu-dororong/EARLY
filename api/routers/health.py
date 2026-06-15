@@ -56,6 +56,7 @@ def get_health():
         )
         SELECT
             MAX(scored_at) AS last_scored_at,
+            MAX(snapshot_date) AS snapshot_date,
             SUM(CASE WHEN scored_at >= ? THEN 1 ELSE 0 END) AS games_scored_this_week,
             (SELECT json_group_object(state, cnt) FROM state_agg) AS state_counts,
             SUM(CASE WHEN p_distressed IS NULL THEN 1 ELSE 0 END) AS null_p_distressed,
@@ -73,6 +74,7 @@ def get_health():
         return PipelineHealth(
             status="empty",
             last_scored_at=None,
+            snapshot_date=None,
             games_scored_this_week=0,
             games_total=0,
             at_risk_count=0,
@@ -82,15 +84,16 @@ def get_health():
         )
 
     last_scored_at = row[0]
-    games_scored_this_week = row[1] or 0
+    snapshot_date = row[1]
+    games_scored_this_week = row[2] or 0
 
-    state_counts = json.loads(row[2] or "{}")
+    state_counts = json.loads(row[3] or "{}")
     games_total = sum(state_counts.values())
 
     # Null rate check on monitored features
     null_warnings = []
     for i, col in enumerate(_MONITORED_FEATURES):
-        null_count = row[3 + i] or 0
+        null_count = row[4 + i] or 0
         if games_total > 0:
             null_rate = null_count / games_total
             if null_rate > _NULL_RATE_WARN:
@@ -103,6 +106,7 @@ def get_health():
     return PipelineHealth(
         status=status,
         last_scored_at=last_scored_at,
+        snapshot_date=snapshot_date,
         games_scored_this_week=games_scored_this_week,
         games_total=games_total,
         at_risk_count=state_counts.get("At Risk", 0),

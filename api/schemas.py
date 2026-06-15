@@ -249,6 +249,7 @@ class AnalysisTriggerResponse(BaseModel):
 class PipelineHealth(BaseModel):
     status:                 str           # "ok" | "stale" | "empty"
     last_scored_at:         int | None
+    snapshot_date:          str | None = None
     games_scored_this_week: int
     games_total:            int
     at_risk_count:          int
