@@ -74,6 +74,9 @@ def list_games(
     filters = []
     params: list = []
 
+    # Restrict results to the latest batch dynamically to save a DB roundtrip
+    filters.append("ls.snapshot_date = (SELECT MAX(snapshot_date) FROM live_scores)")
+
     if l1_state is not None:
         filters.append("ls.l1_state = ?")
         params.append(l1_state)
@@ -98,67 +101,81 @@ def list_games(
 
     where = ("WHERE " + " AND ".join(filters)) if filters else ""
 
-    base_query = f"""
-        FROM (
+    query = f"""
+        WITH latest AS (
             SELECT appid, MAX(scored_at) AS latest
             FROM live_scores
             GROUP BY appid
-        ) latest
-        JOIN live_scores ls ON ls.appid = latest.appid AND ls.scored_at = latest.latest
-        LEFT JOIN games_v2 g ON g.appid = ls.appid
-        {where}
+        ),
+        base AS (
+            SELECT
+                ls.appid,
+                g.name,
+                g.ea_start_date,
+                ls.ea_age_days,
+                ls.l1_state,
+                ls.p_distressed,
+                ls.is_distressed,
+                ls.ml_eligible,
+                ls.review_count_at_T,
+                ls.snapshot_date,
+                g.outcome,
+                ls.days_since_last_build_update,
+                (
+                    (
+                        (ls.p_distressed * 100.0) +                  -- Weighting Risk heavily
+                        (LOG(MAX(ls.review_count_at_T, 1)) * 20.0) - -- Log scale for popularity (caps massive outliers)
+                        (ls.ea_age_days * 0.05)                      -- Penalty multiplier for older games
+                    )*
+                    (ls.days_since_last_build_update * 0.1)          -- Penalty multiplier for stale builds
+                ) AS triage_priority_score
+            FROM latest
+            JOIN live_scores ls ON ls.appid = latest.appid AND ls.scored_at = latest.latest
+            LEFT JOIN games_v2 g ON g.appid = ls.appid
+            {where}
+        ),
+        state_agg AS (
+            SELECT IFNULL(l1_state, 'Unknown') AS state, COUNT(*) as cnt
+            FROM base
+            GROUP BY l1_state
+        ),
+        page AS (
+            SELECT *
+            FROM base
+            ORDER BY triage_priority_score DESC NULLS LAST
+            LIMIT ? OFFSET ?
+        )
+        SELECT
+            (SELECT SUM(cnt) FROM state_agg) AS total,
+            (SELECT json_group_object(state, cnt) FROM state_agg) AS state_counts,
+            (SELECT json_group_array(json_object(
+                'appid', appid,
+                'name', name,
+                'ea_start_date', ea_start_date,
+                'ea_age_days', ea_age_days,
+                'l1_state', l1_state,
+                'p_distressed', p_distressed,
+                'is_distressed', is_distressed,
+                'ml_eligible', ml_eligible,
+                'review_count_at_T', review_count_at_T,
+                'snap_date', snapshot_date,
+                'outcome', outcome,
+                'days_since_last_build_update', days_since_last_build_update
+            )) FROM page) AS items_json
     """
 
-    # Calculate the exact breakdown of L1 states across the entire filtered dataset
-    state_rows = db.execute(f"""
-        SELECT ls.l1_state, COUNT(*)
-        {base_query}
-        GROUP BY ls.l1_state
-    """, params).fetchall()
-    state_counts = {r[0]: r[1] for r in state_rows}
-    total = sum(state_counts.values())
+    row = db.execute(query, params + [limit, offset]).fetchone()
+    
+    total = row[0] or 0
+    state_counts = json.loads(row[1] or "{}")
+    items_json = json.loads(row[2] or "[]")
 
-    rows = db.execute(f"""
-        SELECT
-            ls.appid,
-            g.name,
-            g.ea_start_date,
-            ls.ea_age_days,
-            ls.l1_state,
-            ls.p_distressed,
-            ls.is_distressed,
-            ls.ml_eligible,
-            ls.review_count_at_T,
-            ls.snapshot_date,
-            g.outcome,
-            ls.days_since_last_build_update,
-            (
-                (
-                    (ls.p_distressed * 100.0) +                  -- Weighting Risk heavily
-                    (LOG(MAX(ls.review_count_at_T, 1)) * 20.0) - -- Log scale for popularity (caps massive outliers)
-                    (ls.ea_age_days * 0.05)                      -- Penalty multiplier for older games
-                )*                    
-                (ls.days_since_last_build_update * 0.1)          -- Penalty multiplier for stale builds
-            ) AS triage_priority_score
-        {base_query}
-        ORDER BY triage_priority_score DESC NULLS LAST
-        LIMIT ? OFFSET ?
-    """, params + [limit, offset]).fetchall()
-
-    items = [
-        GameSummary(
-            appid=r[0], name=r[1], ea_start_date=r[2], ea_age_days=r[3],
-            l1_state=r[4], p_distressed=r[5], is_distressed=r[6],
-            ml_eligible=r[7], review_count_at_T=r[8], snap_date=r[9], outcome=r[10],
-            days_since_last_build_update=r[11],
-        )
-        for r in rows
-    ]
+    items = [GameSummary(**item) for item in items_json]
 
     return GameListResponse(
-        total=total, 
-        offset=offset, 
-        limit=limit, 
+        total=total,
+        offset=offset,
+        limit=limit,
         items=items,
         state_counts=state_counts
     )
