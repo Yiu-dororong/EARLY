@@ -39,6 +39,12 @@ import time
 import warnings
 from datetime import datetime
 from pathlib import Path
+import sys
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 import libsql
 import numpy as np
@@ -57,6 +63,8 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import GroupKFold, StratifiedGroupKFold, cross_val_score
 from sklearn.preprocessing import LabelEncoder
+
+from utils.mlflow_client import start_run, log_training_run
 
 warnings.filterwarnings("ignore", category=UserWarning)
 load_dotenv()
@@ -649,6 +657,26 @@ def evaluate(
         res["lift_oof_fast"] = float(oof_prauc_fast - baseline_prauc_fast)
         res["holdout_horizon_days"] = float(holdout_horizon)
 
+    tier_agreement = {}
+    for tier, target_label in [("Healthy", 0), ("Watch", 1), ("At Risk", 1)]:
+        mask = df_test["l1_state"] == tier
+        if mask.sum() > 0:
+            tier_agreement[tier] = float((y_test[mask] == target_label).mean())
+        else:
+            tier_agreement[tier] = None
+
+    if tier_agreement["Healthy"] is not None:
+        res["healthy_outcome_agreement"] = tier_agreement["Healthy"]
+    if tier_agreement["Watch"] is not None:
+        res["watch_outcome_agreement"] = tier_agreement["Watch"]
+    if tier_agreement["At Risk"] is not None:
+        res["at_risk_outcome_agreement"] = tier_agreement["At Risk"]
+
+    log.info("Per-tier outcome agreement (holdout):")
+    for tier, val in tier_agreement.items():
+        if val is not None:
+            log.info("  %-10s %.4f", tier, val)
+
     log.info("-" * 60)
 
     return res
@@ -940,38 +968,58 @@ def main():
     else:
         log.info("Ignoring tuned parameters (--ignore-tuned). Using default XGB_PARAMS.")
 
-    # ── Section 3: CV ────────────────────────────────────────────────────────
-    oof_preds, y_tv, feature_names, genre_enc, best_iters = run_cv(
-        df_train_val, scale_pos_weight
-    )
+    with start_run(model_version=MODEL_VERSION) as mlflow_run:
 
-    # ── Dynamic threshold from OOF ───────────────────────────────────────────
-    threshold = find_optimal_threshold(y_tv.values, oof_preds)
+        # ── Section 3: CV ────────────────────────────────────────────────
+        oof_preds, y_tv, feature_names, genre_enc, best_iters = run_cv(
+            df_train_val, scale_pos_weight
+        )
 
-    # ── Section 4: Final model ───────────────────────────────────────────────
-    model = train_final_model(
-        df_train_val, best_iters, scale_pos_weight, genre_enc, feature_names, threshold
-    )
+        # ── Dynamic threshold from OOF ───────────────────────────────────
+        threshold = find_optimal_threshold(y_tv.values, oof_preds)
 
-    # ── Section 5: Evaluation + Lift ─────────────────────────────────────────
-    metrics = evaluate(
-        model, df_test, oof_preds, y_tv,
-        df_train_val, genre_enc, feature_names, threshold,
-        time_bounded_eval=args.time_bounded_eval
-    )
+        # ── Section 4: Final model ───────────────────────────────────────
+        model = train_final_model(
+            df_train_val, best_iters, scale_pos_weight, genre_enc, feature_names, threshold
+        )
 
-    # ── Section 6: SHAP ──────────────────────────────────────────────────────
-    if not args.no_shap:
+        # ── Section 5: Evaluation + Lift ─────────────────────────────────
+        metrics = evaluate(
+            model, df_test, oof_preds, y_tv,
+            df_train_val, genre_enc, feature_names, threshold,
+            time_bounded_eval=args.time_bounded_eval
+        )
+        # ──  Unified Feature Matrix Creation for Signatures & SHAP ──
         X_tv, _, _, _ = build_feature_matrix(df_train_val, genre_enc)
         X_tv = X_tv.reindex(columns=feature_names, fill_value=np.nan)
-        # Sample up to 2000 rows for SHAP (TreeExplainer is exact, not approximate)
-        shap_sample = X_tv.sample(min(2000, len(X_tv)), random_state=RANDOM_SEED)
-        run_shap(model, shap_sample, feature_names)
-        
-        analyze_errors_shap(model, df_test, genre_enc, feature_names, threshold)
 
-    # ── Section 7: Log ───────────────────────────────────────────────────────
-    write_run_log(metrics, df_train_val, df_test, feature_names, best_iters)
+        # ── Section 6: SHAP ───────────────────────────────────────────────
+        shap_top25_path = OUTPUT_DIR / f"shap_top25_{MODEL_VERSION}.json"
+        if not args.no_shap:
+            shap_sample = X_tv.sample(min(2000, len(X_tv)), random_state=RANDOM_SEED)
+            run_shap(model, shap_sample, feature_names)
+            analyze_errors_shap(model, df_test, genre_enc, feature_names, threshold)
+
+        # ── Section 7: Log ────────────────────────────────────────────────
+        write_run_log(metrics, df_train_val, df_test, feature_names, best_iters)
+
+        # ── MLflow: log run + register model ─────────────────────────────
+        input_example = X_tv.iloc[[0]]
+        log_training_run(
+            run=mlflow_run,
+            params=XGB_PARAMS,
+            metrics=metrics,
+            model_path=OUTPUT_DIR / f"xgb_{MODEL_VERSION}.json",
+            features_path=OUTPUT_DIR / f"xgb_{MODEL_VERSION}_features.json",
+            shap_top25_path=shap_top25_path if not args.no_shap else None,
+            model_version=MODEL_VERSION,
+            scorecard_config_version=CONFIG_VERSION,
+            training_cohort={
+                "train_val_games": df_train_val["appid"].nunique(),
+                "holdout_games": df_test["appid"].nunique(),
+            },
+            input_example=input_example,
+        )
 
 
 if __name__ == "__main__":
