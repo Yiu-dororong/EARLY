@@ -1004,7 +1004,7 @@ def main():
         write_run_log(metrics, df_train_val, df_test, feature_names, best_iters)
 
         # ── MLflow: log run + register model ─────────────────────────────
-        input_example = X_tv.iloc[[0]]
+        input_example = X_tv.astype(float).iloc[[0]]
         log_training_run(
             run=mlflow_run,
             params=XGB_PARAMS,

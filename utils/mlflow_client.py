@@ -14,7 +14,9 @@ Local file-store tracking (default, free, no server):
   MLFLOW_TRACKING_URI not set -> defaults to ./mlruns (local file store)
 
 Optional remote tracking server:
-  MLFLOW_TRACKING_URI=https://your-mlflow-server
+    DATABRICKS_TOKEN="dapixxxx"
+    DATABRICKS_HOST="https://dbc-xxx.com/"
+    MLFLOW_REGISTRY_URI="databricks-uc"
 
 Registry model name is fixed: "early_xgb_classifier"
 
@@ -35,6 +37,7 @@ USAGE (train_xgboost.py)
             model_version=MODEL_VERSION,
             scorecard_config_version=CONFIG_VERSION,
             training_cohort={"train_val_games": ..., "holdout_games": ...},
+            input_example=input_example_df,
         )
 
 ─────────────────────────────────────────────────────────────────────────────
@@ -103,17 +106,13 @@ def start_run(model_version: str, experiment_name: str = "early_xgb_training"):
 
     default_uri = "databricks" if os.getenv("DATABRICKS_HOST") else "./mlruns"
     mlflow.set_tracking_uri(default_uri)
-    experiment_name = f"/Shared/{experiment_name}"
-
 
     if default_uri == "databricks" and not experiment_name.startswith("/"):
         user_email = os.getenv("DATABRICKS_USER_EMAIL")
         
         if user_email:
-            # If you specified your login email, route it to your unique personal sandbox folder
             experiment_name = f"/Users/{user_email}/{experiment_name}"
         else:
-            # 🟢 FIX: Route directly to the root /Shared folder which is guaranteed to exist!
             experiment_name = f"/Shared/{experiment_name}"
 
     if default_uri == "databricks":
@@ -200,6 +199,15 @@ def log_training_run(
 # Registry resolution (for inference / Zilliz pipeline)
 # ---------------------------------------------------------------------------
 
+def _setup_mlflow_uris():
+    """Ensure tracking and registry URIs are set consistently."""
+    tracking_uri = "databricks" if os.getenv("DATABRICKS_HOST") else os.getenv("MLFLOW_TRACKING_URI", "./mlruns")
+    mlflow.set_tracking_uri(tracking_uri)
+    if tracking_uri == "databricks":
+        registry_uri = os.getenv("MLFLOW_REGISTRY_URI", "databricks-uc")
+        mlflow.set_registry_uri(registry_uri)
+
+
 def get_production_model_uri() -> str | None:
     """
     Return the model URI for the current Production-stage registered model,
@@ -208,8 +216,7 @@ def get_production_model_uri() -> str | None:
     if not _MLFLOW_AVAILABLE:
         return None
 
-    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "./mlruns")
-    mlflow.set_tracking_uri(tracking_uri)
+    _setup_mlflow_uris()
     client = MlflowClient()
 
     try:
@@ -231,8 +238,7 @@ def get_run_metrics(run_id: str) -> dict:
     """Fetch logged metrics for a run_id. Empty dict if unavailable."""
     if not _MLFLOW_AVAILABLE:
         return {}
-    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "./mlruns")
-    mlflow.set_tracking_uri(tracking_uri)
+    _setup_mlflow_uris()
     client = MlflowClient()
     try:
         run = client.get_run(run_id)
@@ -249,8 +255,7 @@ def download_artifact(model_uri: str, artifact_relpath: str, dst_dir: str | Path
     """
     if not _MLFLOW_AVAILABLE:
         return None
-    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "./mlruns")
-    mlflow.set_tracking_uri(tracking_uri)
+    _setup_mlflow_uris()
     try:
         local_path = mlflow.artifacts.download_artifacts(
             artifact_uri=f"{model_uri}/{artifact_relpath}",
