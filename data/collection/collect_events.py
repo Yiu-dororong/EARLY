@@ -1,7 +1,7 @@
 """
 collect_events.py — EARLY pipeline: Steam event history collector
 
-Fetches event_type 12, 13 (build updates) and 14 (dev posts) for every
+Fetches event_type 12, 13, 14 (build updates) and 28 (dev posts) for every
 ELIGIBLE game in games_v2, stores them in the event_history table.
 
 Event type reference (confirmed against live Steam API):
@@ -9,7 +9,7 @@ Event type reference (confirmed against live Steam API):
   13  k_EClanPreAnnounceMajorUpdateEvent — in practice: regular patch update
   14  k_EClanMajorUpdateEvent   — major content update / season launch
 
-Build clock:  types 12 + 13 +14 only
+Build clock:  types 12 + 13 + 14 only
 Post clock:   type 28 only (developer-authored posts, filtered)
 Branch note:  build_branch field is empty for most games in the events API.
               Branch filtering is NOT implemented — live API data confirms the

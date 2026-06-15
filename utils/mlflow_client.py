@@ -43,7 +43,7 @@ USAGE (train_xgboost.py)
 ─────────────────────────────────────────────────────────────────────────────
 USAGE (inference.py / populate_zilliz.py)
 ─────────────────────────────────────────────────────────────────────────────
-    from training.mlflow_client import get_production_model_uri, download_artifact
+    from utils.mlflow_client import get_production_model_uri, download_artifact
 
     uri = get_production_model_uri()   # None if registry unavailable/empty
     if uri:

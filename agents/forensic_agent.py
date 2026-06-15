@@ -14,8 +14,8 @@ Analyzes the last 3 announcements within 180 days of snapshot to produce:
 Triangulation note:
   Steam event types (12/13/14) are announcement categories, not proof a
   build shipped. A game can post "Major Update" announcements with zero
-  development content (see: "Never Mourn" case). event_state_mismatch=1
-  flags exactly this — the ML model sees "recent event → looks active",
+  development content. event_state_mismatch=1 flags exactly 
+  this — the ML model sees "recent event → looks active",
   but the actual content says otherwise. This is the signal the Critic
   Agent uses to override or soften the ML-derived l1_state.
 
@@ -42,7 +42,7 @@ from agents.prompts import FORENSIC_SYSTEM_PROMPT
 # Lookback window — see design note in module docstring
 MAX_EVENTS_CONSIDERED = 3
 LOOKBACK_DAYS         = 365
-MAX_BODY_CHARS        = 600   # per-event truncation to bound total prompt size
+MAX_BODY_CHARS        = 1000   # per-event truncation to bound total prompt size
 
 MODEL_NAME = "meta-llama/llama-4-scout-17b-16e-instruct"
 
@@ -67,12 +67,19 @@ def _build_user_prompt(state: ForensicState) -> str:
     ]
 
     for i, ann in enumerate(state["announcements"], 1):
-        body = (ann["body_stripped"] or "").strip()[:MAX_BODY_CHARS] or "[empty body]"
+        raw_body = (ann["body_stripped"] or "").strip()
+        # Determine if truncation is actually required
+        if len(raw_body) > MAX_BODY_CHARS:
+            body = raw_body[:MAX_BODY_CHARS].strip() + "... [TRUNCATED]"
+            word_count_label = f"{ann['word_count']} (Original total before truncation)"
+        else:
+            body = raw_body or "[empty body]"
+            word_count_label = f"{ann['word_count']}"
         parts += [
             "",
             f"--- ANNOUNCEMENT #{i} ({ann['days_ago']} days ago) ---",
             f"Type: {_event_label(ann['event_type'])} (type {ann['event_type']})",
-            f"Word count: {ann['word_count']}",
+            f"Word count: {word_count_label}",
             f"Title: {ann['title']}",
             f"Body: {body}",
         ]

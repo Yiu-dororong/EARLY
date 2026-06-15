@@ -31,8 +31,8 @@ Schema written:
     )
 
 Rate limits:
-    Both endpoints are on store.steampowered.com — ~200 req/min safe.
-    Script uses 0.35s delay. Level 2 fetch adds one extra call only for
+    Both endpoints are on store.steampowered.com — ~200 req/5 min safe.
+    Script uses 1.5s delay. Level 2 fetch adds one extra call only for
     games that failed Level 1, so total calls = n_games + n_level2_fallbacks.
 
 Usage:

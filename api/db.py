@@ -4,6 +4,14 @@ api/db.py
 Shared libsql connection for the FastAPI process.
 One connection is created at startup and reused across requests.
 libsql's Python client is thread-safe for reads.
+
+Single source of truth for all CREATE TABLE statements.
+Called by init_db() at startup — all statements are idempotent (IF NOT EXISTS).
+
+Tables:
+    live_scores       — pre-computed weekly scores (serving layer)
+    live_snapshots    — latest feature vector per game (overwritten weekly)
+    agent_analysis    — cached LangGraph agent output (on-demand, user-triggered)
 """
 
 import os
@@ -18,74 +26,6 @@ import libsql
 logger = logging.getLogger(__name__)
 _conn: libsql.Connection | None = None
 _reconnect_lock = threading.Lock()
-
-
-async def init_db() -> None:
-    global _conn
-    url   = os.environ["TURSO_URL"]
-    token = os.environ["TURSO_AUTH_TOKEN"]
-    _conn = libsql.connect(database=url, auth_token=token)
-
-    # Ensure all tables exist (idempotent)
-    for ddl in ALL_TABLES:
-        _conn.execute(ddl)
-    _conn.commit()
-
-async def close_db() -> None:
-    global _conn
-    if _conn is not None:
-        _conn.close()
-        _conn = None
-
-
-class ResilientDB:
-    def execute(self, sql: str, parameters: tuple | list | dict = ()):
-        global _conn
-        for attempt in range(1, 4):
-            try:
-                if _conn is None:
-                    self._reconnect()
-                return _conn.execute(sql, parameters)
-            except Exception as e:
-                if attempt == 3:
-                    raise
-                logger.warning("DB execute error (attempt %d): %s — reconnecting", attempt, e)
-                self._reconnect()
-
-    def commit(self) -> None:
-        global _conn
-        if _conn:
-            _conn.commit()
-
-    def _reconnect(self) -> None:
-        global _conn
-        with _reconnect_lock:
-            try:
-                if _conn is not None:
-                    _conn.close()
-            except Exception:
-                pass
-            url = os.environ["TURSO_URL"]
-            token = os.environ["TURSO_AUTH_TOKEN"]
-            _conn = libsql.connect(database=url, auth_token=token)
-
-
-def get_db() -> ResilientDB:
-    if _conn is None:
-        raise RuntimeError("Database not initialised — call init_db() first.")
-    return ResilientDB()
-
-"""
-api/schema.py
--------------
-Single source of truth for all CREATE TABLE statements.
-Called by init_db() at startup — all statements are idempotent (IF NOT EXISTS).
-
-Tables:
-    live_scores       — pre-computed weekly scores (serving layer)
-    live_snapshots    — latest feature vector per game (overwritten weekly)
-    agent_analysis    — cached LangGraph agent output (on-demand, user-triggered)
-"""
 
 # ---------------------------------------------------------------------------
 # live_scores
@@ -204,3 +144,58 @@ ALL_TABLES = [
     AGENT_ANALYSIS,
     REVIEW_HISTORY,
 ]
+
+async def init_db() -> None:
+    global _conn
+    url   = os.environ["TURSO_URL"]
+    token = os.environ["TURSO_AUTH_TOKEN"]
+    _conn = libsql.connect(database=url, auth_token=token)
+
+    # Ensure all tables exist (idempotent)
+    for ddl in ALL_TABLES:
+        _conn.execute(ddl)
+    _conn.commit()
+
+async def close_db() -> None:
+    global _conn
+    if _conn is not None:
+        _conn.close()
+        _conn = None
+
+
+class ResilientDB:
+    def execute(self, sql: str, parameters: tuple | list | dict = ()):
+        global _conn
+        for attempt in range(1, 4):
+            try:
+                if _conn is None:
+                    self._reconnect()
+                return _conn.execute(sql, parameters)
+            except Exception as e:
+                if attempt == 3:
+                    raise
+                logger.warning("DB execute error (attempt %d): %s — reconnecting", attempt, e)
+                self._reconnect()
+
+    def commit(self) -> None:
+        global _conn
+        if _conn:
+            _conn.commit()
+
+    def _reconnect(self) -> None:
+        global _conn
+        with _reconnect_lock:
+            try:
+                if _conn is not None:
+                    _conn.close()
+            except Exception:
+                pass
+            url = os.environ["TURSO_URL"]
+            token = os.environ["TURSO_AUTH_TOKEN"]
+            _conn = libsql.connect(database=url, auth_token=token)
+
+
+def get_db() -> ResilientDB:
+    if _conn is None:
+        raise RuntimeError("Database not initialised — call init_db() first.")
+    return ResilientDB()

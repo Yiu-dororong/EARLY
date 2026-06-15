@@ -1,6 +1,6 @@
 """
 agents/sentiment_auditor.py
-EARLY — Sentiment Auditor (Phase 2, Layer 2)
+EARLY — Sentiment Auditor 
 
 Clusters recent Steam reviews into thematic signals.
 Only runs when ml_eligible = True.

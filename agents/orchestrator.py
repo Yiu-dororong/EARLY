@@ -1,6 +1,6 @@
 """
 agents/orchestrator.py
-EARLY — Phase 2 Agent Orchestrator
+EARLY — Agent Orchestrator
 
 Coordinates Forensic Agent, Sentiment Auditor, Critic Agent.
 Creates a top-level Langfuse trace per run_analysis() call and passes
