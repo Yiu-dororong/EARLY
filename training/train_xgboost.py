@@ -14,9 +14,6 @@ Target encoding:
   EXIT_ABANDONED → 1
   EXIT_SILENT    → 1  (behaviorally abandoned)
 
-Missing dev features (pending 160k rerun):
-  dev_total_games_shipped → excluded, add post-rerun and retrain as v1.1
-
 Usage:
   python train_xgboost.py
   python train_xgboost.py --dry-run       # feature matrix only, no training

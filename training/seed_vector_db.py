@@ -14,7 +14,7 @@ Usage:
     python seed_vector_db.py --rebuild          # drop + recreate collection first
 
 Requirements:
-    - TURSO_DATABASE_URL, TURSO_AUTH_TOKEN       (source DB)
+    - TURSO_URL, TURSO_AUTH_TOKEN       (source DB)
     - ZILLIZ_URI, ZILLIZ_TOKEN                   (target)
     - models/shap_top25_{MODEL_VERSION}.json     (feature order)
     - models/{MODEL_VERSION}.json                (XGBoost model)

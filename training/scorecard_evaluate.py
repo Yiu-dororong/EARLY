@@ -26,6 +26,11 @@ Three evaluation layers:
        - Suggests threshold adjustments based on observed distribution
        - Suggests cap adjustments for features clustering at 0.0 or 1.0
 
+Export scorecard stats:
+    1. State distribution (counts + %)
+
+    2. Outcome agreement rates per state
+
 Usage:
     python scorecard_evaluate.py [--snapshot-pct PCT] [--output-dir DIR]
 """
