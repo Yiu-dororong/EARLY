@@ -29,17 +29,18 @@ class DimensionScores(BaseModel):
 # ---------------------------------------------------------------------------
 
 class GameSummary(BaseModel):
-    appid:             int
-    name:              str | None
-    ea_start_date:     str | None
-    ea_age_days:       int | None
-    l1_state:          str | None
-    p_distressed:      float | None
-    is_distressed:     int | None
-    ml_eligible:       int | None
-    review_count_at_T: int | None
-    snap_date:         str | None
-    outcome:           str | None
+    appid:                          int
+    name:                           str | None
+    ea_start_date:                  str | None
+    ea_age_days:                    int | None
+    l1_state:                       str | None
+    p_distressed:                   float | None
+    is_distressed:                  int | None
+    ml_eligible:                    int | None
+    review_count_at_T:              int | None
+    snap_date:                      str | None
+    outcome:                        str | None
+    days_since_last_build_update:   int | None = None
 
 
 class GameListResponse(BaseModel):
@@ -71,6 +72,7 @@ class GameScore(BaseModel):
     dimensions:        DimensionScores | None
     outcome:           str | None
     currently_in_ea:   int | None
+    days_since_last_build_update: int | None = None
 
     @field_validator("null_features", mode="before")
     @classmethod
@@ -110,6 +112,7 @@ class ScoreSnapshot(BaseModel):
     review_count_at_T: int | None
     null_features:     list[str]
     dimensions:        DimensionScores | None
+    days_since_last_build_update: int | None = None
 
     @field_validator("null_features", mode="before")
     @classmethod

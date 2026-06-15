@@ -64,6 +64,7 @@ def list_games(
     currently_in_ea: int | None = Query(None, description="1 = active EA only"),
     outcome:         str | None = Query(None, description="EXIT_SUCCESS | EXIT_ABANDONED | EXIT_SILENT | STAYS_ACTIVE"),
     min_reviews:     int | None = Query(None, description="Minimum review_count_at_T"),
+    max_days_since_build: int | None = Query(None, description="Max days since last build update"),
     search_name:     str | None = Query(None, description="Search by game name"),
     offset:          int = Query(0, ge=0),
     limit:           int = Query(50, ge=1, le=5000),
@@ -88,6 +89,9 @@ def list_games(
     if min_reviews is not None:
         filters.append("ls.review_count_at_T >= ?")
         params.append(min_reviews)
+    if max_days_since_build is not None:
+        filters.append("ls.days_since_last_build_update <= ?")
+        params.append(max_days_since_build)
     if search_name is not None:
         filters.append("g.name LIKE ?")
         params.append(f"%{search_name}%")
@@ -127,6 +131,7 @@ def list_games(
             ls.review_count_at_T,
             ls.snapshot_date,
             g.outcome,
+            ls.days_since_last_build_update,
             (
                 (ls.p_distressed * 100.0) +                  -- Weighting Risk heavily
                 (LOG(MAX(ls.review_count_at_T, 1)) * 20.0) - -- Log scale for popularity (caps massive outliers)
@@ -142,6 +147,7 @@ def list_games(
             appid=r[0], name=r[1], ea_start_date=r[2], ea_age_days=r[3],
             l1_state=r[4], p_distressed=r[5], is_distressed=r[6],
             ml_eligible=r[7], review_count_at_T=r[8], snap_date=r[9], outcome=r[10],
+            days_since_last_build_update=r[11],
         )
         for r in rows
     ]
@@ -170,7 +176,7 @@ def get_game_score(appid: int):
             ls.ml_eligible, ls.model_version, ls.snapshot_date, ls.review_count_at_T,
             ls.null_features, ls.update_health, ls.player_retention,
             ls.dev_engagement, ls.sentiment, ls.price_market,
-            g.outcome, g.currently_in_ea
+            g.outcome, g.currently_in_ea, ls.days_since_last_build_update
         FROM live_scores ls
         LEFT JOIN games_v2    g  ON g.appid  = ls.appid
         WHERE ls.appid = ?
@@ -189,6 +195,7 @@ def get_game_score(appid: int):
         "null_features": row[12], "update_health": row[13], "player_retention": row[14],
         "dev_engagement": row[15], "sentiment": row[16], "price_market": row[17],
         "outcome": row[18], "currently_in_ea": row[19],
+        "days_since_last_build_update": row[20],
     }
 
     null_list = json.loads(row_dict["null_features"]) if isinstance(row_dict["null_features"], str) else (row_dict["null_features"] or [])
@@ -214,7 +221,8 @@ def get_game_history(appid: int):
         SELECT
             snapshot_date, l1_state, p_distressed, is_distressed,
             ea_age_days, review_count_at_T, null_features,
-            update_health, player_retention, dev_engagement, sentiment, price_market
+            update_health, player_retention, dev_engagement, sentiment, price_market,
+            days_since_last_build_update
         FROM live_scores
         WHERE appid = ?
         ORDER BY scored_at ASC
@@ -232,6 +240,7 @@ def get_game_history(appid: int):
             "is_distressed": r[3], "ea_age_days": r[4], "review_count_at_T": r[5],
             "null_features": r[6], "update_health": r[7], "player_retention": r[8],
             "dev_engagement": r[9], "sentiment": r[10], "price_market": r[11],
+            "days_since_last_build_update": r[12],
         }
         snapshots.append(ScoreSnapshot(
             **{k: v for k, v in row_dict.items() if k not in _DIMENSION_COLS and k != "null_features"},

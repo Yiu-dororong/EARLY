@@ -110,6 +110,7 @@ CREATE TABLE IF NOT EXISTS live_scores (
     dev_engagement      REAL,
     sentiment           REAL,
     price_market        REAL,
+    days_since_last_build_update INTEGER,
     PRIMARY KEY (appid, scored_at)
 )
 """

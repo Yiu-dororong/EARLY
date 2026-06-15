@@ -140,24 +140,25 @@ def get_conn() -> libsql.Connection:
 def ensure_live_scores_table(conn: libsql.Connection) -> None:
     conn.execute("""
         CREATE TABLE IF NOT EXISTS live_scores (
-            appid               INTEGER,
-            snapshot_date       TEXT,
-            primary_genre       TEXT,
-            scored_at           INTEGER NOT NULL,
-            ea_age_days         INTEGER,
-            p_distressed        REAL,
-            is_distressed       INTEGER,
-            l1_state            TEXT,
-            ml_eligible         INTEGER,
-            model_version       TEXT,
-            null_features       TEXT,    -- JSON array of null feature names
-            review_count_at_T   INTEGER,
-            update_health       REAL,
-            player_retention    REAL,
-            dev_engagement      REAL,
-            sentiment           REAL,
-            price_market        REAL,
-            shap_json           TEXT,
+            appid                           INTEGER,
+            snapshot_date                   TEXT,
+            primary_genre                   TEXT,
+            scored_at                       INTEGER NOT NULL,
+            ea_age_days                     INTEGER,
+            p_distressed                    REAL,
+            is_distressed                   INTEGER,
+            l1_state                        TEXT,
+            ml_eligible                     INTEGER,
+            model_version                   TEXT,
+            null_features                   TEXT,    -- JSON array of null feature names
+            review_count_at_T               INTEGER,
+            update_health                   REAL,
+            player_retention                REAL,
+            dev_engagement                  REAL,
+            sentiment                       REAL,
+            price_market                    REAL,
+            shap_json                       TEXT,
+            days_since_last_build_update    INTEGER,
             PRIMARY KEY (appid, scored_at)
         )
     """)
@@ -213,8 +214,8 @@ def upsert_score(conn: libsql.Connection, score: dict) -> libsql.Connection:
                     ml_eligible, model_version,
                     null_features, review_count_at_T,
                     update_health, player_retention, dev_engagement, sentiment, price_market,
-                    shap_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    shap_json, days_since_last_build_update
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 score["appid"],
                 score["snapshot_date"],
@@ -234,6 +235,7 @@ def upsert_score(conn: libsql.Connection, score: dict) -> libsql.Connection:
                 score["sentiment"],
                 score["price_market"],
                 json.dumps(score["top25_shap"]) if score.get("top25_shap") else None,
+                score["days_since_last_build_update"],
             ))
             return conn
         except Exception as e:
@@ -563,6 +565,7 @@ def score_game(
         "sentiment":        sentiment,
         "price_market":     price_market,
         "top25_shap":       top25_shap,
+        "days_since_last_build_update": features.get("days_since_last_build_update"),
     }
 
 
