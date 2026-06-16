@@ -38,6 +38,9 @@ app = FastAPI(
     description="EA game health scoring and distress prediction.",
     version="1.0.0",
     lifespan=lifespan,
+    docs_url=None if IS_RENDER else "/docs",
+    redoc_url=None if IS_RENDER else "/redoc",
+    openapi_url=None if IS_RENDER else "/openapi.json",
 )
 
 # ── 1. Configure Dynamic CORS ──────────────────────────────────────────────────
