@@ -195,7 +195,7 @@ Agent tests use DeepEval. `fixtures.py` includes the Never Mourn case, a hotfix 
 ## Quick Start
 
 ```bash
-git clone https://github.com/<!-- INSERT: your-github-handle -->/early.git
+git clone https://github.com/Yiu-dororong/EARLY.git
 cd early
 cp .env.example .env
 # fill in TURSO_URL, TURSO_AUTH_TOKEN, GROQ_API_KEY, ZILLIZ_URI, ZILLIZ_TOKEN
@@ -216,12 +216,11 @@ early/
 ├── api/                   # FastAPI routers, services, schema
 ├── core/                  # Feature builder, inference engine (shared)
 ├── data/                  # Collection scripts (Steam API) + processing
-├── training/              # train_xgboost.py, scorecard, MLflow client, drift monitor
 ├── frontend/              # Streamlit app (single-file session-state router)
-├── infrastructure/        # Dockerfile, docker-compose.yml, .env.example
+├── models/                # ML artifacts, SHAP top-25 contract, drift reference
 ├── tests/                 # DeepEval agent tests + fixtures
-├── utils/                 # Langfuse client, ITAD client
-└── models/                # ML artifacts, SHAP top-25 contract, drift reference
+├── training/              # train_xgboost.py, scorecard, MLflow client, drift monitor
+└── utils/                 # Langfuse client, ITAD client
 ```
 
 ---
