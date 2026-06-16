@@ -2,10 +2,9 @@
 mlflow_client.py — EARLY pipeline: thin MLflow wrapper
 =======================================================
 
-Stage 2 of the MLOps upgrade. Provides a small, consistent interface for
-logging training runs and resolving the current Production model, with a
-no-op fallback so training/inference work standalone if MLflow isn't
-configured (mirrors the langfuse_client.py pattern).
+Provides a small, consistent interface for logging training runs and resolving 
+the current Production model, with a no-op fallback so training/inference work 
+standalone if MLflow isn't configured (mirrors the langfuse_client.py pattern).
 
 ─────────────────────────────────────────────────────────────────────────────
 SETUP
@@ -37,7 +36,7 @@ USAGE (train_xgboost.py)
             model_version=MODEL_VERSION,
             scorecard_config_version=CONFIG_VERSION,
             training_cohort={"train_val_games": ..., "holdout_games": ...},
-            input_example=input_example_df,
+            input_example=input_example,
         )
 
 ─────────────────────────────────────────────────────────────────────────────
@@ -176,8 +175,8 @@ def log_training_run(
     if shap_top25_path and shap_top25_path.exists():
         mlflow.log_artifact(str(shap_top25_path), artifact_path="shap")
 
-    # Register model — version is created in 'None' stage; promote_model.py
-    # handles transition to Staging/Production.
+    # Register model — version is created without aliases; promote_model.py
+    # handles assigning staging/champion aliases.
     registered_version = None
     try:
         run_id = run.info.run_id
@@ -210,7 +209,7 @@ def _setup_mlflow_uris():
 
 def get_production_model_uri() -> str | None:
     """
-    Return the model URI for the current Production-stage registered model,
+    Return the model URI for the current champion registered model,
     or None if mlflow unavailable / no Production model exists.
     """
     if not _MLFLOW_AVAILABLE:
@@ -220,18 +219,13 @@ def get_production_model_uri() -> str | None:
     client = MlflowClient()
 
     try:
-        versions = client.get_latest_versions(REGISTERED_MODEL_NAME, stages=["Production"])
+        mv = client.get_model_version_by_alias(name=REGISTERED_MODEL_NAME, alias="champion")
     except Exception as e:
         log.warning("Could not query registry: %s", e)
         return None
 
-    if not versions:
-        log.info("No Production-stage model found for %s", REGISTERED_MODEL_NAME)
-        return None
-
-    mv = versions[0]
     log.info("Production model: %s v%s (run_id=%s)", REGISTERED_MODEL_NAME, mv.version, mv.run_id)
-    return f"models:/{REGISTERED_MODEL_NAME}/Production"
+    return f"models:/{REGISTERED_MODEL_NAME}@champion"
 
 
 def get_run_metrics(run_id: str) -> dict:
