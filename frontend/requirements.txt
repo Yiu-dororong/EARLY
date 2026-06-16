@@ -1,0 +1,7 @@
+streamlit==1.58.0
+pandas==2.3.3
+plotly==6.8.0
+requests==2.33.1
+python-dotenv==1.2.2
+numpy==2.2.6
+mlflow==3.13.0

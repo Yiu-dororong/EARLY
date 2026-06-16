@@ -1,0 +1,79 @@
+"""
+frontend/utils/api.py
+---------------------
+Thin API client for the EARLY FastAPI backend.
+All functions return parsed JSON or None on failure.
+"""
+
+from __future__ import annotations
+
+import os
+import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+
+API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000")
+TIMEOUT  = 10
+
+
+def _get(path: str, params: dict | None = None) -> dict | None:
+    try:
+        r = requests.get(f"{API_BASE}{path}", params=params, timeout=TIMEOUT)
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return None
+
+
+def _post(path: str, params: dict | None = None) -> dict | None:
+    try:
+        r = requests.post(f"{API_BASE}{path}", params=params, timeout=TIMEOUT)
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
+def get_health() -> dict | None:
+    return _get("/health")
+
+
+def list_games(
+    l1_state:    str | None = None,
+    ml_eligible: int | None = None,
+    min_reviews: int | None = None,
+    search_name: str | None = None,
+    offset: int = 0,
+    limit:  int = 100,
+) -> dict | None:
+    params: dict = {"offset": offset, "limit": limit}
+    if l1_state    is not None: params["l1_state"]    = l1_state
+    if ml_eligible is not None: params["ml_eligible"] = ml_eligible
+    if min_reviews is not None: params["min_reviews"] = min_reviews
+    if search_name is not None: params["search_name"] = search_name
+    return _get("/games", params)
+
+
+def get_score(appid: int) -> dict | None:
+    return _get(f"/games/{appid}/score")
+
+
+def get_history(appid: int) -> dict | None:
+    return _get(f"/games/{appid}/history")
+
+
+def get_analysis(appid: int) -> dict | None:
+    return _get(f"/games/{appid}/analysis")
+
+
+def trigger_analysis(appid: int, force: bool = False) -> dict | None:
+    return _post(f"/games/{appid}/analyse", params={"force": str(force).lower()})
+
+
+def get_similar(appid: int, n_results: int = 5) -> dict | None:
+    return _post("/search/similar", params={"appid": appid, "n_results": n_results})
