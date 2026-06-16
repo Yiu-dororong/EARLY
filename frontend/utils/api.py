@@ -9,17 +9,30 @@ from __future__ import annotations
 
 import os
 import requests
+import streamlit as st
 from dotenv import load_dotenv
 
 load_dotenv()
 
-API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000")
+API_BASE = os.getenv("RENDER_URL") or os.getenv("API_BASE_URL", "http://localhost:8000")
 TIMEOUT  = 10
+IS_RENDER = bool(os.getenv("RENDER_URL"))
+
+
+def _get_headers() -> dict:
+    headers = {}
+    if IS_RENDER:
+        token = os.getenv("INTERNAL_API_TOKEN")
+        if token:
+            headers["X-API-Token"] = token
+        else:
+            st.error("Configuration Error: Production API Token missing from environment.")
+    return headers
 
 
 def _get(path: str, params: dict | None = None) -> dict | None:
     try:
-        r = requests.get(f"{API_BASE}{path}", params=params, timeout=TIMEOUT)
+        r = requests.get(f"{API_BASE}{path}", params=params, headers=_get_headers(), timeout=TIMEOUT)
         r.raise_for_status()
         return r.json()
     except Exception:
@@ -28,7 +41,7 @@ def _get(path: str, params: dict | None = None) -> dict | None:
 
 def _post(path: str, params: dict | None = None) -> dict | None:
     try:
-        r = requests.post(f"{API_BASE}{path}", params=params, timeout=TIMEOUT)
+        r = requests.post(f"{API_BASE}{path}", params=params, headers=_get_headers(), timeout=TIMEOUT)
         r.raise_for_status()
         return r.json()
     except Exception:
