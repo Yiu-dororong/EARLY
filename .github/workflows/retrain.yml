@@ -1,0 +1,191 @@
+# retrain.yml — EARLY pipeline: scheduled retraining workflow
+# =============================================================
+# Triggers:
+#   - Manual (workflow_dispatch) with inputs for trigger reason + flags
+#   - Monthly schedule (disabled until gate behaviour confirmed over
+#     a few manual cycles — uncomment schedule block below to activate)
+#
+# Runs:
+#   retrain.py --scheduled / --drift-triggered
+#   which internally calls train_xgboost.py, compares against Production
+#   via MLflow, and promotes only if the gate passes.
+#
+# Secrets required (set in GitHub repo Settings → Secrets → Actions):
+#   TURSO_URL, TURSO_AUTH_TOKEN
+#   GROQ_API_KEY
+#   ZILLIZ_URI, ZILLIZ_TOKEN
+#   DATABRICKS_HOST            (optional — for Unity Catalog)
+#   DATABRICKS_TOKEN           (optional — for Unity Catalog)
+#   DATABRICKS_USER_EMAIL      (optional — routes experiment to /Users/email instead of /Shared/)
+#   MLFLOW_REGISTRY_URI        (optional — defaults to databricks-uc)
+#   MLFLOW_TRACKING_URI        (optional — ignored if DATABRICKS_HOST is set)
+#   LANGFUSE_PUBLIC_KEY        (optional — no-op stub if unset)
+#   LANGFUSE_SECRET_KEY        (optional)
+#   LANGFUSE_BASE_URL          (optional — required for EU cloud or self-hosted)
+#   ITAD_API_KEY               (optional)
+
+name: retrain
+
+on:
+  # ── Manual trigger ─────────────────────────────────────────────────────
+  workflow_dispatch:
+    inputs:
+      trigger_reason:
+        description: "Trigger reason"
+        required: true
+        default: "scheduled"
+        type: choice
+        options:
+          - scheduled
+          - drift_triggered
+          - manual_review
+      no_auto_promote:
+        description: "Hold at candidate stage — do not auto-promote to Production"
+        required: false
+        default: true
+        type: boolean
+      no_shap:
+        description: "Skip SHAP computation (faster, for testing)"
+        required: false
+        default: false
+        type: boolean
+
+  # ── Monthly schedule (DISABLED — uncomment to activate) ────────────────
+  # Recommended: only activate after 2-3 manual cycles confirm the
+  # gate is behaving correctly (no surprise regressions, no false passes).
+  #
+  # schedule:
+  #   - cron: '0 3 1 * *'   # 03:00 UTC on the 1st of every month
+
+jobs:
+  retrain:
+    name: Retrain + conditional promotion
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      TURSO_URL:             ${{ secrets.TURSO_URL }}
+      TURSO_AUTH_TOKEN:      ${{ secrets.TURSO_AUTH_TOKEN }}
+      GROQ_API_KEY:          ${{ secrets.GROQ_API_KEY }}
+      ZILLIZ_URI:            ${{ secrets.ZILLIZ_URI }}
+      ZILLIZ_TOKEN:          ${{ secrets.ZILLIZ_TOKEN }}
+      MLFLOW_TRACKING_URI:   ${{ secrets.MLFLOW_TRACKING_URI }}
+      DATABRICKS_HOST:       ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN:      ${{ secrets.DATABRICKS_TOKEN }}
+      DATABRICKS_USER_EMAIL: ${{ secrets.DATABRICKS_USER_EMAIL }}
+      MLFLOW_REGISTRY_URI:   ${{ secrets.MLFLOW_REGISTRY_URI }}
+      LANGFUSE_PUBLIC_KEY:   ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+      LANGFUSE_SECRET_KEY:   ${{ secrets.LANGFUSE_SECRET_KEY }}
+      LANGFUSE_BASE_URL:     ${{ secrets.LANGFUSE_BASE_URL }}
+      ITAD_API_KEY:          ${{ secrets.ITAD_API_KEY }}
+
+    steps:
+      # ── Checkout ─────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Python ───────────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ── Resolve trigger flag ─────────────────────────────────────────
+      # workflow_dispatch sets trigger_reason directly.
+      # schedule trigger has no inputs — default to "scheduled".
+      - name: Resolve trigger reason
+        id: trigger
+        run: |
+          REASON="${{ github.event.inputs.trigger_reason }}"
+          if [ -z "$REASON" ]; then
+            REASON="scheduled"
+          fi
+          echo "reason=$REASON" >> $GITHUB_OUTPUT
+          echo "Trigger reason: $REASON"
+
+      # ── Build retrain.py args ────────────────────────────────────────
+      - name: Build retrain arguments
+        id: args
+        run: |
+          ARGS="--${{ steps.trigger.outputs.reason }}"
+
+          # no_auto_promote: default true for manual runs, always true for
+          # schedule until the block above is uncommented intentionally
+          NO_AUTO="${{ github.event.inputs.no_auto_promote }}"
+          if [ "$NO_AUTO" != "false" ]; then
+            ARGS="$ARGS --no-auto-promote"
+          fi
+
+          if [ "${{ github.event.inputs.no_shap }}" == "true" ]; then
+            ARGS="$ARGS --no-shap"
+          fi
+
+          echo "retrain_args=$ARGS" >> $GITHUB_OUTPUT
+          echo "retrain.py args: $ARGS"
+
+      # ── Run retrain ──────────────────────────────────────────────────
+      - name: Run retrain cycle
+        run: |
+          python training/retrain.py ${{ steps.args.outputs.retrain_args }}
+
+      # ── Upload retrain report ────────────────────────────────────────
+      - name: Upload retrain report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrain-report-${{ github.run_id }}
+          path: outputs/retrain_report_*.json
+          retention-days: 90
+
+      # ── Upload MLflow runs (local file store only) ───────────────────
+      # If MLFLOW_TRACKING_URI points to a remote server, this step is
+      # redundant — runs are already persisted there. For local mlruns/,
+      # this preserves the artifact store across CI runs.
+      - name: Upload mlruns artifact store
+        if: ${{ env.MLFLOW_TRACKING_URI == '' && env.DATABRICKS_HOST == '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlruns-${{ github.run_id }}
+          path: mlruns/
+          retention-days: 90
+
+      # ── Summary ──────────────────────────────────────────────────────
+      - name: Write job summary
+        if: always()
+        run: |
+          REPORT=$(find outputs/ -name "retrain_report_*.json" | head -1)
+          if [ -z "$REPORT" ]; then
+            echo "### ⚠️ Retrain report not found" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          GATE=$(python -c "import json,sys; d=json.load(open('$REPORT')); print('✅ PASS' if d.get('gate_passed') else '❌ FAIL')")
+          ACTION=$(python -c "import json,sys; d=json.load(open('$REPORT')); print(d.get('action_taken','—'))")
+          CANDIDATE=$(python -c "import json,sys; d=json.load(open('$REPORT')); print(d.get('candidate_version','—'))")
+          PREV=$(python -c "import json,sys; d=json.load(open('$REPORT')); print(d.get('previous_production_version','none'))")
+          ZILLIZ=$(python -c "import json,sys; d=json.load(open('$REPORT')); print('⚠️ Yes — run seed_vector_db.py --rebuild' if d.get('zilliz_rebuild_needed') else 'No')")
+          REASONS=$(python -c "
+          import json,sys
+          d=json.load(open('$REPORT'))
+          reasons=d.get('reasons',[])
+          print('\n'.join(f'- {r}' for r in reasons) if reasons else '—')
+          ")
+
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ### EARLY — Retrain Cycle
+
+          | | |
+          |---|---|
+          | **Gate** | $GATE |
+          | **Action taken** | $ACTION |
+          | **Candidate version** | $CANDIDATE |
+          | **Previous Production** | $PREV |
+          | **Zilliz rebuild needed** | $ZILLIZ |
+
+          **Gate failure reasons:**
+          $REASONS
+          EOF
