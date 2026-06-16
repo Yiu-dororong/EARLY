@@ -1,0 +1,36 @@
+# .dockerignore (repo root)
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Env / secrets
+.env
+.env.*
+!infrastructure/.env.example
+
+# Data / outputs (large, not needed in image)
+outputs/
+*.db
+*.sqlite
+
+# Git
+.git/
+.gitignore
+
+# Docs
+README.md
+*.md
+
+# Legacy
+legacy/
+
+# IDE
+.vscode/
+.idea/
