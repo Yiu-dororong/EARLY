@@ -29,7 +29,14 @@ from api.schemas import (
     ScoreSnapshot,
 )
 from api.services.agents import is_analysis_eligible, trigger_analysis
-from api.rate_limit import limiter, ai_rate_limit, general_rate_limit
+from api.rate_limit import (
+    limiter, 
+    ai_rate_limit, 
+    general_rate_limit,
+    ai_ip_rate_limit,
+    general_ip_rate_limit,
+    get_real_ip,
+)
 
 router = APIRouter(tags=["games"])
 
@@ -59,6 +66,7 @@ def _build_dimensions(row: dict) -> DimensionScores | None:
 
 @router.get("", response_model=GameListResponse)
 @limiter.limit(general_rate_limit)
+@limiter.limit(general_ip_rate_limit, key_func=get_real_ip)
 def list_games(
     request:         Request,
     l1_state:        str | None = Query(None, description="Healthy | Watch | At Risk"),
@@ -181,6 +189,7 @@ def list_games(
 
 @router.get("/{appid}/score", response_model=GameScore)
 @limiter.limit(general_rate_limit)
+@limiter.limit(general_ip_rate_limit, key_func=get_real_ip)
 def get_game_score(appid: int, request: Request):
     db = get_db()
 
@@ -230,6 +239,7 @@ def get_game_score(appid: int, request: Request):
 
 @router.get("/{appid}/history", response_model=ScoreHistoryResponse)
 @limiter.limit(general_rate_limit)
+@limiter.limit(general_ip_rate_limit, key_func=get_real_ip)
 def get_game_history(appid: int, request: Request):
     db = get_db()
 
@@ -277,6 +287,7 @@ def get_game_history(appid: int, request: Request):
 
 @router.get("/{appid}/features", response_model=GameFeatures)
 @limiter.limit(general_rate_limit)
+@limiter.limit(general_ip_rate_limit, key_func=get_real_ip)
 def get_game_features(appid: int, request: Request):
     db = get_db()
 
@@ -311,6 +322,7 @@ def get_game_features(appid: int, request: Request):
 
 @router.post("/{appid}/analyse", response_model=AnalysisTriggerResponse)
 @limiter.limit(ai_rate_limit)
+@limiter.limit(ai_ip_rate_limit, key_func=get_real_ip)
 def trigger_game_analysis(
     appid: int,
     request: Request,
@@ -352,6 +364,7 @@ def trigger_game_analysis(
 
 @router.get("/{appid}/analysis", response_model=AgentAnalysisResponse)
 @limiter.limit(general_rate_limit)
+@limiter.limit(general_ip_rate_limit, key_func=get_real_ip)
 def get_game_analysis(appid: int, request: Request):
     db = get_db()
 

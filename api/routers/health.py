@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from api.db import get_db
 from api.schemas import PipelineHealth
-from api.rate_limit import limiter, general_rate_limit
+from api.rate_limit import limiter, general_rate_limit, general_ip_rate_limit, get_real_ip
 
 router = APIRouter(tags=["health"])
 
@@ -34,6 +34,7 @@ _MONITORED_FEATURES = [
 
 @router.get("/health", response_model=PipelineHealth)
 @limiter.limit(general_rate_limit)
+@limiter.limit(general_ip_rate_limit, key_func=get_real_ip)
 def get_health(request: Request):
     db = get_db()
 

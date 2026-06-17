@@ -22,7 +22,7 @@ from slowapi.errors import RateLimitExceeded
 from api.db import close_db, init_db, get_db
 from api.routers import games, health
 from api.routers.search import router as search_router
-from api.rate_limit import limiter, IS_RENDER, general_rate_limit
+from api.rate_limit import limiter, IS_RENDER, general_rate_limit, general_ip_rate_limit, get_real_ip
 
 
 
@@ -116,6 +116,7 @@ app.include_router(
 @app.get("/")
 @app.head("/")
 @limiter.limit(general_rate_limit)
+@limiter.limit(general_ip_rate_limit, key_func=get_real_ip)
 async def root(request: Request):
     return {
         "api_name": "EARLY API",
@@ -127,6 +128,7 @@ async def root(request: Request):
 @app.get("/livez", status_code=status.HTTP_200_OK)
 @app.head("/livez")
 @limiter.limit(general_rate_limit)
+@limiter.limit(general_ip_rate_limit, key_func=get_real_ip)
 async def liveness(request: Request):
     """
     Indicates whether the container process is running.
@@ -139,6 +141,7 @@ async def liveness(request: Request):
 @app.get("/readyz")
 @app.head("/readyz")
 @limiter.limit(general_rate_limit)
+@limiter.limit(general_ip_rate_limit, key_func=get_real_ip)
 async def readiness(request: Request, response: Response):
     """
     Indicates whether the application is ready to process queries.
