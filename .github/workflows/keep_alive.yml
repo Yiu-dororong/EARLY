@@ -1,0 +1,34 @@
+name: Wake Streamlit App
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"      
+  workflow_dispatch:
+
+jobs:
+  wake-app:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install System Webdrivers & Chromium Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-chromedriver
+
+      - name: Install Automation Package Requirements
+        run: |
+          pip install selenium
+
+      - name: Execute Headless Keep-Alive Check
+        env:
+          # 🟢 This URL should be configured as a repository secret: STREAMLIT_APP_URL
+          STREAMLIT_APP_URL: ${{ secrets.STREAMLIT_APP_URL }}
+        run: python scripts/wake_app.py
