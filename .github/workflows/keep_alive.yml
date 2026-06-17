@@ -21,26 +21,9 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Configure System Chrome Paths
-        run: |
-            CHROME_PATH=$(which google-chrome || which google-chrome-stable)
-            echo "Found Chrome binary execution path at: $CHROME_PATH"
-            if [ ! -f /usr/bin/google-chrome ] && [ -n "$CHROME_PATH" ]; then
-              sudo ln -s "$CHROME_PATH" /usr/bin/google-chrome
-              echo "Successfully symlinked to /usr/bin/google-chrome"
-            fi
-
-      - name: Install System Webdrivers & Chromium Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y chromium-chromedriver
-
       - name: Install Automation Package Requirements
         run: |
           pip install selenium
 
       - name: Execute Headless Keep-Alive Check
-        env:
-          # 🟢 This URL should be configured as a repository secret: STREAMLIT_APP_URL
-          STREAMLIT_APP_URL: ${{ secrets.STREAMLIT_APP_URL }}
         run: python scripts/wake_app.py
