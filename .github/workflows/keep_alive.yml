@@ -18,10 +18,14 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Setup Google Chrome Browser
-        uses: browser-actions/setup-chrome@v1
-        with:
-          chrome-version: stable
+      - name: Configure System Chrome Paths
+        run: |
+            CHROME_PATH=$(which google-chrome || which google-chrome-stable)
+            echo "Found Chrome binary execution path at: $CHROME_PATH"
+            if [ ! -f /usr/bin/google-chrome ] && [ -n "$CHROME_PATH" ]; then
+              sudo ln -s "$CHROME_PATH" /usr/bin/google-chrome
+              echo "Successfully symlinked to /usr/bin/google-chrome"
+            fi
 
       - name: Install System Webdrivers & Chromium Dependencies
         run: |
