@@ -11,22 +11,31 @@ import os
 import requests
 import streamlit as st
 from dotenv import load_dotenv
+from streamlit.runtime.scriptrunner import get_script_run_ctx
 
 load_dotenv()
 
-API_BASE = os.getenv("RENDER_URL") or os.getenv("API_BASE_URL", "http://localhost:8000")
+API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000")
 TIMEOUT  = 10
 IS_RENDER = bool(os.getenv("RENDER_URL"))
 
 
-def _get_headers() -> dict:
+def _get_headers(include_session: bool = False) -> dict:
     headers = {}
     if IS_RENDER:
         token = os.getenv("INTERNAL_API_TOKEN")
         if token:
-            headers["X-API-Token"] = token
+            headers["api-key"] = token
         else:
             st.error("Configuration Error: Production API Token missing from environment.")
+            
+    if include_session:
+        try:
+            session_id = get_script_run_ctx().session_id
+        except Exception:
+            session_id = "anonymous"
+        headers["session-id"] = session_id
+        
     return headers
 
 
@@ -41,7 +50,7 @@ def _get(path: str, params: dict | None = None) -> dict | None:
 
 def _post(path: str, params: dict | None = None) -> dict | None:
     try:
-        r = requests.post(f"{API_BASE}{path}", params=params, headers=_get_headers(), timeout=TIMEOUT)
+        r = requests.post(f"{API_BASE}{path}", params=params, headers=_get_headers(include_session=True), timeout=TIMEOUT)
         r.raise_for_status()
         return r.json()
     except Exception:

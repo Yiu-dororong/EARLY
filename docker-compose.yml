@@ -18,11 +18,11 @@ services:
         max-file: "3"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/readyz"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/livez"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
   frontend:
     build:

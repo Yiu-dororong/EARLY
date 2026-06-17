@@ -14,17 +14,19 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from api.db import get_db
 from api.schemas import SimilarGame, SimilaritySearchResponse
 from api.services.zilliz import VECTOR_DIM, search_similar
+from api.rate_limit import limiter, search_rate_limit
 
 router = APIRouter(tags=["search"])
 
 
 @router.post("/similar", response_model=SimilaritySearchResponse)
-def find_similar_games(appid: int, n_results: int = 5):
+@limiter.limit(search_rate_limit)
+def find_similar_games(request: Request, appid: int, n_results: int = 5):
     """
     Find historically similar games for a given appid using Zilliz ANN search.
 

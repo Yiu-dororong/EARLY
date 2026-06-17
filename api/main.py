@@ -13,17 +13,17 @@ Production:
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Response, status, Depends, HTTPException
+from fastapi import FastAPI, Response, status, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
+from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 
-from api.db import close_db, init_db
+from api.db import close_db, init_db, get_db
 from api.routers import games, health
 from api.routers.search import router as search_router
+from api.rate_limit import limiter, IS_RENDER, general_rate_limit
 
-# ── Detect the Execution Environment ──────────────────────────────────────────
-# Render automatically sets RENDER_URL
-IS_RENDER = bool(os.getenv("RENDER_URL"))
 
 
 @asynccontextmanager
@@ -42,14 +42,27 @@ app = FastAPI(
     redoc_url=None if IS_RENDER else "/redoc",
     openapi_url=None if IS_RENDER else "/openapi.json",
 )
+app.state.limiter = limiter
+
+@app.exception_handler(RateLimitExceeded)
+async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={
+            "error": "Rate Limit Exceeded",
+            "detail": f"Request volume threshold breached. Limit rule: {exc.detail}",
+            "hint": "Please wait before retrying.",
+        },
+    )
 
 # ── 1. Configure Dynamic CORS ──────────────────────────────────────────────────
 if IS_RENDER:
     # Production: Restrict to your specific Frontend deployment URL on Render
-    # You can override this by setting FRONTEND_URL in Render's environment dashboard
-    allowed_origins = [
-        os.getenv("FRONTEND_URL") or os.getenv("RENDER_URL"), 
-    ]
+    frontend_url = os.getenv("RENDER_URL")
+    if not frontend_url:
+        # This will be logged by FastAPI on startup if empty.
+        print("WARNING: RENDER_URL environment variable not set. CORS may fail.")
+    allowed_origins = [frontend_url] if frontend_url else []
 else:
     # Local Development: Allow your local Streamlit instance to connect freely
     allowed_origins = [
@@ -66,7 +79,7 @@ app.add_middleware(
 )
 
 # ── 2. Configure Dynamic API Token Enforcement ──────────────────────────────
-API_KEY_NAME = "X-API-Token"
+API_KEY_NAME = "api-key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
 async def verify_api_token(api_key: str = Depends(api_key_header)):
@@ -83,29 +96,38 @@ async def verify_api_token(api_key: str = Depends(api_key_header)):
         if api_key != expected_token:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or missing X-API-Token authentication header."
+                detail=f"Invalid or missing {API_KEY_NAME} authentication header."
             )
     return api_key
 
 # ── 3. Apply the Security Dependency to Protected Routes ──────────────────────
 app.include_router(health.router, dependencies=[Depends(verify_api_token)])
-app.include_router(games.router, prefix="/games", dependencies=[Depends(verify_api_token)])
-app.include_router(search_router, prefix="/search", dependencies=[Depends(verify_api_token)])
+app.include_router(
+    games.router,
+    prefix="/games",
+    dependencies=[Depends(verify_api_token)]
+)
+app.include_router(
+    search_router,
+    prefix="/search",
+    dependencies=[Depends(verify_api_token)]
+)
 
 @app.get("/")
 @app.head("/")
-async def root():
+@limiter.limit(general_rate_limit)
+async def root(request: Request):
     return {
         "api_name": "EARLY API",
         "version": "1.0.0",
-        "documentation": "/docs"
     }
 
 
 # ── Liveness Endpoint ────────────────────────────────────────────────────
 @app.get("/livez", status_code=status.HTTP_200_OK)
 @app.head("/livez")
-async def liveness():
+@limiter.limit(general_rate_limit)
+async def liveness(request: Request):
     """
     Indicates whether the container process is running.
     Should remain lightweight; avoid blocking operations or external calls.
@@ -116,11 +138,17 @@ async def liveness():
 # ── Readiness Endpoint ───────────────────────────────────────────────────
 @app.get("/readyz")
 @app.head("/readyz")
-async def readiness(response: Response):
+@limiter.limit(general_rate_limit)
+async def readiness(request: Request, response: Response):
     """
-    Indicates whether the application is ready to process incoming API queries.
-    Verifies that backing models, memories, or databases are successfully connected.
+    Indicates whether the application is ready to process queries.
+    Verifies that backing services like the database are connected.
     """
-    return {
-        "status": "READY"
-    }
+    try:
+        db = get_db()
+        # A simple, fast query to check if the DB is responsive.
+        db.execute("SELECT 1")
+        return {"status": "READY"}
+    except Exception as e:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {"status": "UNREADY", "reason": f"Database connection failed: {e}"}

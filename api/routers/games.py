@@ -10,9 +10,8 @@ GET  /games/{appid}/analysis     — retrieve cached agent analysis
 """
 
 import json
-import time
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
 
 from api.db import get_db
 from api.schemas import (
@@ -30,6 +29,7 @@ from api.schemas import (
     ScoreSnapshot,
 )
 from api.services.agents import is_analysis_eligible, trigger_analysis
+from api.rate_limit import limiter, ai_rate_limit, general_rate_limit
 
 router = APIRouter(tags=["games"])
 
@@ -58,7 +58,9 @@ def _build_dimensions(row: dict) -> DimensionScores | None:
 # ---------------------------------------------------------------------------
 
 @router.get("", response_model=GameListResponse)
+@limiter.limit(general_rate_limit)
 def list_games(
+    request:         Request,
     l1_state:        str | None = Query(None, description="Healthy | Watch | At Risk"),
     ml_eligible:     int | None = Query(None, description="1 = ML eligible only"),
     currently_in_ea: int | None = Query(None, description="1 = active EA only"),
@@ -178,7 +180,8 @@ def list_games(
 # ---------------------------------------------------------------------------
 
 @router.get("/{appid}/score", response_model=GameScore)
-def get_game_score(appid: int):
+@limiter.limit(general_rate_limit)
+def get_game_score(appid: int, request: Request):
     db = get_db()
 
     row = db.execute("""
@@ -226,7 +229,8 @@ def get_game_score(appid: int):
 # ---------------------------------------------------------------------------
 
 @router.get("/{appid}/history", response_model=ScoreHistoryResponse)
-def get_game_history(appid: int):
+@limiter.limit(general_rate_limit)
+def get_game_history(appid: int, request: Request):
     db = get_db()
 
     rows = db.execute("""
@@ -272,7 +276,8 @@ def get_game_history(appid: int):
 # ---------------------------------------------------------------------------
 
 @router.get("/{appid}/features", response_model=GameFeatures)
-def get_game_features(appid: int):
+@limiter.limit(general_rate_limit)
+def get_game_features(appid: int, request: Request):
     db = get_db()
 
     row = db.execute("""
@@ -305,8 +310,10 @@ def get_game_features(appid: int):
 # ---------------------------------------------------------------------------
 
 @router.post("/{appid}/analyse", response_model=AnalysisTriggerResponse)
+@limiter.limit(ai_rate_limit)
 def trigger_game_analysis(
     appid: int,
+    request: Request,
     background_tasks: BackgroundTasks,
     force: bool = Query(False, description="Re-run even if analysis is fresh"),
 ):
@@ -344,7 +351,8 @@ def trigger_game_analysis(
 # ---------------------------------------------------------------------------
 
 @router.get("/{appid}/analysis", response_model=AgentAnalysisResponse)
-def get_game_analysis(appid: int):
+@limiter.limit(general_rate_limit)
+def get_game_analysis(appid: int, request: Request):
     db = get_db()
 
     # Check game exists

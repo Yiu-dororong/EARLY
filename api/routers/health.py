@@ -7,10 +7,11 @@ GET /health — pipeline heartbeat.
 import json
 import time
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from api.db import get_db
 from api.schemas import PipelineHealth
+from api.rate_limit import limiter, general_rate_limit
 
 router = APIRouter(tags=["health"])
 
@@ -32,7 +33,8 @@ _MONITORED_FEATURES = [
 
 
 @router.get("/health", response_model=PipelineHealth)
-def get_health():
+@limiter.limit(general_rate_limit)
+def get_health(request: Request):
     db = get_db()
 
     cutoff_7d = int(time.time()) - _STALE_THRESHOLD_SECS
