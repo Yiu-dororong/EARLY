@@ -126,7 +126,7 @@ class ResilientZilliz:
 
 
 def get_client() -> ResilientZilliz | None:
-    use_local = os.getenv("USE_LOCAL_MILVUS", "false").lower() == "true"
+    use_local = os.getenv("USE_LOCAL_DB", "false").lower() == "true"
     if not use_local and (not os.getenv("ZILLIZ_URI") or not os.getenv("ZILLIZ_TOKEN")):
         return None
     return ResilientZilliz()
