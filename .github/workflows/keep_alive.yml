@@ -9,6 +9,9 @@ jobs:
   wake-app:
     runs-on: ubuntu-latest
 
+    env:
+      STREAMLIT_APP_URL: ${{ secrets.STREAMLIT_APP_URL }}
+
     steps:
       - name: Checkout Code Repository
         uses: actions/checkout@v4
