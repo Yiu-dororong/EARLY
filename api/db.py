@@ -12,6 +12,7 @@ Tables:
     live_scores       — pre-computed weekly scores (serving layer)
     live_snapshots    — latest feature vector per game (overwritten weekly)
     agent_analysis    — cached LangGraph agent output (on-demand, user-triggered)
+    review_history    — historical review buckets (owned by collect pipeline, read-only here)
 """
 
 import os
@@ -60,7 +61,7 @@ CREATE TABLE IF NOT EXISTS live_scores (
 # live_snapshots
 # Current feature vector per game — one row per appid, overwritten weekly.
 # Used for: feature explainability, Zilliz ANN query vector, downstream tasks.
-# All 69 model features stored as JSON blob + key scalar fields as columns
+# All 76 model features stored as JSON blob + key scalar fields as columns
 # for cheap filtering without JSON parsing.
 # ---------------------------------------------------------------------------
 
@@ -148,9 +149,15 @@ ALL_TABLES = [
 
 async def init_db() -> None:
     global _conn
-    url   = os.environ["TURSO_URL"]
-    token = os.environ["TURSO_AUTH_TOKEN"]
-    _conn = libsql.connect(database=url, auth_token=token)
+    
+    use_local = os.getenv("USE_LOCAL_DB", "false").lower() == "true"
+    if use_local:
+        db_path = "./demo_data/early_sample.db"
+        _conn = libsql.connect(database=db_path)
+    else:
+        url   = os.environ["TURSO_URL"]
+        token = os.environ["TURSO_AUTH_TOKEN"]
+        _conn = libsql.connect(database=url, auth_token=token)
 
     # Ensure all tables exist (idempotent)
     for ddl in ALL_TABLES:
@@ -191,9 +198,14 @@ class ResilientDB:
                     _conn.close()
             except Exception:
                 pass
-            url = os.environ["TURSO_URL"]
-            token = os.environ["TURSO_AUTH_TOKEN"]
-            _conn = libsql.connect(database=url, auth_token=token)
+            use_local = os.getenv("USE_LOCAL_DB", "false").lower() == "true"
+            if use_local:
+                db_path = "./demo_data/early_sample.db"
+                _conn = libsql.connect(database=db_path)
+            else:
+                url = os.environ["TURSO_URL"]
+                token = os.environ["TURSO_AUTH_TOKEN"]
+                _conn = libsql.connect(database=url, auth_token=token)
 
 
 def get_db() -> ResilientDB:

@@ -61,6 +61,25 @@ class ResilientZilliz:
             except Exception:
                 pass
 
+            use_local = os.getenv("USE_LOCAL_DB", "false").lower() == "true"
+            
+            if use_local:
+                db_path = "./demo_data/early_vector.db"
+                try:
+                    from pymilvus import MilvusClient
+                    _client = MilvusClient(db_path)
+                    if _client.has_collection(COLLECTION_NAME):
+                        _client.load_collection(COLLECTION_NAME)
+                        logger.info("Local collection '%s' loaded.", COLLECTION_NAME)
+                    logger.info("Zilliz client initialised to local Milvus Lite (%s)", db_path)
+                except ImportError:
+                    logger.warning("pymilvus[milvus_lite] not installed — Local Zilliz disabled")
+                    _client = None
+                except Exception as e:
+                    logger.error("Local Zilliz connection failed: %s", e)
+                    _client = None
+                return
+
             uri   = os.getenv("ZILLIZ_URI")
             token = os.getenv("ZILLIZ_TOKEN")
 
@@ -107,7 +126,8 @@ class ResilientZilliz:
 
 
 def get_client() -> ResilientZilliz | None:
-    if not os.getenv("ZILLIZ_URI") or not os.getenv("ZILLIZ_TOKEN"):
+    use_local = os.getenv("USE_LOCAL_MILVUS", "false").lower() == "true"
+    if not use_local and (not os.getenv("ZILLIZ_URI") or not os.getenv("ZILLIZ_TOKEN")):
         return None
     return ResilientZilliz()
 
