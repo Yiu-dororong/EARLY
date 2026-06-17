@@ -7,9 +7,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-from dotenv import load_dotenv
-
-load_dotenv()
 
 # 1. Resolve target environment parameter
 STREAMLIT_URL = os.getenv("STREAMLIT_APP_URL")
