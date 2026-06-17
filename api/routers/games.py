@@ -126,10 +126,10 @@ def list_games(
                 (
                     (
                         (ls.p_distressed * 100.0) +                  -- Weighting Risk heavily
-                        (LOG(MAX(ls.review_count_at_T, 1)) * 20.0) - -- Log scale for popularity (caps massive outliers)
+                        (LOG(MAX(ls.review_count_at_T, 1)) * 25.0) - -- Log scale for popularity
                         (ls.ea_age_days * 0.05)                      -- Penalty multiplier for older games
                     )*
-                    (ls.days_since_last_build_update * 0.1)          -- Penalty multiplier for stale builds
+                    (MAX(ls.days_since_last_build_update, 300) * 0.1)          -- Penalty multiplier for stale builds
                 ) AS triage_priority_score
             FROM latest
             JOIN live_scores ls ON ls.appid = latest.appid AND ls.scored_at = latest.latest
