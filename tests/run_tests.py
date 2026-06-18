@@ -30,7 +30,10 @@ def main():
     
     # 3. Run pytest on the agents test directory using the absolute path
     agents_test_dir = os.path.join(script_dir, "agents")
-    exit_code = pytest.main([agents_test_dir, "-v"])
+    
+    # Forward any additional command-line arguments to pytest
+    pytest_args = [agents_test_dir, "-v"] + sys.argv[1:]
+    exit_code = pytest.main(pytest_args)
     sys.exit(exit_code)
 
 if __name__ == "__main__":
