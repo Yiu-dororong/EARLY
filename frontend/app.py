@@ -302,7 +302,7 @@ def render_browse():
     st.error("""
     **⚠️ Important Disclaimer**:
              
-    EARLY is an independent analytical tool, **not affiliated with Valve or Steam**. 
+    EARLY is an independent analytical tool, **not affiliated with Valve, Steam, or any game developers.**. 
              
     - All predictions are statistical estimates only. Past performance does not guarantee future results.
     - Predictions can be wrong. The model may suffer from data limitations and concept drift over time. 
