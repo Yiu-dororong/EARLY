@@ -1,46 +1,43 @@
-# EARLY — Steam Early Access Intelligence System (WIP)
+# EARLY — Steam Early Access Intelligence System
 
-**THIS README IS NOT THE FINAL VERSION. ALL INFORMATION IS SUBJECT TO CHANGE**
+*THIS README IS NOT THE FINAL VERSION. ALL INFORMATION IS SUBJECT TO CHANGE*
 
-> **Can you tell a game is being abandoned before the developer says so?**
+**Detects early warning signs that a Steam Early Access game may be abandoned.**
 
-> EARLY answers that question by monitoring 1,000+ live Steam Early Access games, learning from ~1,600 historical outcomes, and surfacing early warning signals — weeks or months before a game goes silent.
+EARLY monitors more than 1,000 active Early Access titles and draws on patterns from roughly 1,600 historically completed or abandoned games. It produces a distress risk score and a three-tier health label (**Healthy / Watch / At Risk**) to highlight games that are losing momentum — often well before the review scores reflect the decline.
 
-<!-- INSERT: screenshot or short GIF of Streamlit "mission control" dashboard — dark theme, dimension meters, distress risk badge -->
+<!-- INSERT: screenshot or short GIF of the Streamlit dashboard (dark theme, risk meters, health labels) -->
 
-🔴 **[Live Demo](https://early-system.streamlit.app/)** &nbsp;|&nbsp; 📄 **[Technical Documentation](docs/technical.md)**
+🔴 **[Live Demo](https://early-system.streamlit.app/)** &nbsp;&nbsp;|&nbsp;&nbsp; 📄 **[Technical Documentation](docs/technical.md)**
 
-> **⚠️ Important Disclaimer**
->* EARLY is an independent, unofficial analytical tool. It is not affiliated with, endorsed by, or connected to Valve, Steam, or any game developers.
->* All risk scores, predictions, and tier labels are statistical estimates based on historical patterns and publicly available data. Past performance does not guarantee future outcomes.
->* Predictions can be incorrect due to data limitations, concept drift, changes in developer behavior, or unforeseen events.
->* Self-fulfilling prophecy risk: Public visibility of risk signals could potentially influence developer or player behavior in ways that affect the predicted outcome.
->* EARLY should be used for informational and exploratory purposes only. It is not financial, investment, or purchasing advice.
->* Always verify information directly on Steam and perform your own due diligence. Do not base major decisions solely on this tool.
->* The authors assume no responsibility or liability for any decisions made based on EARLY's outputs.
+> **⚠️ Disclaimer**  
+> EARLY is an independent, unofficial tool. It is not affiliated with Valve, Steam, or any game developers. <br/> All risk scores are statistical estimates which can be wrong. Use this for informational purposes only.
 
 ---
 
 ## The Problem
 
-30–40% of Steam Early Access games never reach a full release. They go quiet — updates slow, the developer stops responding, and players are left with an unfinished product they paid for. There is no official signal. Steam shows a basic warning if the last update was over 12 months ago, but this signal is very late. Review scores lag by weeks. By the time the community notices, it's already over.
+Our analysis of historical Early Access titles shows that roughly 30–40% never reach a full release. When development slows or stops, players are often left with an unfinished product they paid for.
 
-Detecting abandonment early is genuinely hard:
 
-- Steam exposes **no public API for "did this game actually ship code"** — build announcements are categories, not depot-verified signals. A developer can post a "major update" with no actual build attached.
-- Useful signals (player concurrents, changelog word counts, dev response rates) are **scattered across multiple Steam endpoints** with no unified view.
-- A model trained naively on snapshots will learn from the future — standard train/test splits **leak look-ahead information** for time-series game data, silently inflating every metric.
-- The games that are hardest to call — Watch and At Risk — also have **2× more missing features** than Healthy games, so reliability degrades exactly where it matters most.
+Current systems make early detection difficult:
 
-EARLY was built to navigate all of these, explicitly.
+- Steam provides no public API to confirm whether an announced update actually shipped executable code.
+- Important signals — player counts, changelog substance, developer response rates — are scattered across multiple endpoints with no unified view.
+- Steam’s official warning only appears after 12 months of inactivity, long after the game has already lost momentum.
+- Games falling below 10 monthly reviews lose their "Recent Reviews" metric, pushing Steam to show stale all-time averages that mask ongoing decline.
+- Standard machine-learning approaches on time-series game data easily leak future information, inflating performance metrics and hiding real-world reliability issues.
+
+EARLY was built to address these exact challenges.
 
 ---
 
 ## What It Does
 
-EARLY ingests the full Steam catalog (160,000+ apps via official APIs), filters to Early Access games with sufficient history, and runs a weekly pipeline that produces a **distress risk score** and **three-tier health label** (Healthy / Watch / At Risk) for each game.
+EARLY ingests the full Steam catalog (160,000+ apps) through official APIs, filters to Early Access titles with sufficient history, and runs a weekly pipeline that generates a **distress risk score** and a three-tier health label (**Healthy / Watch / At Risk**) for each game.
 
-For games showing warning signs, an **on-demand LLM agent layer** cross-checks three independent signal sources — the ML model, raw review sentiment, and the actual text of developer announcements — and flags when they conflict. A game that posts a "big update" announcement with hollow content while reviews say "no real changes in months" gets called out explicitly.
+For titles flagged as Watch or At Risk, an on-demand LangGraph agent layer cross-checks three independent sources: the ML model output, recent review sentiment, and the actual substance of developer announcements. This triangulation surfaces conflicts — for example, when a “major update” announcement contains little real progress while reviews indicate months of stagnation.
+
 
 ```mermaid
 block-beta
@@ -63,7 +60,7 @@ B["Data Pipeline<br/>GitHub Actions"] space C["XGBoost + L1 Scorecard<br/>Weekly
     B --> C
     C --> D
     D -- "Scorecard Label" --> E
-    D --> F
+    D -.-> F
     E -- "Yes" --> G
     E -- "No" --> H
     G --> I
@@ -75,79 +72,67 @@ B["Data Pipeline<br/>GitHub Actions"] space C["XGBoost + L1 Scorecard<br/>Weekly
 
 ---
 
-## Key Findings
+## Quick Start
 
-**The reliability gap concentrates where it matters most.** At Risk games average 13.6 missing features per snapshot vs 5.2 for Healthy games — the games most in need of agent analysis are the ones the model is least confident about. `data_quality` (high/medium/low) is surfaced directly in the API response.
+```bash
+git clone https://github.com/Yiu-dororong/EARLY.git
+cd early
+cp .env.example .env
 
-**Build announcements can still mislead.**  
-Even though Steam’s event history API provides `build_id` and `build_branch` (when the developer supplies them), these fields are **optional** and frequently absent. During testing, a critical edge case was discovered: a game posted a standard Type-13 (regular update) announcement with an empty build signature—revealing that announcements categories do not guarantee actual code deployments.  
+# [Optional] Only fill in GROQ_API_KEY if you want to run live AI analysis.
+# All other cloud integrations (Turso, Zilliz, etc.) are bypassable out-of-the-box using the pre-seeded local fallback data.
 
-It broke a core assumption in the original model and triggered a major redesign of the agent layer — shifting its role from “explain the score” to “detect when independent signals disagree.”
+docker compose up
+```
 
-<!-- INSERT: screenshot of Never Mourn game in the UI — Forensic Agent flagging event_state_mismatch, Critic verdict showing signal conflict -->
+API: `http://localhost:8000` &nbsp;|&nbsp; UI: `http://localhost:8501`
 
-**Signal triangulation catches what a single model cannot.** The Critic Agent now runs a deterministic alignment check before any LLM call — comparing ML state, review sentiment direction, and forensic substance score. When all three agree, confidence is high. When they conflict, the verdict says so explicitly.
+**Running Tests**
 
-<!-- INSERT: screenshot or diagram of triangulation output — three signals, alignment result, verdict -->
+```bash
+# Deterministic tests (no API key needed)
+python tests/run_tests.py -m not_live
+# Full agent tests (requires GROQ_API_KEY)
+python tests/run_tests.py -m live
+```
+
+Agent tests use DeepEval. `fixtures.py` includes a fake heartbeat test case, a hotfix series, and edge cases. Deterministic tests cover `compute_signal_alignment` without any LLM call; live tests are auto-skipped if `GROQ_API_KEY` is unset.
 
 ---
 
-## Architecture
+## Key Insights & Results
 
-```mermaid
-flowchart LR
-    subgraph Bootstrap ["🛠️ Bootstrap / Training Pipeline"]
-        direction TB
+**The hardest games to predict are also the ones with the least reliable data.** Games labeled At Risk average 13.6 missing features per snapshot, compared with 5.2 for Healthy games. This gap is surfaced directly in the API through a `data_quality` field (high/medium/low).
 
-        A[Steam APIs<br/>160k+ Apps] --> B[Filter Eligible <br/> Early Access Games]
-        
-        B --> C["Data Collection<br/>from Third Parties<br/>(ITAD and Steam Charts)"]
+**Announcement signals can be misleading.** Even when Steam’s event API returns `build_id` or `build_branch`, these fields are optional. During testing we discovered cases where a standard update announcement (Type-13) was posted with no corresponding build. This finding drove a major redesign of the agent layer, shifting its role from explanation to active conflict detection.
+<!-- INSERT: screenshot of Never Mourn game in the UI — Forensic Agent flagging event_state_mismatch, Critic verdict showing signal conflict -->
 
-        C --> D[Feature Engineering +<br/>Outcome Labeling]
+**Signal triangulation improves reliability.** Before any LLM call, the Critic Agent runs a deterministic check across three signals: ML state, review sentiment direction, and forensic substance score. When the signals disagree, the verdict explicitly states the conflict rather than forcing a single conclusion.
+<!-- INSERT: screenshot or diagram of triangulation output — three signals, alignment result, verdict -->
 
-        D --> E[Reconstruct ~6,200 <br/>Historical Snapshots<br/> from ~1,600 Games]
+**Model Performance & Validation Metrics (v1.3)**
 
-        E --> F["<span style='white-space:nowrap;'>Scorecard Calibration<br/> (5-dimension, backbone + momentum)"]
 
-        F --> G[XGBoost Training GroupKFold <br/> Dynamic Threshold]
+| Evaluation Framework | AUC-ROC | PR-AUC | Lift Over Scorecard Baseline |
+| --- | --- | --- | --- |
+| **Standard Holdout Set** | 0.9096 | 0.7378 | **+0.2271** |
+| **Time-Bounded Cohort**  | 0.8761 | 0.6533 | **+0.1577** |
 
-        
 
-    end
 
-    subgraph Inference ["🚀 Continuous Inference Pipeline"]
-        direction TB
-        H["<span style='white-space:nowrap;'>Weekly Data Pipeline Delta Run<br/>GitHub Actions"] 
-        --> I[Feature Engineering +<br/>Outcome Labeling]
+**Risk Tier Classification Integrity**
 
-        I --> J["<span style='white-space:nowrap;'>Scorecard + XGBoost Inference</span>"]
+The baseline heuristic scorecard is calibrated by tracking the final lifecycle snapshot of each game against its final outcome. This evaluation shows that while the system is highly reliable when identifying clearly Healthy titles, it requires extra scrutiny precisely where heuristic confidence is lowest:
 
-        J --> K["FastAPI Backend<br/>Turso + Zilliz (Milvus)"]
+| Risk Tier          | Final-Snapshot Agreement | Operational Takeaway |
+|--------------------|--------------------------------------------------|----------------------|
+| 🟢 **Healthy**     | 98.3%                                            | High-confidence identification of stable, actively progressing titles; false positives are minimal. |
+| 🟡 **Watch**        | 75.7%                                            | Captures transitionary phases; represents an elevated risk profile with a lower probability of reaching distress. |
+| 🔴 **At Risk**      | 51.3%                                            | Identifies titles experiencing communication gaps or abandonment; functions as a low-confidence heuristic triage step. |
 
-        K --> L{Watch or At Risk ?}
+*Note: Scorecard calibration is evaluated at a game’s terminal checkpoint to calculate the precise outcome agreement rate. For Healthy and Watch tiers, agreement measures successful full release. For the At Risk tier, agreement measures meeting the definition of distressed.*
 
-        L -- "Yes (On-Demand)" --> M["LangGraph Agents <br/>Signal Triangulation"]
-
-        M --> O[Streamlit Frontend]
-
-        L -- No --> O
-
-        K -. "Optional" .-> P[Vector Search<br/>Similar Snapshots Lookup]
-
-        P --> O
-        
-    end
-
-    Bootstrap --> Inference
-
-    classDef train fill:#166534,stroke:#4ade80,color:#fff
-    classDef infer fill:#1e3a8a,stroke:#60a5fa,color:#fff
-    classDef ui fill:#312e81,stroke:#a5b4fc,color:#fff
-
-    class A,B,C,D,E,F,G train
-    class H,I,J,K,L,M,N,O infer
-    class O ui
-```
+<!-- INSERT: screenshot of Never Mourn case showing Forensic Agent flagging event_state_mismatch and Critic verdict highlighting signal conflict -->
 
 ---
 ## Tech Stack
@@ -166,110 +151,44 @@ flowchart LR
 
 ---
 
-## ML Design Decisions Worth Noting
+## Technical Deep Dive
 
-**GroupKFold by `appid`** — all snapshots from one game stay in the same fold. Without this, a model sees early snapshots of a game during training and later snapshots during validation, leaking temporal information.
+**ML Design Decisions**
 
-**Dynamic Threshold from OOF PR Curve** — Instead of using a fixed 0.5 cutoff, the classification threshold is chosen dynamically based on the Precision-Recall curve from out-of-fold predictions. This better handles the class imbalance (~3:1 active vs abandoned) and allows tunable precision/recall trade-offs.
+- **GroupKFold by `appid`**: All snapshots from the same game stay in one fold. This prevents temporal leakage where the model would see both early and late snapshots of the same title.
+- **Dynamic threshold from OOF PR curve**: Instead of a fixed 0.5 cutoff, the classification threshold is chosen based on the precision-recall curve from out-of-fold predictions. This handles the class imbalance more effectively.
+- **Cosine similarity on SHAP vectors**: Used instead of L2 distance so games failing for the same reasons cluster together regardless of score magnitude.
+- **No imputation for missing values**: XGBoost natively handles nulls. We return dense SHAP vectors with `pred_contribs=True`; earlier mean-imputation attempts were removed as they added distortion.
 
+**Agent Layer**
 
-**Cosine similarity for SHAP vectors, not L2** — a Watch game and an At Risk game failing for the same underlying reasons would appear distant under L2 purely due to score magnitude. Cosine measures directional similarity — games failing for the same reasons cluster together regardless of severity.
+The agent system runs **on-demand only** for Watch and At Risk games and caches results until the `l1_state` changes or 14 days pass (to respect Groq rate limits).
 
-**No imputation for Missing Values** — XGBoost handles nulls natively at prediction time. `pred_contribs=True` always returns a dense SHAP vector. An earlier design proposed mean-imputing null SHAP values; this was removed when confirmed unnecessary and potentially distorting.
+- **Forensic Agent**: Analyzes the last 5 developer announcements for actual substance. Detects “fake heartbeat” updates that lack corresponding build changes and outputs `event_state_mismatch` flags.
+- **Sentiment Auditor**: Compares recent versus historical reviews to produce a `sentiment_alignment` score that checks consistency with the current ML state.
+- **Critic Agent**: First runs a fast deterministic alignment check across ML score, review sentiment, and forensic signals, then produces two plain-language verdicts: `consumer_verdict` and `developer_brief`.
+
+**Review Quality Adjustments**
+
+Reviews are processed with three corrections before sentiment scoring:
+- Meme discount (high funny/helpful ratio on negative reviews reduces weight)
+- CJK-aware length scoring (CJK characters weighted 2.5× due to information density)
+- “Great Wall of Text” guard (deduplication and smart truncation at 300 characters)
+
 
 ---
 
-## Agent Layer
+## MLOps & Reliability
 
-The agent system is triggered **on-demand only** (never during the weekly batch run). Due to Groq rate limits, agent analysis runs only for Watch/At Risk games and results are cached in the database. Cached results remain valid until the game’s `l1_state` changes or 14 days pass.
+EARLY treats production ML reliability as a first-class concern. A four-stage maturity plan is in place, with Stages 1–3 currently implemented.
 
-**Forensic Agent**  
-Analyzes the last 5 developer announcements for actual substance (not just recency). Detects “fake heartbeat” updates — announcements that suggest progress without corresponding build changes. Outputs include `momentum` trends and `event_state_mismatch` flags (e.g. the Never Mourn case).
+| Stage | Goal | Implementation |
+|-------|------|----------------|
+| **Stage 1 – Drift Monitoring** | Detect degradation before it impacts predictions | `monitor_drift.py` tracks PSI on the top-25 SHAP features, prediction distribution shift, null-rate by risk tier, and delayed label drift. Runs automatically after each inference in `score.yml` and writes results to the `drift_reports` table. |
+| **Stage 2 – Model Registry** | Controlled, auditable promotion | Every training run logs parameters, metrics, and artifacts to MLflow. Promotion to Production is gated: new models must improve PR-AUC *and* per-tier outcome agreement compared to the current production model. When MLflow is not configured, the promotion step becomes a no-op stub. |
+| **Stage 3 – Conditional Retraining** | Safe, drift-triggered updates | `retrain.py` can be triggered by schedule or drift thresholds. It trains a new model, runs it through the promotion gate, and only promotes if metrics hold. Defaults to `--no-auto-promote` (human review strongly recommended for early cycles). Automatically flags `--zilliz-rebuild-needed` if the SHAP top-25 feature contract changes. |
+| **Stage 4 – Survival Modeling (Roadmap)** | Move beyond binary classification | Replace the current distress flag with XGBoost AFT (Accelerated Failure Time) survival analysis to predict *how much runway* an Early Access title has left. |
 
-<!-- INSERT: example Forensic Agent output — fake heartbeat case vs genuine update series -->
-
-**Sentiment Auditor**  
-Compares recent vs historical reviews to extract thematic signals (developer responsiveness, content drought, bug burden, etc.). Produces a `sentiment_alignment` score that explicitly checks consistency with the current ML `l1_state`.
-
-**Critic Agent**  
-First runs a fast deterministic alignment check (no LLM) across ML state, review sentiment, and forensic signals. Then generates two clear verdicts:
-- `consumer_verdict` — player-facing plain language summary
-- `developer_brief` — actionable insights for developers
-
-When signals conflict, the verdict clearly states the disagreement.
-
-<!-- INSERT: screenshot of Developer tab — developer_brief, key_concerns list, forensic detail expander -->
-
----
-
-## Review Quality
-
-Reviews are not taken at face value. Three adjustments are applied before sentiment scoring:
-
-- **Meme discount** — high funny/helpful ratio on negative reviews reduces their weight
-- **CJK-aware length scoring** — CJK characters weighted 2.5× vs Latin (character density difference)
-- **Great Wall of Text guard** — line-level and token-level deduplication before scoring length; smart sentence-boundary truncation to 300 chars
-
----
-<!-- NEED REVIEW -->
-## MLOps
-
-Four-stage plan, Stages 1–3 implemented:
-
-**Stage 1 — Drift monitoring** (`monitor_drift.py`): PSI across top-25 SHAP features, prediction distribution, null-rate by tier, and delayed label drift. Runs post-inference in `score.yml`. Stores results in `drift_reports` table.
-
-**Stage 2 — MLflow model registry** (`mlflow_client.py`, `promote_model.py`): every training run logs params, metrics, and artifacts. Promotion is gated — PR-AUC and per-tier outcome agreement are compared against current Production before transition. No-op stub when MLflow is not configured.
-
-**Stage 3 — Conditional retraining** (`retrain.py`): scheduled or drift-triggered. Trains, compares against Production via the promotion gate, promotes only if metrics hold. Defaults to `--no-auto-promote` (human review recommended for first few cycles). Flags `--zilliz-rebuild-needed` if the SHAP top-25 feature set changes on promotion.
-
-**Stage 4 (roadmap)** — XGBoost AFT survival analysis: reframe from binary classification to time-to-event prediction, modelling how much runway a game has rather than a binary distress flag.
-
----
-
-## Testing
-```bash
-# Deterministic tests (no API key needed)
-python tests/run_tests.py -m not_live
-# Full agent tests (requires GROQ_API_KEY)
-python tests/run_tests.py -m live
-```
-
-Agent tests use DeepEval. `fixtures.py` includes the Never Mourn case, a hotfix series, and edge cases. Deterministic tests cover `compute_signal_alignment` without any LLM call; live tests are auto-skipped if `GROQ_API_KEY` is unset.
-
----
-
-
-## 📊 Results
-
-**Model Performance (v1.3 Holdout Set)**
-
-| Metric              | Value     |
-|---------------------|-----------|
-| AUC-ROC             | **0.9127** |
-| PR-AUC              | **0.7382** |
-| Lift over Scorecard | **+0.262** |
-
-**Risk Tier Historical Accuracy** 
-- **🟢 Healthy** → 98.2% success rate
-- **🟡 Watch** → 74.9% success rate
-- **🔴 At Risk** → ~48% success rate
-<!-- ADD time tound eval & avg scorecard alignment -->
----
-
-## Quick Start
-
-```bash
-git clone https://github.com/Yiu-dororong/EARLY.git
-cd early
-cp .env.example .env
-
-# [Optional] Only fill in GROQ_API_KEY if you want to run live AI analysis.
-# All other cloud integrations (Turso, Zilliz, etc.) are bypassable out-of-the-box using the pre-seeded local fallback data.
-
-docker compose up
-```
-
-API: `http://localhost:8000` &nbsp;|&nbsp; UI: `http://localhost:8501`
 
 ---
 
@@ -282,18 +201,29 @@ early/
 ├── api/                   # FastAPI routers, services, schema
 ├── core/                  # Feature builder, inference engine (shared)
 ├── data/                  # Collection scripts (Steam API) + processing
-├── frontend/              # Streamlit app (single-file session-state router)
+├── frontend/              # Streamlit app
 ├── models/                # ML artifacts, SHAP top-25 contract, drift reference
 ├── tests/                 # DeepEval agent tests + fixtures
-├── training/              # train_xgboost.py, scorecard, MLflow client, drift monitor
-└── utils/                 # Langfuse client, ITAD client
+├── training/              # train_xgboost.py, scorecard, drift monitor
+└── utils/                 # Langfuse client, ITAD client, MLflow client
 ```
 
 ---
+## Important Notes
 
-## What This Is Not
+### Disclaimer
+>* EARLY is an independent, unofficial analytical tool. It is not affiliated with, endorsed by, or connected to Valve, Steam, or any game developers.
+>* All risk scores, predictions, and tier labels are statistical estimates based on historical patterns and publicly available data. Past performance does not guarantee future outcomes.
+>* Predictions can be incorrect due to data limitations, concept drift, changes in developer behavior, or unforeseen events.
+>* Self-fulfilling prophecy risk: Public visibility of risk signals could potentially influence developer or player behavior in ways that affect the predicted outcome.
+>* EARLY should be used for informational and exploratory purposes only. It is not financial, investment, or purchasing advice.
+>* Always verify information directly on Steam and perform your own due diligence. Do not base major decisions solely on this tool.
+>* The authors assume no responsibility or liability for any decisions made based on EARLY's outputs.
 
-EARLY does not predict whether a game will be *good*. It detects signals that a developer has slowed or stopped meaningful development. A game can score Healthy and still be mediocre. A game can score At Risk and recover — the system flags it, not sentences it.
+
+### What This Is Not
+
+>EARLY does not predict whether a game will be *good*. It detects signals that a developer has slowed or stopped meaningful development. A game can score Healthy and still be mediocre. A game can score At Risk and recover — the system flags it, not sentences it.
 
 <!-- INSERT: example of a Watch game that recovered — score history chart showing trajectory reversal -->
 
