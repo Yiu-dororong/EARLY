@@ -124,11 +124,11 @@ Agent tests use DeepEval. `fixtures.py` includes a fake heartbeat test case, a h
 
 The baseline heuristic scorecard is calibrated by tracking the final lifecycle snapshot of each game against its final outcome. This evaluation shows that while the system is highly reliable when identifying clearly Healthy titles, it requires extra scrutiny precisely where heuristic confidence is lowest:
 
-| Risk Tier          | Final-Snapshot Agreement | Operational Takeaway |
+| Risk Tier          | Final&nbsp;Snapshot&nbsp;Agreement | Operational Takeaway |
 |--------------------|--------------------------------------------------|----------------------|
-| 🟢 **Healthy**     | 98.3%                                            | High-confidence identification of stable, actively progressing titles; false positives are minimal. |
-| 🟡 **Watch**        | 75.7%                                            | Captures transitionary phases; represents an elevated risk profile with a lower probability of reaching distress. |
-| 🔴 **At Risk**      | 51.3%                                            | Identifies titles experiencing communication gaps or abandonment; functions as a low-confidence heuristic triage step. |
+| 🟢&nbsp;**Healthy**     | 98.3%                                            | High-confidence identification of stable, actively progressing titles; false positives are minimal. |
+| 🟡&nbsp;**Watch**        | 75.7%                                            | Captures transitionary phases; represents an elevated risk profile with a lower probability of reaching distress. |
+| 🔴&nbsp;**At Risk**      | 51.3%                                            | Identifies titles experiencing communication gaps or abandonment; functions as a low-confidence heuristic triage step. |
 
 *Note: Scorecard calibration is evaluated at a game’s terminal checkpoint to calculate the precise outcome agreement rate. For Healthy and Watch tiers, agreement measures successful full release. For the At Risk tier, agreement measures meeting the definition of distressed.*
 
