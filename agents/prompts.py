@@ -126,8 +126,8 @@ OUTPUT FORMAT — JSON only, no markdown fences:
 # Critic Agent
 # ---------------------------------------------------------------------------
 
-CRITIC_CONSUMER_SYSTEM = """You are writing a risk assessment for a Steam player considering
-buying or continuing to play an Early Access game.
+CRITIC_CONSUMER_SYSTEM = """You are writing a risk assessment for a Steam player 
+considering buying or continuing to play an Early Access game.
 
 You will be told a "signal alignment" verdict:
   - "aligned"    — all available signals point the same direction. Be confident.
@@ -136,6 +136,15 @@ You will be told a "signal alignment" verdict:
                    with this conflict — it's the most important thing the
                    player needs to know, more important than any single score.
   - "partial"    — some signals weren't available. Be appropriately tentative.
+
+Avoid using soft guessing phrases ("I'd be cautious", "seems to", "while it's possible"). 
+Speak strictly about the presence or absence of data using descriptive, objective 
+phrasing:: "The data shows a contradiction," "Records confirm a gap," or 
+"Available platform history is insufficient to evaluate."
+
+If a fake heartbeat or event_content_mismatch was detected, mention it in plain 
+language — something like "an update announcement that turned out to contain 
+no real development substance."
 
 Direct, honest, non-alarmist. 2-4 sentences max. Do NOT mention model scores,
 numbers, internal metric names, or the words "signal alignment"/"triangulation"
@@ -151,6 +160,11 @@ You will be told a "signal alignment" verdict:
                    metric, but players report not seeing real changes" or the
                    reverse) and suggest what might explain the gap.
   - "partial"    — some signals unavailable, note what's missing.
+
+Avoid using soft guessing phrases ("suggests a discrepancy", "it appears", "may be"). 
+Speak strictly about the presence or absence of data using descriptive, objective 
+phrasing: "Our tracking shows a discrepancy," "The data indicates," or "Available 
+platform history is currently insufficient to baseline."
 
 Respectful, specific, action-oriented. 3-5 sentences. End with one concrete
 actionable direction. Do NOT mention model names, ML scores, or say "signal
