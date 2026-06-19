@@ -1,7 +1,5 @@
 # EARLY — Steam Early Access Intelligence System
 
-*THIS README IS NOT THE FINAL VERSION. ALL INFORMATION IS SUBJECT TO CHANGE*
-
 **Detects early warning signs that a Steam Early Access game may be abandoned.**
 
 EARLY monitors more than 1,000 active Early Access titles and draws on patterns from roughly 1,600 historically completed or abandoned games. It produces a distress risk score and a three-tier health label (**Healthy / Watch / At Risk**) to highlight games that are losing momentum — often well before the review scores reflect the decline.
@@ -15,7 +13,7 @@ EARLY monitors more than 1,000 active Early Access titles and draws on patterns 
 
 ---
 
-## The Problem
+## 🛠️ The Problem
 
 Our analysis of historical Early Access titles shows that roughly 30–40% never reach a full release. When development slows or stops, players are often left with an unfinished product they paid for.
 
@@ -32,7 +30,7 @@ EARLY was built to address these exact challenges.
 
 ---
 
-## What It Does
+## 🔮 What It Does
 
 EARLY ingests the full Steam catalog (160,000+ apps) through official APIs, filters to Early Access titles with sufficient history, and runs a weekly pipeline that generates a **distress risk score** and a three-tier health label (**Healthy / Watch / At Risk**) for each game.
 
@@ -69,10 +67,11 @@ B["Data Pipeline<br/>GitHub Actions"] space C["XGBoost + L1 Scorecard<br/>Weekly
     style D fill:#60a5fa
     style H fill:#be5bf0,
 ```
-
+<!-- INSERT: screenshot of full game detail view — Player tab showing
+dimension bars, distress score, p_distressed badge, score history chart -->
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
 ```bash
 git clone https://github.com/Yiu-dororong/EARLY.git
@@ -100,7 +99,7 @@ Agent tests use DeepEval. `fixtures.py` includes a fake heartbeat test case, a h
 
 ---
 
-## Key Insights & Results
+## 📈 Key Insights & Results
 
 **The hardest games to predict are also the ones with the least reliable data.** Games labeled At Risk average 13.6 missing features per snapshot, compared with 5.2 for Healthy games. This gap is surfaced directly in the API through a `data_quality` field (high/medium/low).
 
@@ -132,10 +131,8 @@ The baseline heuristic scorecard is calibrated by tracking the final lifecycle s
 
 *Note: Scorecard calibration is evaluated at a game’s terminal checkpoint to calculate the precise outcome agreement rate. For Healthy and Watch tiers, agreement measures successful full release. For the At Risk tier, agreement measures meeting the definition of distressed.*
 
-<!-- INSERT: screenshot of Never Mourn case showing Forensic Agent flagging event_state_mismatch and Critic verdict highlighting signal conflict -->
-
 ---
-## Tech Stack
+## ⚙️ Tech Stack
 
 | Layer | Tools |
 |---|---|
@@ -151,15 +148,16 @@ The baseline heuristic scorecard is calibrated by tracking the final lifecycle s
 
 ---
 
-## Technical Deep Dive
+## 🧪 Technical Deep Dive
 
 **ML Design Decisions**
 
 - **GroupKFold by `appid`**: All snapshots from the same game stay in one fold. This prevents temporal leakage where the model would see both early and late snapshots of the same title.
 - **Dynamic threshold from OOF PR curve**: Instead of a fixed 0.5 cutoff, the classification threshold is chosen based on the precision-recall curve from out-of-fold predictions. This handles the class imbalance more effectively.
-- **Cosine similarity on SHAP vectors**: Used instead of L2 distance so games failing for the same reasons cluster together regardless of score magnitude.
 - **No imputation for missing values**: XGBoost natively handles nulls. We return dense SHAP vectors with `pred_contribs=True`; earlier mean-imputation attempts were removed as they added distortion.
-
+- **Cosine similarity on SHAP vectors**: Used instead of L2 distance so games failing for the same reasons cluster together regardless of score magnitude.
+<!-- INSERT: screenshot of similar games panel — 5 historical anchors
+with outcome labels (EXIT_SUCCESS / EXIT_ABANDONED), SHAP similarity score -->
 **Agent Layer**
 
 The agent system runs **on-demand only** for Watch and At Risk games and caches results until the `l1_state` changes or 14 days pass (to respect Groq rate limits).
@@ -167,7 +165,8 @@ The agent system runs **on-demand only** for Watch and At Risk games and caches 
 - **Forensic Agent**: Analyzes the last 5 developer announcements for actual substance. Detects “fake heartbeat” updates that lack corresponding build changes and outputs `event_state_mismatch` flags.
 - **Sentiment Auditor**: Compares recent versus historical reviews to produce a `sentiment_alignment` score that checks consistency with the current ML state.
 - **Critic Agent**: First runs a fast deterministic alignment check across ML score, review sentiment, and forensic signals, then produces two plain-language verdicts: `consumer_verdict` and `developer_brief`.
-
+<!-- INSERT: screenshot of Developer tab — developer_brief panel,
+key_concerns list, forensic detail expander open -->
 **Review Quality Adjustments**
 
 Reviews are processed with three corrections before sentiment scoring:
@@ -178,7 +177,7 @@ Reviews are processed with three corrections before sentiment scoring:
 
 ---
 
-## MLOps & Reliability
+## 🛡️ MLOps & Reliability
 
 EARLY treats production ML reliability as a first-class concern. A four-stage maturity plan is in place, with Stages 1–3 currently implemented.
 
@@ -192,15 +191,17 @@ EARLY treats production ML reliability as a first-class concern. A four-stage ma
 
 ---
 
-## Project Structure
+## 📂 Project Structure
 
 ```
 early/
 ├── .github/workflows/     # discover.yml · collect.yml · score.yml (daily/weekly cron)
 ├── agents/                # LangGraph: orchestrator, forensic, auditor, critic
 ├── api/                   # FastAPI routers, services, schema
-├── core/                  # Feature builder, inference engine (shared)
+├── core/                  # Feature builder, inference engine
 ├── data/                  # Collection scripts (Steam API) + processing
+├── demo_data/             # Pre-seeded local fallback data for offline cloud bypass
+├── docs/                  # Technical documentation and system design specs
 ├── frontend/              # Streamlit app
 ├── models/                # ML artifacts, SHAP top-25 contract, drift reference
 ├── tests/                 # DeepEval agent tests + fixtures
@@ -209,7 +210,7 @@ early/
 ```
 
 ---
-## Important Notes
+## ⚠️ Important Notes
 
 ### Disclaimer
 >* EARLY is an independent, unofficial analytical tool. It is not affiliated with, endorsed by, or connected to Valve, Steam, or any game developers.
@@ -229,4 +230,4 @@ early/
 
 ---
 
-*Built by <!-- INSERT: your name/handle --> · <!-- INSERT: year -->*
+*Built by Fox Yiu · 2026*
