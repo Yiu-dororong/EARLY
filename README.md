@@ -5,6 +5,13 @@
 EARLY monitors more than 1,000 active Early Access titles and draws on patterns from roughly 1,600 historically completed or abandoned games. It produces a distress risk score and a three-tier health label (**Healthy / Watch / At Risk**) to highlight games that are losing momentum — often well before the review scores reflect the decline.
 
 <!-- INSERT: screenshot or short GIF of the Streamlit dashboard (dark theme, risk meters, health labels) -->
+<p align="center">
+    <kbd>
+        <img width="1280" height="720" alt="st_demo" src="https://github.com/user-attachments/assets/f33e6fe9-3255-4ca5-bbcb-a554ce9c32f6" />
+    </kbd>
+</p>
+
+
 
 🔴 **[Live Demo](https://early-system.streamlit.app/)** &nbsp;&nbsp;|&nbsp;&nbsp; 📄 **[Technical Documentation](docs/technical.md)**
 
@@ -106,9 +113,20 @@ Agent tests use DeepEval. `fixtures.py` includes a fake heartbeat test case, a h
 **Announcement signals can be misleading.** Even when Steam’s event API returns `build_id` or `build_branch`, these fields are optional. During testing we discovered cases where a standard update announcement (Type-13) was posted with no corresponding build. This finding drove a major redesign of the agent layer, shifting its role from explanation to active conflict detection.
 <!-- INSERT: screenshot of Never Mourn game in the UI — Forensic Agent flagging event_state_mismatch, Critic verdict showing signal conflict -->
 
+<p align="center">
+    <kbd>
+        <img width="957" height="207" alt="image" src="https://github.com/user-attachments/assets/29daf0c7-9adc-478d-a9df-f32bebeb153c" />
+   </kbd>
+</p>
+
 **Signal triangulation improves reliability.** Before any LLM call, the Critic Agent runs a deterministic check across three signals: ML state, review sentiment direction, and forensic substance score. When the signals disagree, the verdict explicitly states the conflict rather than forcing a single conclusion.
 <!-- INSERT: screenshot or diagram of triangulation output — three signals, alignment result, verdict -->
 
+<p align="center">
+    <kbd>
+        <img width="967" height="185" alt="image" src="https://github.com/user-attachments/assets/ba7239c0-9fc3-463c-81b9-970d7448a25d" />
+    </kbd>
+</p>
 **Model Performance & Validation Metrics (v1.3)**
 
 
@@ -156,8 +174,13 @@ The baseline heuristic scorecard is calibrated by tracking the final lifecycle s
 - **Dynamic threshold from OOF PR curve**: Instead of a fixed 0.5 cutoff, the classification threshold is chosen based on the precision-recall curve from out-of-fold predictions. This handles the class imbalance more effectively.
 - **No imputation for missing values**: XGBoost natively handles nulls. We return dense SHAP vectors with `pred_contribs=True`; earlier mean-imputation attempts were removed as they added distortion.
 - **Cosine similarity on SHAP vectors**: Used instead of L2 distance so games failing for the same reasons cluster together regardless of score magnitude.
-<!-- INSERT: screenshot of similar games panel — 5 historical anchors
-with outcome labels (EXIT_SUCCESS / EXIT_ABANDONED), SHAP similarity score -->
+
+<p align="center">
+    <kbd>
+        <img width="970" height="486" alt="image" src="https://github.com/user-attachments/assets/e170d79b-7294-44c1-8906-8f015125ace6" />
+    </kbd>
+</p>
+
 **Agent Layer**
 
 The agent system runs **on-demand only** for Watch and At Risk games and caches results until the `l1_state` changes or 14 days pass (to respect Groq rate limits).
@@ -165,8 +188,12 @@ The agent system runs **on-demand only** for Watch and At Risk games and caches 
 - **Forensic Agent**: Analyzes the last 5 developer announcements for actual substance. Detects “fake heartbeat” updates that lack corresponding build changes and outputs `event_state_mismatch` flags.
 - **Sentiment Auditor**: Compares recent versus historical reviews to produce a `sentiment_alignment` score that checks consistency with the current ML state.
 - **Critic Agent**: First runs a fast deterministic alignment check across ML score, review sentiment, and forensic signals, then produces two plain-language verdicts: `consumer_verdict` and `developer_brief`.
-<!-- INSERT: screenshot of Developer tab — developer_brief panel,
-key_concerns list, forensic detail expander open -->
+<p align="center">
+    <kbd>
+        <img width="965" height="1041" alt="image" src="https://github.com/user-attachments/assets/19026ec6-fac7-4943-9235-68eb251b6a90" />
+    </kbd>
+</p>
+
 **Review Quality Adjustments**
 
 Reviews are processed with three corrections before sentiment scoring:
@@ -224,9 +251,9 @@ early/
 
 ### What This Is Not
 
->EARLY does not predict whether a game will be *good*. It detects signals that a developer has slowed or stopped meaningful development. A game can score Healthy and still be mediocre. A game can score At Risk and recover — the system flags it, not sentences it.
+>EARLY does not predict whether a game will be *good*. It detects signals that a developer has slowed or stopped meaningful development. A game can score Healthy and still be mediocre. A game can score At Risk and recover — the system flags it, not sentences it. </br>
 
-<!-- INSERT: example of a Watch game that recovered — score history chart showing trajectory reversal -->
+Of the [15 Early Access games](docs/ea_exit_validation.csv) that resolved most recently in our tracked universe, all 5 games labeled **At Risk** were distressed, and 2 out of 3 games labeled **Watch** reached a full release. But `Wool at the Gates` (0.69) and `Kebab Chefs!` (0.58) exited successfully while carrying **Healthy** labels despite elevated distress scores — a reminder that the model sees developer activity signals, not the full picture. Use the score as a prompt to look closer, not as a verdict.
 
 ---
 
