@@ -288,7 +288,7 @@ def render_browse():
                 Early Access game will **stop updating** before reaching full release (1.0).
     """)
 
-    with st.expander("📜 Why This Tool Exists", expanded=True):
+    with st.expander("📜 Why This Tool Exists", expanded=False):
         st.markdown("""
         Steam Early Access is a high-risk, high-reward environment. While many games succeed, many others go silent and never ship.
 
