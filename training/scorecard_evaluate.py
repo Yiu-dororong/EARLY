@@ -235,7 +235,7 @@ def analyse_outcome_agreement(df: pd.DataFrame) -> dict:
 
         n          = len(subset)
         n_success  = (subset["outcome"] == "EXIT_SUCCESS").sum()
-        n_abandoned = (subset["outcome"] == "EXIT_ABANDONED").sum()
+        n_abandoned = ((subset["outcome"] == "EXIT_ABANDONED") | (subset["outcome"] == "EXIT_SILENT")).sum()
         pct_success  = 100 * n_success  / n
         pct_abandoned = 100 * n_abandoned / n
 

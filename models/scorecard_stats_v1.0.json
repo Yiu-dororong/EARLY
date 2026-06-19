@@ -4,22 +4,22 @@
     "Healthy": {
       "n_games": 815,
       "success_rate": 0.9828220858895707,
-      "abandoned_rate": 0.006134969325153374,
+      "abandoned_rate": 0.01717791411042945,
       "agreement_rate": 0.9828220858895707,
       "expected_outcome": "SUCCESS"
     },
     "Watch": {
       "n_games": 469,
       "success_rate": 0.7569296375266525,
-      "abandoned_rate": 0.1791044776119403,
+      "abandoned_rate": 0.24307036247334754,
       "agreement_rate": 0.7569296375266525,
       "expected_outcome": "SUCCESS"
     },
     "At Risk": {
       "n_games": 343,
       "success_rate": 0.4868804664723032,
-      "abandoned_rate": 0.46355685131195334,
-      "agreement_rate": 0.46355685131195334,
+      "abandoned_rate": 0.5131195335276968,
+      "agreement_rate": 0.5131195335276968,
       "expected_outcome": "ABANDONED"
     }
   },
