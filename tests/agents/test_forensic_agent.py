@@ -28,6 +28,7 @@ pytestmark = pytest.mark.live  # requires GROQ_API_KEY
 # Fast-path tests (no LLM call)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.not_live
 def test_empty_announcement_fast_path():
     """Empty body + zero word count should skip the LLM entirely."""
     result = run_forensic_agent(

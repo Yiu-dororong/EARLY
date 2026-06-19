@@ -29,6 +29,7 @@ pytestmark = pytest.mark.live
 # Deterministic / fast-path tests (no LLM)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.not_live
 def test_no_reviews_returns_insufficient_data():
     """Zero reviews → skip LLM, return insufficient_data for both shift fields."""
     result = run_sentiment_auditor(

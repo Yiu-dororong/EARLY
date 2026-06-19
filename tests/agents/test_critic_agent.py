@@ -36,6 +36,7 @@ BASE_KWARGS = dict(
 # (no LLM — tests the logic node directly)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.not_live
 def test_alignment_conflicted_when_forensic_mismatch():
     """event_state_mismatch=1 → conflicted, regardless of auditor."""
     from agents.states import CriticState
@@ -47,6 +48,7 @@ def test_alignment_conflicted_when_forensic_mismatch():
     assert compute_signal_alignment(state) == "conflicted"
 
 
+@pytest.mark.not_live
 def test_alignment_conflicted_when_auditor_conflicts():
     """sentiment_alignment=conflicted → conflicted, even if forensic is fine."""
     from agents.states import CriticState
@@ -58,6 +60,7 @@ def test_alignment_conflicted_when_auditor_conflicts():
     assert compute_signal_alignment(state) == "conflicted"
 
 
+@pytest.mark.not_live
 def test_alignment_aligned_when_both_ran_no_conflict():
     """Both agents ran, no conflicts → aligned."""
     from agents.states import CriticState
@@ -69,6 +72,7 @@ def test_alignment_aligned_when_both_ran_no_conflict():
     assert compute_signal_alignment(state) == "aligned"
 
 
+@pytest.mark.not_live
 def test_alignment_partial_when_only_one_ran():
     """Only forensic ran (auditor skipped) → partial."""
     from agents.states import CriticState
@@ -80,6 +84,7 @@ def test_alignment_partial_when_only_one_ran():
     assert compute_signal_alignment(state) == "partial"
 
 
+@pytest.mark.not_live
 def test_alignment_partial_when_neither_ran():
     from agents.states import CriticState
     state: CriticState = {
