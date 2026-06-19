@@ -734,6 +734,7 @@ def _render_similar_section(appid: int, audience: str):
     st.caption(
         f"{len(games)} similar games found — "
         f"{abandoned} abandoned, {success} succeeded"
+        "*(Note: `dist` is cosine similarity where 1 = complete match, -1 = opposite)*"
     )
 
     rows_html = "".join(ui.similar_game_row(g) for g in games)
