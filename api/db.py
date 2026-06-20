@@ -12,17 +12,19 @@ Tables:
     live_scores       — pre-computed weekly scores (serving layer)
     live_snapshots    — latest feature vector per game (overwritten weekly)
     agent_analysis    — cached LangGraph agent output (on-demand, user-triggered)
-    review_history    — historical review buckets (owned by collect pipeline, read-only here)
+    review_history    — historical review buckets (owned by collect pipeline, 
+                                                                read-only here)
 """
 
-import os
 import logging
+import os
 import threading
-from dotenv import load_dotenv
-
-load_dotenv()
 
 import libsql
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 _conn: libsql.Connection | None = None
@@ -68,13 +70,13 @@ CREATE TABLE IF NOT EXISTS live_scores (
 LIVE_SNAPSHOTS = """
 CREATE TABLE IF NOT EXISTS live_snapshots (
     appid               INTEGER PRIMARY KEY,
-    snap_date           TEXT    NOT NULL,   -- YYYY-MM-DD of last score run
+    snap_date           TEXT    NOT NULL,  -- YYYY-MM-DD of last score run
     ea_age_days         INTEGER,
-    genre_bucket        TEXT,               -- coarse genre for Zilliz filter
+    genre_bucket        TEXT,              -- coarse genre for Zilliz filter
     review_count_at_T   INTEGER,
-    features_json       TEXT    NOT NULL,   -- full feature dict as JSON
-    shap_json           TEXT,               -- top-N SHAP values as JSON {feature: value}
-    updated_at          INTEGER NOT NULL    -- Unix ts
+    features_json       TEXT    NOT NULL,  -- full feature dict as JSON
+    shap_json           TEXT,              -- top-N SHAP values as JSON {feature: value}
+    updated_at          INTEGER NOT NULL   -- Unix ts
 )
 """
 
@@ -87,10 +89,18 @@ CREATE TABLE IF NOT EXISTS live_snapshots (
 AGENT_ANALYSIS = """
 CREATE TABLE IF NOT EXISTS agent_analysis (
     appid                   INTEGER PRIMARY KEY,
-    snapshot_date           TEXT    NOT NULL,   -- YYYY-MM-DD of the live_scores row used
-    analysed_at             INTEGER NOT NULL,   -- Unix ts of agent run
-    trigger_reason          TEXT    NOT NULL,   -- "user_request" | "state_change" | "stale"
-    l1_state_at_analysis    TEXT,               -- l1_state when analysis ran (staleness check)
+
+    -- YYYY-MM-DD of the live_scores row used
+    snapshot_date           TEXT    NOT NULL,   
+
+    -- Unix ts of agent run
+    analysed_at             INTEGER NOT NULL,   
+
+    -- "user_request" | "state_change" | "stale"
+    trigger_reason          TEXT    NOT NULL,   
+
+    -- l1_state when analysis ran (staleness check)
+    l1_state_at_analysis    TEXT,               
 
     -- Forensic Agent
     forensic_ran            INTEGER NOT NULL DEFAULT 0,
@@ -182,7 +192,8 @@ class ResilientDB:
             except Exception as e:
                 if attempt == 3:
                     raise
-                logger.warning("DB execute error (attempt %d): %s — reconnecting", attempt, e)
+                logger.warning("DB execute error (attempt %d): %s — reconnecting", 
+                               attempt, e)
                 self._reconnect()
 
     def commit(self) -> None:

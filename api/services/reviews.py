@@ -23,6 +23,7 @@ from dataclasses import dataclass
 
 import requests
 
+
 logger = logging.getLogger(__name__)
 
 STEAM_REVIEWS_URL = "https://store.steampowered.com/appreviews/{appid}"
@@ -64,7 +65,8 @@ def _fetch_raw_reviews(
         data = resp.json()
         return data.get("reviews", [])
     except Exception as e:
-        logger.warning("Steam review fetch failed appid=%d filter=%s: %s", appid, filter_type, e)
+        logger.warning("Steam review fetch failed appid=%d filter=%s: %s", 
+                       appid, filter_type, e)
         return []
 
 
@@ -163,7 +165,7 @@ def _score_review(raw: dict, now_ts: int) -> ScoredReview | None:
     if votes_up > 0:
         funny_ratio = votes_fun / (votes_up + votes_fun)
         # Discount only kicks in meaningfully when funny_ratio is high
-        meme_discount = 1.0 - (funny_ratio ** 2)  # quadratic: mild until funny dominates
+        meme_discount = 1.0 - (funny_ratio ** 2)  # quadratic: mild until funny dominate
     else:
         meme_discount = 1.0
 
@@ -226,11 +228,17 @@ def fetch_reviews_for_auditor(
     # Recent pool: Steam's "recent" filter is last 30d by default for
     # day_range purposes, but returns reviews sorted by date regardless.
     # Fetch a larger pool and let scoring + day-window filtering handle it.
-    recent_raw = _fetch_raw_reviews(appid, filter_type="all", day_range=90, num_per_page=100)
+    recent_raw = _fetch_raw_reviews(appid, 
+                                    filter_type="all", 
+                                    day_range=90, 
+                                    num_per_page=100)
 
     # Helpful pool: sorted by helpfulness, no day_range — gives us older
     # high-signal reviews that "recent" would miss.
-    helpful_raw = _fetch_raw_reviews(appid, filter_type="all", day_range=None, num_per_page=100)
+    helpful_raw = _fetch_raw_reviews(appid, 
+                                     filter_type="all", 
+                                     day_range=None, 
+                                     num_per_page=100)
 
     # Partition by age
     cutoff_90d  = now_ts - (90 * 86400)
@@ -248,8 +256,10 @@ def fetch_reviews_for_auditor(
     older_reviews  = _select_top(older_pool, n_older, now_ts)
 
     logger.info(
-        "appid=%d reviews: %d recent (from %d candidates), %d older (from %d candidates)",
-        appid, len(recent_reviews), len(recent_pool), len(older_reviews), len(older_pool),
+        "appid=%d reviews: %d recent (from %d candidates), "
+        "%d older (from %d candidates)",
+        appid, len(recent_reviews), len(recent_pool), 
+        len(older_reviews), len(older_pool),
     )
 
     return recent_reviews, older_reviews

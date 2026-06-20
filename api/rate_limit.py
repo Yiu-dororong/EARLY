@@ -1,7 +1,9 @@
 import os
+
 from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+
 
 IS_RENDER = bool(os.getenv("RENDER_URL"))
 

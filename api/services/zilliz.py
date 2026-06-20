@@ -19,15 +19,14 @@ Filter relaxation strategy:
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import threading
 import time
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
+
 from dotenv import load_dotenv
+
 
 load_dotenv()
 
@@ -71,9 +70,11 @@ class ResilientZilliz:
                     if _client.has_collection(COLLECTION_NAME):
                         _client.load_collection(COLLECTION_NAME)
                         logger.info("Local collection '%s' loaded.", COLLECTION_NAME)
-                    logger.info("Zilliz client initialised to local Milvus Lite (%s)", db_path)
+                    logger.info("Zilliz client initialised to local Milvus Lite (%s)", 
+                                db_path)
                 except ImportError:
-                    logger.warning("pymilvus[milvus_lite] not installed — Local Zilliz disabled")
+                    logger.warning("pymilvus[milvus_lite] not installed — "
+                                   "Local Zilliz disabled")
                     _client = None
                 except Exception as e:
                     logger.error("Local Zilliz connection failed: %s", e)
@@ -113,16 +114,28 @@ class ResilientZilliz:
             except Exception as e:
                 if attempt == 3:
                     raise
-                logger.warning("Zilliz '%s' error (attempt %d): %s — reconnecting", operation, attempt, e)
+                logger.warning("Zilliz '%s' error (attempt %d): %s — reconnecting", 
+                               operation, attempt, e)
                 time.sleep(1)
                 self._reconnect()
 
-    def search(self, *args, **kwargs): return self._execute_with_retry("search", *args, **kwargs)
-    def upsert(self, *args, **kwargs): return self._execute_with_retry("upsert", *args, **kwargs)
-    def has_collection(self, *args, **kwargs): return self._execute_with_retry("has_collection", *args, **kwargs)
-    def create_schema(self, *args, **kwargs): return self._execute_with_retry("create_schema", *args, **kwargs)
-    def prepare_index_params(self, *args, **kwargs): return self._execute_with_retry("prepare_index_params", *args, **kwargs)
-    def create_collection(self, *args, **kwargs): return self._execute_with_retry("create_collection", *args, **kwargs)
+    def search(self, *args, **kwargs): 
+        return self._execute_with_retry("search", *args, **kwargs)
+    
+    def upsert(self, *args, **kwargs): 
+        return self._execute_with_retry("upsert", *args, **kwargs)
+    
+    def has_collection(self, *args, **kwargs):
+        return self._execute_with_retry("has_collection", *args, **kwargs)
+    
+    def create_schema(self, *args, **kwargs): 
+        return self._execute_with_retry("create_schema", *args, **kwargs)
+    
+    def prepare_index_params(self, *args, **kwargs): 
+        return self._execute_with_retry("prepare_index_params", *args, **kwargs)
+    
+    def create_collection(self, *args, **kwargs): 
+        return self._execute_with_retry("create_collection", *args, **kwargs)
 
 
 def get_client() -> ResilientZilliz | None:
@@ -154,14 +167,20 @@ def ensure_collection() -> bool:
             return True
 
         schema = client.create_schema(auto_id=False, enable_dynamic_field=False)
-        schema.add_field("id",                 DataType.VARCHAR,       max_length=64,  is_primary=True)
-        schema.add_field("shap_vector",        DataType.FLOAT_VECTOR,  dim=VECTOR_DIM)
+        schema.add_field("id",                 DataType.VARCHAR,       
+                                                max_length=64,  is_primary=True)
+        schema.add_field("shap_vector",        DataType.FLOAT_VECTOR,  
+                                                dim=VECTOR_DIM)
         schema.add_field("appid",              DataType.INT64)
-        schema.add_field("snapshot_date",      DataType.VARCHAR,       max_length=16)
+        schema.add_field("snapshot_date",      DataType.VARCHAR,       
+                                                max_length=16)
         schema.add_field("ea_age_days",        DataType.INT64)
-        schema.add_field("primary_genre",      DataType.VARCHAR,       max_length=64)
-        schema.add_field("l1_state",           DataType.VARCHAR,       max_length=16)
-        schema.add_field("outcome",            DataType.VARCHAR,       max_length=32)
+        schema.add_field("primary_genre",      DataType.VARCHAR,       
+                                                max_length=64)
+        schema.add_field("l1_state",           DataType.VARCHAR,       
+                                                max_length=16)
+        schema.add_field("outcome",            DataType.VARCHAR,       
+                                                max_length=32)
         schema.add_field("null_feature_count", DataType.INT64)
         schema.add_field("p_distressed",       DataType.FLOAT)
 
@@ -233,7 +252,9 @@ def upsert_snapshot(
             "l1_state":           l1_state or "unknown",
             "outcome":            outcome,
             "null_feature_count": null_feature_count,
-            "p_distressed":       float(p_distressed) if p_distressed is not None else 0.0,
+            "p_distressed":       (float(p_distressed) 
+                                   if p_distressed is not None 
+                                   else 0.0),
         }
 
         client.upsert(collection_name=COLLECTION_NAME, data=[row])
@@ -293,9 +314,12 @@ def search_similar(
         vector = [float(query_shap_dict.get(f, 0.0)) for f in feature_order]
 
         passes = [
-            _build_filter(query_appid, query_ea_age_days, query_primary_genre, age_window=90,  use_genre=True),
-            _build_filter(query_appid, query_ea_age_days, query_primary_genre, age_window=180, use_genre=True),
-            _build_filter(query_appid, query_ea_age_days, query_primary_genre, age_window=180, use_genre=False),
+            _build_filter(query_appid, query_ea_age_days, query_primary_genre, 
+                          age_window=90,  use_genre=True),
+            _build_filter(query_appid, query_ea_age_days, query_primary_genre, 
+                          age_window=180, use_genre=True),
+            _build_filter(query_appid, query_ea_age_days, query_primary_genre, 
+                          age_window=180, use_genre=False),
         ]
 
         for i, filter_expr in enumerate(passes, 1):

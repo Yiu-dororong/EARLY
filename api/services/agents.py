@@ -18,7 +18,6 @@ Staleness policy:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import re
@@ -27,6 +26,7 @@ from datetime import datetime, timezone
 
 import libsql
 
+from agents.forensic_agent import LOOKBACK_DAYS
 from agents.orchestrator import (
     AnalysisResult,
     AnnouncementEvent,
@@ -35,8 +35,8 @@ from agents.orchestrator import (
     XGBoostResult,
     run_analysis,
 )
-from agents.forensic_agent import LOOKBACK_DAYS
 from api.services.reviews import fetch_reviews_for_auditor
+
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +201,8 @@ def _fetch_announcements(
  
     if build_row and build_row[0]:
         try:
-            last_build_date = datetime.fromtimestamp(build_row[0], tz=timezone.utc).date()
+            last_build_date = datetime.fromtimestamp(build_row[0], 
+                                                     tz=timezone.utc).date()
             days_since_last_build_update = (snapshot_date - last_build_date).days
         except (ValueError, TypeError, OSError):
             days_since_last_build_update = _NO_BUILD_SENTINEL
@@ -217,7 +218,9 @@ def _fetch_existing_analysis(db: libsql.Connection, appid: int) -> dict | None:
     ).fetchone()
     if not row:
         return None
-    cols = [d[0] for d in db.execute("SELECT * FROM agent_analysis LIMIT 0").description]
+    cols = [d[0] for d in db.execute(
+        "SELECT * FROM agent_analysis LIMIT 0"
+        ).description]
     # Re-fetch with description
     cursor = db.execute("SELECT * FROM agent_analysis WHERE appid = ?", (appid,))
     cols = [d[0] for d in cursor.description]
@@ -240,16 +243,20 @@ def _persist_result(
     db.execute("""
         INSERT OR REPLACE INTO agent_analysis (
             appid, snapshot_date, analysed_at, trigger_reason, l1_state_at_analysis,
-            forensic_ran, update_substance_score, fake_heartbeat_flag, momentum, event_state_mismatch, forensic_reasoning,
-            auditor_ran, sentiment_shift, sentiment_alignment, key_concerns, theme_clusters, auditor_summary,
-            signal_alignment, critic_ran, consumer_verdict, developer_brief, confidence_note,
-            error
+            forensic_ran, update_substance_score, fake_heartbeat_flag, momentum, 
+            event_state_mismatch, forensic_reasoning,
+            auditor_ran, sentiment_shift, sentiment_alignment, key_concerns, 
+            theme_clusters, auditor_summary,
+            signal_alignment, critic_ran, consumer_verdict, developer_brief, 
+            confidence_note, error
         ) VALUES (
             ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?
+            ?, ?, ?, ?, 
+            ?, ?,
+            ?, ?, ?, ?, 
+            ?, ?,
+            ?, ?, ?, ?, 
+            ?, ?
         )
     """, (
         appid,
@@ -268,8 +275,10 @@ def _persist_result(
         int(result.auditor_ran),
         auditor.sentiment_shift if auditor else None,
         auditor.sentiment_alignment if auditor else None,
-        json.dumps(auditor.key_concerns) if auditor and auditor.key_concerns else None,
-        json.dumps(auditor.theme_clusters) if auditor and auditor.theme_clusters else None,
+        (json.dumps(auditor.key_concerns) 
+         if auditor and auditor.key_concerns else None),
+        (json.dumps(auditor.theme_clusters) 
+         if auditor and auditor.theme_clusters else None),
         auditor.auditor_summary if auditor else None,
         # Critic
         result.signal_alignment,
@@ -278,7 +287,9 @@ def _persist_result(
         critic.developer_brief if critic else None,
         critic.confidence_note if critic else None,
         # Error
-        ((forensic.error if forensic else None) or (auditor.error if auditor else None) or (critic.error if critic else None)),
+        ((forensic.error if forensic else None) 
+         or (auditor.error if auditor else None) 
+         or (critic.error if critic else None)),
     ))
     db.commit()
 
@@ -302,7 +313,8 @@ def trigger_analysis(db: libsql.Connection, appid: int, force: bool = False) -> 
 
         l1_state = score["l1_state"]
         if not is_analysis_eligible(l1_state):
-            return {"status": "not_eligible", "message": f"l1_state={l1_state} does not require analysis"}
+            return {"status": "not_eligible", 
+                    "message": f"l1_state={l1_state} does not require analysis"}
 
         existing = _fetch_existing_analysis(db, appid)
         should_run, reason = needs_rerun(existing, l1_state)
@@ -314,11 +326,12 @@ def trigger_analysis(db: libsql.Connection, appid: int, force: bool = False) -> 
 
         meta        = _fetch_game_meta(db, appid)
         snap_ts     = score["scored_at"]
-        snap_date   = score.get("snapshot_date") or datetime.fromtimestamp(snap_ts, tz=timezone.utc).strftime("%Y-%m-%d")
+        snap_date   = score.get("snapshot_date") or datetime.fromtimestamp(snap_ts, 
+                                                                           tz=timezone.utc).strftime("%Y-%m-%d")
         announcements, days_since_last_build = _fetch_announcements(db, appid, snap_ts)
         recent_reviews, older_reviews = fetch_reviews_for_auditor(
         appid,
-        n_recent=MAX_REVIEWS_PER_WINDOW,   # existing constant, default 50 — see note below
+        n_recent=MAX_REVIEWS_PER_WINDOW,   # existing constant, default 50 
         n_older=MAX_REVIEWS_PER_WINDOW,
         )
 
@@ -345,7 +358,7 @@ def trigger_analysis(db: libsql.Connection, appid: int, force: bool = False) -> 
             days_since_last_build_update=days_since_last_build,
             recent_reviews=recent_reviews,
             older_reviews=older_reviews,
-            review_score_at_T=0.0,   # not stored in live_scores; auditor handles gracefully
+            review_score_at_T=0.0,   # not stored in live_scores; auditor handles 
             review_score_last_90d=None,
             review_count_at_T=score.get("review_count_at_T") or 0,
             session_id=f"analysis-{appid}-{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"

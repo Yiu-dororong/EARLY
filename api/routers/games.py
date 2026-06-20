@@ -14,6 +14,14 @@ import json
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
 
 from api.db import get_db
+from api.rate_limit import (
+    ai_ip_rate_limit,
+    ai_rate_limit,
+    general_ip_rate_limit,
+    general_rate_limit,
+    get_real_ip,
+    limiter,
+)
 from api.schemas import (
     AgentAnalysisResponse,
     AnalysisTriggerResponse,
@@ -29,14 +37,7 @@ from api.schemas import (
     ScoreSnapshot,
 )
 from api.services.agents import is_analysis_eligible, trigger_analysis
-from api.rate_limit import (
-    limiter, 
-    ai_rate_limit, 
-    general_rate_limit,
-    ai_ip_rate_limit,
-    general_ip_rate_limit,
-    get_real_ip,
-)
+
 
 router = APIRouter(tags=["games"])
 
@@ -72,9 +73,12 @@ def list_games(
     l1_state:        str | None = Query(None, description="Healthy | Watch | At Risk"),
     ml_eligible:     int | None = Query(None, description="1 = ML eligible only"),
     currently_in_ea: int | None = Query(None, description="1 = active EA only"),
-    outcome:         str | None = Query(None, description="EXIT_SUCCESS | EXIT_ABANDONED | EXIT_SILENT | STAYS_ACTIVE"),
-    min_reviews:     int | None = Query(None, description="Minimum review_count_at_T"),
-    max_days_since_build: int | None = Query(None, description="Max days since last build update"),
+    outcome:         str | None = Query(None, description="EXIT_SUCCESS | "
+                                        "EXIT_ABANDONED | EXIT_SILENT | STAYS_ACTIVE"),
+    min_reviews:     int | None = Query(None, description="Minimum "
+                                        "review_count_at_T"),
+    max_days_since_build: int | None = Query(None, description="Max days "
+                                             "since last build update"),
     search_name:     str | None = Query(None, description="Search by game name"),
     offset:          int = Query(0, ge=0),
     limit:           int = Query(50, ge=1, le=5000),
@@ -132,15 +136,17 @@ def list_games(
                 g.outcome,
                 ls.days_since_last_build_update,
                 (
-                    (
-                        (ls.p_distressed * 100.0) +                  -- Weighting Risk heavily
-                        (LOG(MAX(ls.review_count_at_T, 1)) * 25.0) - -- Log scale for popularity
-                        (ls.ea_age_days * 0.05)                      -- Penalty multiplier for older games
+                    ( -- Risk + Log scale for popularity - EA age - Build staleness 
+                        (ls.p_distressed * 100.0) +                  
+                        (LOG(MAX(ls.review_count_at_T, 1)) * 25.0) - 
+                        (ls.ea_age_days * 0.05)                      
                     )*
-                    (MAX(ls.days_since_last_build_update, 300) * 0.1)          -- Penalty multiplier for stale builds
+                    (MAX(ls.days_since_last_build_update, 300) * 0.1)          
                 ) AS triage_priority_score
             FROM latest
-            JOIN live_scores ls ON ls.appid = latest.appid AND ls.scored_at = latest.latest
+            JOIN live_scores ls 
+            ON ls.appid = latest.appid 
+            AND ls.scored_at = latest.latest
             LEFT JOIN games_v2 g ON g.appid = ls.appid
             {where}
         ),
@@ -222,11 +228,18 @@ def get_game_score(appid: int, request: Request):
         "days_since_last_build_update": row[20],
     }
 
-    null_list = json.loads(row_dict["null_features"]) if isinstance(row_dict["null_features"], str) else (row_dict["null_features"] or [])
-    data_quality = "high" if len(null_list) <= 5 else "medium" if len(null_list) <= 15 else "low"
+    null_list = (
+        json.loads(row_dict["null_features"]) 
+        if isinstance(row_dict["null_features"], str) 
+        else (row_dict["null_features"] or []))
+    data_quality = (
+        "high" if len(null_list) <= 5 
+        else "medium" 
+        if len(null_list) <= 15 else "low")
 
     return GameScore(
-        **{k: v for k, v in row_dict.items() if k not in _DIMENSION_COLS and k != "null_features"},
+        **{k: v for k, v in row_dict.items() 
+           if k not in _DIMENSION_COLS and k != "null_features"},
         null_features=row_dict["null_features"],
         data_quality=data_quality,
         dimensions=_build_dimensions(row_dict),
@@ -257,7 +270,10 @@ def get_game_history(appid: int, request: Request):
     if not rows:
         raise HTTPException(status_code=404, detail=f"Game {appid} not found.")
 
-    name_row = db.execute("SELECT name FROM games_v2 WHERE appid = ?", (appid,)).fetchone()
+    name_row = db.execute(
+        "SELECT name FROM games_v2 WHERE appid = ?", 
+        (appid,)
+        ).fetchone()
 
     snapshots = []
     for r in rows:
@@ -269,7 +285,8 @@ def get_game_history(appid: int, request: Request):
             "days_since_last_build_update": r[12],
         }
         snapshots.append(ScoreSnapshot(
-            **{k: v for k, v in row_dict.items() if k not in _DIMENSION_COLS and k != "null_features"},
+            **{k: v for k, v in row_dict.items() 
+               if k not in _DIMENSION_COLS and k != "null_features"},
             null_features=row_dict["null_features"],
             dimensions=_build_dimensions(row_dict),
         ))
@@ -300,9 +317,13 @@ def get_game_features(appid: int, request: Request):
     """, (appid,)).fetchone()
 
     if not row:
-        raise HTTPException(status_code=404, detail=f"No live snapshot found for game {appid}.")
+        raise HTTPException(status_code=404, 
+                            detail=f"No live snapshot found for game {appid}.")
 
-    name_row = db.execute("SELECT name FROM games_v2 WHERE appid = ?", (appid,)).fetchone()
+    name_row = db.execute(
+        "SELECT name FROM games_v2 WHERE appid = ?", 
+        (appid,)
+        ).fetchone()
 
     return GameFeatures(
         appid=appid,
@@ -311,7 +332,7 @@ def get_game_features(appid: int, request: Request):
         ea_age_days=row[1],
         primary_genre=row[2],
         review_count_at_T=row[3],
-        features="{}",          # live_snapshots no longer has a single features_json blob
+        features="{}",          
         shap_values=row[4],     # parsed by field_validator
     )
 
@@ -346,7 +367,8 @@ def trigger_game_analysis(
         return AnalysisTriggerResponse(
             appid=appid,
             status="not_eligible",
-            message=f"Game is '{l1_state}' — agent analysis only runs for Watch and At Risk games.",
+            message=f"Game is '{l1_state}' — "
+            f"agent analysis only runs for Watch and At Risk games.",
         )
 
     background_tasks.add_task(trigger_analysis, db, appid, force)
@@ -379,7 +401,10 @@ def get_game_analysis(appid: int, request: Request):
         raise HTTPException(status_code=404, detail=f"Game {appid} not found.")
 
     l1_state = score_row[0]
-    name_row = db.execute("SELECT name FROM games_v2 WHERE appid = ?", (appid,)).fetchone()
+    name_row = db.execute(
+        "SELECT name FROM games_v2 WHERE appid = ?", 
+        (appid,)
+        ).fetchone()
 
     # Not eligible — return immediately with status
     if not is_analysis_eligible(l1_state):

@@ -67,7 +67,7 @@ class GameScore(BaseModel):
     snap_date:         str | None
     review_count_at_T: int | None
     null_features:     list[str]
-    data_quality:      str          # "high" | "medium" | "low" — based on null feature count
+    data_quality:      str     # "high" | "medium" | "low" — based on null feature count
     dimensions:        DimensionScores | None
     outcome:           str | None
     currently_in_ea:   int | None
@@ -144,7 +144,7 @@ class GameFeatures(BaseModel):
     primary_genre:     str | None
     review_count_at_T: int | None
     features:          dict[str, float | int | str | None]
-    shap_values:       dict[str, float] | None   # top-N SHAP values, None if not computed
+    shap_values:       dict[str, float] | None   
 
     @field_validator("features", mode="before")
     @classmethod
@@ -228,7 +228,7 @@ class AgentAnalysisResponse(BaseModel):
     snapshot_date:   str | None
     analysed_at:     int | None         # Unix ts, None if never analysed
     trigger_reason:  str | None
-    status:          str                # "ready" | "pending" | "not_eligible" | "never_run" | "error"
+    status:          str  # "ready" | "pending" | "not_eligible" | "never_run" | "error"
     signal_alignment: str | None   # NEW — top-level triangulation verdict
     forensic:        ForensicOutput | None
     auditor:         AuditorOutput | None
@@ -269,11 +269,11 @@ class SimilarGame(BaseModel):
     ea_age_days:         int
     primary_genre:       str
     l1_state:            str
-    outcome:             str            # "SUCCESS" | "ABANDONED"
+    outcome:             str    # "SUCCESS" | "ABANDONED"
     p_distressed:        float
-    distance:            float          # Cosine similarity from query vector (higher is closer)
-    match_quality:       str            # "high" | "medium" | "low"
-    null_feature_count:  int            # how many SHAP features were imputed
+    distance:            float  # Cosine similarity from query vector (higher is closer)
+    match_quality:       str    # "high" | "medium" | "low"
+    null_feature_count:  int    # how many SHAP features were imputed
 
 
 class SimilaritySearchResponse(BaseModel):

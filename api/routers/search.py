@@ -17,9 +17,10 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 
 from api.db import get_db
+from api.rate_limit import get_real_ip, limiter, search_ip_rate_limit, search_rate_limit
 from api.schemas import SimilarGame, SimilaritySearchResponse
 from api.services.zilliz import VECTOR_DIM, search_similar
-from api.rate_limit import limiter, search_rate_limit, search_ip_rate_limit, get_real_ip
+
 
 router = APIRouter(tags=["search"])
 
@@ -72,9 +73,10 @@ def find_similar_games(request: Request, appid: int, n_results: int = 5):
     try:
         shap_dict: dict[str, float | None] = json.loads(shap_json_str)
     except (json.JSONDecodeError, TypeError):
-        raise HTTPException(status_code=500, detail="Malformed SHAP JSON in live_snapshots.")
+        raise HTTPException(status_code=500, 
+                            detail="Malformed SHAP JSON in live_snapshots.")
 
-    # Load canonical feature order from the model artifact to guarantee exact vector dimension alignment
+    # Load canonical feature order from model artifact to guarantee dimension alignment
     model_dir = Path(__file__).resolve().parent.parent.parent / "models"
     top25_path = model_dir / f"shap_top25_{model_version}.json"
 
@@ -93,7 +95,8 @@ def find_similar_games(request: Request, appid: int, n_results: int = 5):
     if len(feature_order) != VECTOR_DIM:
         raise HTTPException(
             status_code=500,
-            detail=f"SHAP vector has {len(feature_order)} features, expected {VECTOR_DIM}.",
+            detail=f"SHAP vector has {len(feature_order)} features, "
+            f"expected {VECTOR_DIM}.",
         )
 
     # Run ANN search
@@ -111,7 +114,8 @@ def find_similar_games(request: Request, appid: int, n_results: int = 5):
             query_appid=appid,
             query_snap_date=snapshot_date,
             results=[],
-            message="No similar games found. Zilliz collection may be empty or filters too strict.",
+            message="No similar games found. "
+            "Zilliz collection may be empty or filters too strict.",
         )
 
     # Enrich with game names from DB

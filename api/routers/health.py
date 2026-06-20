@@ -7,11 +7,17 @@ GET /health — pipeline heartbeat.
 import json
 import time
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 
 from api.db import get_db
+from api.rate_limit import (
+    general_ip_rate_limit,
+    general_rate_limit,
+    get_real_ip,
+    limiter,
+)
 from api.schemas import PipelineHealth
-from api.rate_limit import limiter, general_rate_limit, general_ip_rate_limit, get_real_ip
+
 
 router = APIRouter(tags=["health"])
 
@@ -62,12 +68,24 @@ def get_health(request: Request):
             MAX(snapshot_date) AS snapshot_date,
             SUM(CASE WHEN scored_at >= ? THEN 1 ELSE 0 END) AS games_scored_this_week,
             (SELECT json_group_object(state, cnt) FROM state_agg) AS state_counts,
-            SUM(CASE WHEN p_distressed IS NULL THEN 1 ELSE 0 END) AS null_p_distressed,
-            SUM(CASE WHEN update_health IS NULL THEN 1 ELSE 0 END) AS null_update_health,
-            SUM(CASE WHEN player_retention IS NULL THEN 1 ELSE 0 END) AS null_player_retention,
-            SUM(CASE WHEN dev_engagement IS NULL THEN 1 ELSE 0 END) AS null_dev_engagement,
-            SUM(CASE WHEN sentiment IS NULL THEN 1 ELSE 0 END) AS null_sentiment,
-            SUM(CASE WHEN price_market IS NULL THEN 1 ELSE 0 END) AS null_price_market
+            SUM(
+                CASE WHEN p_distressed IS NULL THEN 1 ELSE 0 END
+                ) AS null_p_distressed,
+            SUM(
+                CASE WHEN update_health IS NULL THEN 1 ELSE 0 END
+                ) AS null_update_health,
+            SUM(
+                CASE WHEN player_retention IS NULL THEN 1 ELSE 0 END
+                ) AS null_player_retention,
+            SUM(
+                CASE WHEN dev_engagement IS NULL THEN 1 ELSE 0 END
+                ) AS null_dev_engagement,
+            SUM(
+                CASE WHEN sentiment IS NULL THEN 1 ELSE 0 END
+                ) AS null_sentiment,
+            SUM(
+                CASE WHEN price_market IS NULL THEN 1 ELSE 0 END
+                ) AS null_price_market
         FROM deduped
     """
 

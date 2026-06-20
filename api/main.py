@@ -13,17 +13,22 @@ Production:
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Response, status, Depends, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import APIKeyHeader
 from fastapi.responses import JSONResponse
+from fastapi.security import APIKeyHeader
 from slowapi.errors import RateLimitExceeded
 
-from api.db import close_db, init_db, get_db
+from api.db import close_db, get_db, init_db
+from api.rate_limit import (
+    IS_RENDER,
+    general_ip_rate_limit,
+    general_rate_limit,
+    get_real_ip,
+    limiter,
+)
 from api.routers import games, health
 from api.routers.search import router as search_router
-from api.rate_limit import limiter, IS_RENDER, general_rate_limit, general_ip_rate_limit, get_real_ip
-
 
 
 @asynccontextmanager
