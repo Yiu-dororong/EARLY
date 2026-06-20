@@ -135,13 +135,14 @@ def list_games(
                 ls.snapshot_date,
                 g.outcome,
                 ls.days_since_last_build_update,
+                -- Risk + Log scale for popularity - EA age - Build staleness
                 (
-                    ( -- Risk + Log scale for popularity - EA age - Build staleness 
+                    (  
                         (ls.p_distressed * 100.0) +                  
                         (LOG(MAX(ls.review_count_at_T, 1)) * 25.0) - 
                         (ls.ea_age_days * 0.05)                      
-                    )*
-                    (MAX(ls.days_since_last_build_update, 300) * 0.1)          
+                    )
+                    * (MAX(ls.days_since_last_build_update, 300) * 0.1)          
                 ) AS triage_priority_score
             FROM latest
             JOIN live_scores ls 
