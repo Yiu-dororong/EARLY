@@ -13,8 +13,9 @@ from deepeval import assert_test
 from deepeval.metrics import GEval
 from deepeval.test_case import LLMTestCase, SingleTurnParams
 
-from agents.critic_agent import CriticResult, compute_signal_alignment, run_critic_agent
+from agents.critic_agent import compute_signal_alignment, run_critic_agent
 from tests.agents.eval_llm import DeepEvalGroqAdapter
+
 
 pytestmark = pytest.mark.live
 
@@ -109,7 +110,8 @@ def test_conflicted_verdict_mentions_discrepancy():
         **BASE_KWARGS,
         forensic_ran=True, update_substance_score=2.0, fake_heartbeat_flag=1,
         momentum="hollow_pattern", event_state_mismatch=1,
-        forensic_reasoning="Type-14 major update posted, body contains zero changelog content.",
+        forensic_reasoning="Type-14 major update posted, "
+                            "body contains zero changelog content.",
         auditor_ran=True, sentiment_shift="declining", sentiment_alignment="conflicted",
         key_concerns=["No response to bug reports", "Promised features undelivered"],
         auditor_summary=(
@@ -123,13 +125,16 @@ def test_conflicted_verdict_mentions_discrepancy():
 
     metric = GEval(
         name="ConflictCommunication",
-        model=DeepEvalGroqAdapter(model_name="llama-3.3-70b-versatile", temperature=0.0),
+        model=DeepEvalGroqAdapter(model_name="llama-3.3-70b-versatile", 
+                                  temperature=0.0),
         criteria=(
             "The verdict must explain WHY there is uncertainty — specifically that "
             "the game's official activity signals (recent announcements) don't match "
-            "what players are actually reporting. It should NOT merely say 'be cautious' "
+            "what players are actually reporting. "
+            "It should NOT merely say 'be cautious' "
             "without explaining the discrepancy. It should NOT mention internal metric "
-            "names like 'signal_alignment', 'p_distressed', 'l1_state', or 'triangulation'. "
+            "names like 'signal_alignment', "
+            "'p_distressed', 'l1_state', or 'triangulation'. "
             "A verdict that only reports the negative score without noting that the "
             "activity signals may be misleading should FAIL."
         ),
@@ -190,14 +195,16 @@ def test_aligned_healthy_signal_verdict_is_positive():
         forensic_reasoning="Detailed changelog, multiple system improvements.",
         auditor_ran=True, sentiment_shift="improving", sentiment_alignment="aligned",
         key_concerns=[],
-        auditor_summary="Reviews are increasingly positive, players note active development.",
+        auditor_summary="Reviews are increasingly positive, "
+                        "players note active development.",
     )
     assert result.success, result.error
     assert result.signal_alignment == "aligned"
 
     metric = GEval(
         name="PositiveTone",
-        model=DeepEvalGroqAdapter(model_name="llama-3.3-70b-versatile", temperature=0.0),
+        model=DeepEvalGroqAdapter(model_name="llama-3.3-70b-versatile", 
+                                  temperature=0.0),
         criteria=(
             "When all signals are positive and aligned, the verdict should be "
             "encouraging and reassuring. It should NOT hedge excessively or add "
@@ -227,13 +234,15 @@ def test_developer_brief_ends_with_action():
         forensic_reasoning="Announcement title implies build, body is pure hype text.",
         auditor_ran=True, sentiment_shift="declining", sentiment_alignment="conflicted",
         key_concerns=["No actual build shipped despite announcements", "Forum silence"],
-        auditor_summary="Players are skeptical of announcements without accompanying builds.",
+        auditor_summary="Players are skeptical of announcements "
+                        "without accompanying builds.",
     )
     assert result.success, result.error
 
     metric = GEval(
         name="ActionableEnding",
-        model=DeepEvalGroqAdapter(model_name="llama-3.3-70b-versatile", temperature=0.0),
+        model=DeepEvalGroqAdapter(model_name="llama-3.3-70b-versatile", 
+                                  temperature=0.0),
         criteria=(
             "The developer brief must end with a specific, concrete action the "
             "developer can take — e.g. 'ship a small but real patch this week to "

@@ -8,8 +8,10 @@ API keys (like GROQ_API_KEY) are available for DeepEval and LangChain.
 
 import os
 import sys
+
 import pytest
 from dotenv import load_dotenv
+
 
 def main():
     # 1. Dynamically resolve paths based on the script's location
@@ -24,7 +26,8 @@ def main():
     load_dotenv(os.path.join(project_root, ".env"))
     
     if not os.getenv("GROQ_API_KEY"):
-        print("⚠️ WARNING: GROQ_API_KEY is not set. Live LLM tests will fail.", file=sys.stderr)
+        print("⚠️ WARNING: GROQ_API_KEY is not set. Live LLM tests will fail.", 
+              file=sys.stderr)
         
     print("🚀 Running EARLY agent tests...\n")
     

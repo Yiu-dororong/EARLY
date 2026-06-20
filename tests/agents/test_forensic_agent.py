@@ -16,10 +16,11 @@ import pytest
 from agents.forensic_agent import run_forensic_agent
 from tests.agents.fixtures import (
     EMPTY_ANNOUNCEMENTS,
-    HOTFIX_SERIES,
     HOLLOW_ANNOUNCEMENTS,
+    HOTFIX_SERIES,
     SUBSTANTIVE_ANNOUNCEMENTS,
 )
+
 
 pytestmark = pytest.mark.live  # requires GROQ_API_KEY
 
@@ -60,7 +61,8 @@ def test_hollow_update_event_state_mismatch():
     )
     assert result.success, result.error
     assert result.event_state_mismatch == 1, (
-        f"Expected mismatch=1 for hollow type-14 post, got reasoning: {result.reasoning}"
+        f"Expected mismatch=1 for hollow type-14 post, "
+        f"got reasoning: {result.reasoning}"
     )
     assert result.update_substance_score < 4.0
     assert result.momentum in ("hollow_pattern", "declining")
@@ -90,6 +92,7 @@ def test_hotfix_series_consistent_progress():
     )
     assert result.success, result.error
     assert result.momentum == "consistent_progress", (
-        f"Expected consistent_progress for hotfix series, got {result.momentum}: {result.reasoning}"
+        f"Expected consistent_progress for hotfix series, "
+        f"got {result.momentum}: {result.reasoning}"
     )
     assert result.event_state_mismatch == 0

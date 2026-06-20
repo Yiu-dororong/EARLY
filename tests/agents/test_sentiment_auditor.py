@@ -22,6 +22,7 @@ from tests.agents.fixtures import (
     CONFLICTING_REVIEWS_RECENT,
 )
 
+
 pytestmark = pytest.mark.live
 
 
@@ -105,11 +106,13 @@ def test_auditor_summary_mentions_conflict():
     assert result.success, result.error
 
     if result.sentiment_alignment != "conflicted":
-        pytest.skip("sentiment_alignment not conflicted — conflict wording test not applicable")
+        pytest.skip("sentiment_alignment not conflicted — "
+                    "conflict wording test not applicable")
 
     metric = GEval(
         name="ConflictArticulation",
-        model=DeepEvalGroqAdapter(model_name="llama-3.3-70b-versatile", temperature=0.0),
+        model=DeepEvalGroqAdapter(model_name="llama-3.3-70b-versatile", 
+                                  temperature=0.0),
         criteria=(
             "The summary must explicitly state that player reviews CONTRADICT or "
             "CONFLICT with the stated health classification. It should describe "
@@ -123,7 +126,7 @@ def test_auditor_summary_mentions_conflict():
     )
 
     test_case = LLMTestCase(
-        input=f"l1_state=Healthy, recent reviews describing abandonment",
+        input="l1_state=Healthy, recent reviews describing abandonment",
         actual_output=result.auditor_summary or "",
     )
     assert_test(test_case, [metric])
@@ -149,7 +152,8 @@ def test_key_concerns_are_actionable():
 
     metric = GEval(
         name="ConcernSpecificity",
-        model=DeepEvalGroqAdapter(model_name="llama-3.3-70b-versatile", temperature=0.0),
+        model=DeepEvalGroqAdapter(model_name="llama-3.3-70b-versatile", 
+                                  temperature=0.0),
         criteria=(
             "Each concern should identify a SPECIFIC, ACTIONABLE issue a developer "
             "can address — e.g. 'No response to bug reports in forum' or "
