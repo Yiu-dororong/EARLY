@@ -14,11 +14,11 @@ Step 3: histogram API — ea_start_date (results.start_date)
 Tables:  games_v2, pipeline_log_v2, run_meta
 Storage: Turso (libSQL)
 Run modes:
-  python pipeline_discovery.py                      # delta run (uses last run timestamp)
-  python pipeline_discovery.py --bootstrap          # force full re-fetch
-  python pipeline_discovery.py --dry-run            # fetch app list only, no API calls
-  python pipeline_discovery.py --check-graduated    # check graduated games
-  python pipeline_discovery.py --retry-errors       # rerun games with ERROR status
+  python pipeline_discovery.py                     # delta run (uses last run timestamp)
+  python pipeline_discovery.py --bootstrap         # force full re-fetch
+  python pipeline_discovery.py --dry-run           # fetch app list only, no API calls
+  python pipeline_discovery.py --check-graduated   # check graduated games
+  python pipeline_discovery.py --retry-errors      # rerun games with ERROR status
 """
 
 import argparse

@@ -68,7 +68,8 @@ HOTFIX_SERIES = [
     {
         "event_type": 12,
         "title": "Hotfix 0.8.2b",
-        "body_stripped": "Fixed a bug where boss health bars would not reset between attempts.",
+        "body_stripped": "Fixed a bug where boss "
+        "health bars would not reset between attempts.",
         "word_count": 12,
         "days_ago": 9,
     },
@@ -102,26 +103,39 @@ EMPTY_ANNOUNCEMENTS = [EMPTY_ANNOUNCEMENT]
 
 # Reviews that CONFLICT with l1_state="Healthy" — abandonment language
 CONFLICTING_REVIEWS_RECENT = [
-    {"text": "Dev literally hasn't patched the inventory bug in 3 months. Unplayable now.", "voted_up": False},
-    {"text": "Roadmap items from 2023 still aren't in the game. Feels abandoned.", "voted_up": False},
-    {"text": "No response from devs on the forum in months. Sad to see this die.", "voted_up": False},
-    {"text": "Performance has gotten worse with every patch, not better.", "voted_up": False},
-    {"text": "Used to love this game but development clearly stopped a while ago.", "voted_up": False},
+    {"text": "Dev literally hasn't patched the inventory bug in 3 months. "
+     "Unplayable now.",
+     "voted_up": False},
+    {"text": "Roadmap items from 2023 still aren't in the game. Feels abandoned.", 
+     "voted_up": False},
+    {"text": "No response from devs on the forum in months. Sad to see this die.", 
+     "voted_up": False},
+    {"text": "Performance has gotten worse with every patch, not better.", 
+     "voted_up": False},
+    {"text": "Used to love this game but development clearly stopped a while ago.", 
+     "voted_up": False},
 ]
 CONFLICTING_REVIEWS_OLDER = [
-    {"text": "Really promising early build, dev was super active and responsive.", "voted_up": True},
-    {"text": "Update pace is great for a solo dev, lots of communication.", "voted_up": True},
+    {"text": "Really promising early build, dev was super active and responsive.", 
+     "voted_up": True},
+    {"text": "Update pace is great for a solo dev, lots of communication.", 
+     "voted_up": True},
 ]
 
 # Reviews that AGREE with l1_state="Healthy" — positive, active development
 ALIGNED_REVIEWS_RECENT = [
-    {"text": "New zone added last month is stunning, dev keeps delivering.", "voted_up": True},
-    {"text": "Devs replied to my bug report within a day, great support.", "voted_up": True},
-    {"text": "Solid foundation, updates are frequent and meaningful.", "voted_up": True},
-    {"text": "Performance improved a lot since the last patch, very playable now.", "voted_up": True},
+    {"text": "New zone added last month is stunning, dev keeps delivering.", 
+     "voted_up": True},
+    {"text": "Devs replied to my bug report within a day, great support.", 
+     "voted_up": True},
+    {"text": "Solid foundation, updates are frequent and meaningful.", 
+     "voted_up": True},
+    {"text": "Performance improved a lot since the last patch, very playable now.", 
+     "voted_up": True},
 ]
 ALIGNED_REVIEWS_OLDER = [
-    {"text": "Promising early build, excited to see where this goes.", "voted_up": True},
+    {"text": "Promising early build, excited to see where this goes.", 
+     "voted_up": True},
 ]
 
 
@@ -131,7 +145,8 @@ ALIGNED_REVIEWS_OLDER = [
 
 MEME_REVIEW_RAW = {
     "recommendationid": "1",
-    "review": "uninstalled immediately, my PC caught fire and now my cat won't talk to me 10/10",
+    "review": "uninstalled immediately, "
+    "my PC caught fire and now my cat won't talk to me 10/10",
     "voted_up": False,
     "votes_up": 240,
     "votes_funny": 230,
