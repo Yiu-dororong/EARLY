@@ -88,14 +88,30 @@ cd early
 cp .env.example .env
 
 # [Optional] Only fill in GROQ_API_KEY if you want to run live AI analysis.
-# All other cloud integrations (Turso, Zilliz, etc.) are bypassable out-of-the-box using the pre-seeded local fallback data.
+# All other cloud integrations (Turso, Zilliz, etc.) are bypassable 
+# out-of-the-box using the pre-seeded local fallback data.
 
 docker compose up
 ```
 
 API: `http://localhost:8000` &nbsp;|&nbsp; UI: `http://localhost:8501`
 
-**Running Tests**
+💰 **Infrastructure Note**  
+Designed for **zero** ongoing operating cost. This constraint heavily influenced key architecture decisions, such as response caching and deterministic pre-checks before calling the LLM.
+
+| Component          | Service                  | Tier     |
+|--------------------|--------------------------|----------|
+| LLM Inference      | Groq                     | Free     |
+| Vector Store       | Zilliz Cloud (Milvus)    | Free     |
+| Experiment Tracking| MLflow                   | Free     |
+| Database           | Turso (libSQL)           | Free     |
+| API                | Render                   | Free*    |
+| Frontend           | Streamlit Cloud          | Free     |
+| Scheduled Jobs     | GitHub Actions           | Free     |
+
+\* *Render is free after a one-time $1 verification fee. Pair it with free UptimeRobot to prevent the container from sleeping and ensure 24/7 availability. For Streamlit Cloud, use the `keep_alive.yml` GitHub Action.*
+
+🧪 **Running Tests**
 
 ```bash
 # Deterministic tests (no API key needed)
@@ -168,7 +184,7 @@ The baseline heuristic scorecard is calibrated by tracking the final lifecycle s
 
 ---
 
-## 🧪 Technical Deep Dive
+## 🔍 Technical Deep Dive
 
 **ML Design Decisions**
 
