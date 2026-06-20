@@ -200,7 +200,7 @@ def compute_medians(
         return corpus_median, "corpus_fallback"
 
     resolved = result.apply(
-        lambda row: pd.Series(resolve_median(row), 
+        lambda row: pd.Series(resolve_median(row),
                               index=["median_price_usd", "genre_median_source"]),
         axis=1,
     )
@@ -306,7 +306,7 @@ def write_ratios(
     ratios_clean = ratios.where(pd.notnull(ratios), None)
     updates = [
         (
-            float(row["price_vs_genre_median"]) 
+            float(row["price_vs_genre_median"])
             if row["price_vs_genre_median"] is not None else None,
             row["primary_genre"],
             row["appid"],
@@ -328,7 +328,7 @@ def write_ratios(
             chunk,
         )
         processed = i + len(chunk)
-        log.info("  Updated %d/%d snapshots (%.1f%%)", 
+        log.info("  Updated %d/%d snapshots (%.1f%%)",
                  processed, total, processed / total * 100)
 
     conn.commit()

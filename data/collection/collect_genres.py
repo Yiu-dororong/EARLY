@@ -101,14 +101,14 @@ GENRE_PRIORITY: list[tuple[str, int]] = [
     ("RPG",                   2),
     ("Strategy",              2),
     ("Simulation",            2),
-    ("Survival",              2),   
+    ("Survival",              2),
     ("Sports",                2),
     ("Racing",                2),
     ("Adventure",             1),
     ("Action",                1),
     ("Casual",                1),
-    ("Visual Novel",          1),   
-    ("Rhythm",                1),  
+    ("Visual Novel",          1),
+    ("Rhythm",                1),
     ("Puzzle",                1),
 ]
 
@@ -155,7 +155,7 @@ def derive_from_labels(labels: list[str]) -> tuple[str | None, int]:
             canonical = TAG_SYNONYM_MAP[tag]
             scope = dict(GENRE_PRIORITY)[canonical]
             return canonical, scope
-        
+
     for label, scope in GENRE_PRIORITY:
         if label.lower() in normalised:
             return label, scope
@@ -196,7 +196,7 @@ def fetch_official_genres(appid: int, session: requests.Session) -> list[str] | 
         if not isinstance(genres, list):
             return []
 
-        return [g["description"] for g in genres 
+        return [g["description"] for g in genres
                 if isinstance(g, dict) and "description" in g]
 
     except requests.exceptions.Timeout:
@@ -212,14 +212,14 @@ def fetch_official_genres(appid: int, session: requests.Session) -> list[str] | 
 
 def fetch_community_tags(appid: int, session: requests.Session) -> list[dict] | None:
     """
-    Scrapes Steam community tags and their vote counts 
+    Scrapes Steam community tags and their vote counts
     directly from the official store page HTML.
     Returns list of {name, count} dicts.
     Returns [] if no tags. Returns None on failure.
     """
     url = f"{STORE_APP_URL}{appid}/"
     cookies = {
-        'birthtime': '283993201', 
+        'birthtime': '283993201',
         'lastagecheckage': '1-January-1979',
         'wants_mature_content': '1' # This is the missing key for M-rated games
     }
@@ -229,25 +229,25 @@ def fetch_community_tags(appid: int, session: requests.Session) -> list[dict] | 
         resp.raise_for_status()
 
         # The exact tag counts are embedded in a JavaScript call on the page
-        match = re.search(r'InitAppTagModal\s*\(\s*\d+\s*,\s*(\[\{.*?\}\])', 
-                          resp.text, 
+        match = re.search(r'InitAppTagModal\s*\(\s*\d+\s*,\s*(\[\{.*?\}\])',
+                          resp.text,
                           re.DOTALL)
-        
+
         if match:
             try:
                 tag_data = json.loads(match.group(1))
-                return [{"name": t["name"], 
-                         "count": int(t.get("count", 0))} 
+                return [{"name": t["name"],
+                         "count": int(t.get("count", 0))}
                          for t in tag_data if "name" in t]
             except json.JSONDecodeError:
                 pass
 
-        # Fallback to BeautifulSoup scraping if the JS array isn't found 
+        # Fallback to BeautifulSoup scraping if the JS array isn't found
         # (count defaults to 0)
         soup = BeautifulSoup(resp.text, 'html.parser')
-        tags = [tag.text.strip() for tag in soup.find_all('a', class_='app_tag') 
+        tags = [tag.text.strip() for tag in soup.find_all('a', class_='app_tag')
                 if tag.text.strip() != '+']
-        
+
         return [{"name": tag, "count": 0} for tag in tags]
 
     except requests.exceptions.Timeout:
@@ -341,23 +341,23 @@ def resolve_genre(
 # DB helpers
 # ---------------------------------------------------------------------------
 
-def get_target_appids(conn: libsql.Connection, 
-                      refetch: bool, 
+def get_target_appids(conn: libsql.Connection,
+                      refetch: bool,
                       delta: bool = False) -> list[int]:
     delta_filter = ""
     if delta:
         delta_filter = f"""
         AND appid IN (
-            SELECT appid FROM games_v2 
-            WHERE currently_in_ea = 1 
-               OR (currently_in_ea = 0 
-               AND graduation_date IS NOT NULL 
+            SELECT appid FROM games_v2
+            WHERE currently_in_ea = 1
+               OR (currently_in_ea = 0
+               AND graduation_date IS NOT NULL
                AND graduation_date >= date('now', '-{DELTA_GRADUATION_DAYS} days'))
         )
         """
 
     query = f"""
-        SELECT appid FROM ccu_availability 
+        SELECT appid FROM ccu_availability
         WHERE ccu_available IN ('AVAILABLE', 'UNAVAILABLE')
         {delta_filter}
         ORDER BY appid
@@ -398,7 +398,7 @@ def upsert(conn: libsql.Connection, appid: int, res: dict) -> None:
             res["genre_scope"],
             res["genre_source"],
             json.dumps(res["raw_genres"]),
-            json.dumps(res["community_tags"]) 
+            json.dumps(res["community_tags"])
                 if res["community_tags"] is not None else None,
             datetime.now(timezone.utc).isoformat(),
         ],
@@ -478,7 +478,7 @@ def run(delay: float, refetch: bool, dry_run: bool, delta: bool) -> None:
     log.info("Done. source breakdown: %s", source_counts)
     if source_counts["default"] > 0:
         log.warning(
-            "Found %d games with unclassified/unknown primary genre (defaulted).", 
+            "Found %d games with unclassified/unknown primary genre (defaulted).",
             source_counts["default"]
             )
 

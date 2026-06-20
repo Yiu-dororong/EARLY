@@ -62,7 +62,7 @@ load_dotenv()
 
 DB_URL = os.getenv("TURSO_URL")
 DB_AUTH = os.getenv("TURSO_AUTH_TOKEN")
-REQUEST_DELAY = float(os.getenv("CCU_REQUEST_DELAY", "2.0"))   
+REQUEST_DELAY = float(os.getenv("CCU_REQUEST_DELAY", "2.0"))
 REVIEW_API_DELAY = float(os.getenv("REVIEW_API_DELAY", "1.5"))
 
 MIN_EA_AGE_DAYS = 90
@@ -132,7 +132,7 @@ def ensure_tables(conn: libsql.Connection) -> None:
     log.info("ccu_history and ccu_availability tables ready")
 
 
-def get_candidates(conn: libsql.Connection, delta: bool = False) -> tuple[list[dict], 
+def get_candidates(conn: libsql.Connection, delta: bool = False) -> tuple[list[dict],
                                                                           libsql.Connection]:
     """
     Step 1: ELIGIBLE games with ea_age >= 90 days.
@@ -150,7 +150,7 @@ def get_candidates(conn: libsql.Connection, delta: bool = False) -> tuple[list[d
                         f"date('now', '-{DELTA_GRADUATION_DAYS} days')))")
 
     query = f"""
-        SELECT g.appid, g.ea_start_date, g.ea_start_ts, 
+        SELECT g.appid, g.ea_start_date, g.ea_start_ts,
                 g.graduation_date, ca.review_count_at_check, ca.review_checked_at
         FROM games_v2 g
         LEFT JOIN ccu_availability ca ON g.appid = ca.appid
@@ -174,8 +174,8 @@ def get_candidates(conn: libsql.Connection, delta: bool = False) -> tuple[list[d
     for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
             rows = conn.execute(query, (min_age_ts,)).fetchall()
-            return [{"appid": r[0], "ea_start_date": r[1], 
-                     "ea_start_ts": r[2], "review_count": r[4], 
+            return [{"appid": r[0], "ea_start_date": r[1],
+                     "ea_start_ts": r[2], "review_count": r[4],
                      "review_checked_at": r[5]} for r in rows], conn
         except Exception as e:
             if attempt == DB_MAX_RETRIES:
@@ -183,15 +183,15 @@ def get_candidates(conn: libsql.Connection, delta: bool = False) -> tuple[list[d
             log.warning("DB read error attempt %d in get_candidates: "
                         "%s - reconnecting", attempt, e)
             time.sleep(DB_RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 log.warning("Error occurred while closing connection: %s", e)
             conn = get_conn()
     return [], conn
 
 
-def get_already_collected(conn: libsql.Connection) -> tuple[set[int], 
+def get_already_collected(conn: libsql.Connection) -> tuple[set[int],
                                                             libsql.Connection]:
     for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
@@ -223,7 +223,7 @@ def write_availability(
         try:
             conn.execute("""
                 INSERT OR REPLACE INTO ccu_availability
-                    (appid, ccu_available, review_count_at_check, 
+                    (appid, ccu_available, review_count_at_check,
                          review_checked_at, months_collected, collected_at)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (
@@ -245,8 +245,8 @@ def write_availability(
             conn = get_conn()
 
 
-def upsert_ccu_rows(conn: libsql.Connection, 
-                    rows: list[dict], 
+def upsert_ccu_rows(conn: libsql.Connection,
+                    rows: list[dict],
                     delta: bool = False) -> tuple[int, libsql.Connection]:
     if not rows:
         return 0, conn
@@ -261,15 +261,15 @@ def upsert_ccu_rows(conn: libsql.Connection,
                 ).fetchone()
                 if max_date_row and max_date_row[0]:
                     max_date = max_date_row[0]
-                    current_rows = [r for r in current_rows 
+                    current_rows = [r for r in current_rows
                                     if r["month_date"] >= max_date]
 
             tuples = [
-                (r["appid"], r["month_date"], r["avg_players"], 
+                (r["appid"], r["month_date"], r["avg_players"],
                  r["peak_players"], r["collected_at"])
                 for r in current_rows
             ]
-            
+
             conn.executemany("""
                 INSERT OR REPLACE INTO ccu_history
                     (appid, month_date, avg_players, peak_players, collected_at)
@@ -279,11 +279,11 @@ def upsert_ccu_rows(conn: libsql.Connection,
             return len(tuples), conn
         except Exception as e:
             if attempt == DB_MAX_RETRIES:
-                log.warning("CCU row insert failed after %d attempts for appid=%d: %s", 
+                log.warning("CCU row insert failed after %d attempts for appid=%d: %s",
                             DB_MAX_RETRIES, rows[0]["appid"], e)
                 return 0, conn
             log.warning("DB upsert_ccu_rows error attempt %d for appid %d: %s - "
-                        "reconnecting in %ds", 
+                        "reconnecting in %ds",
                         attempt, rows[0]["appid"], e, DB_RETRY_DELAY)
             time.sleep(DB_RETRY_DELAY)
             try:
@@ -291,7 +291,7 @@ def upsert_ccu_rows(conn: libsql.Connection,
             except Exception as e:
                 log.warning("Error occurred while closing database connection: %s", e)
             conn = get_conn()
-            
+
     return 0, conn
 
 
@@ -317,11 +317,11 @@ def get_review_count(appid: int, session: requests.Session) -> int | None:
         )
         resp.raise_for_status()
         data = resp.json()
-        
+
         if data.get("success") != 1:
             log.warning("appid %d review count API returned success != 1", appid)
             return None
-            
+
         summary = data.get("query_summary") or {}
         total = summary.get("total_reviews")
         if total is not None:
@@ -448,7 +448,7 @@ def fetch_ccu_history(
         resp = session.get(url, timeout=15)
 
         if resp.status_code in (500, 404):
-            log.debug("appid %d: Steam Charts %d — UNAVAILABLE", 
+            log.debug("appid %d: Steam Charts %d — UNAVAILABLE",
                       appid, resp.status_code)
             return "UNAVAILABLE", []
 
@@ -481,15 +481,15 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Collect CCU history for EARLY pipeline (3-step pipeline)"
     )
-    p.add_argument("--appid", type=int, 
+    p.add_argument("--appid", type=int,
                    help="Single appid (debug)")
-    p.add_argument("--force", action="store_true", 
+    p.add_argument("--force", action="store_true",
                    help="Re-fetch already-collected appids")
-    p.add_argument("--delta", action="store_true", 
+    p.add_argument("--delta", action="store_true",
                    help="Delta run: update CCU history "
                    "for active and recently graduated games")
     p.add_argument("--limit", type=int, help="Cap number of appids processed")
-    p.add_argument("--dry-run", action="store_true", 
+    p.add_argument("--dry-run", action="store_true",
                    help="Plan only, no API calls or writes")
     p.add_argument("--skip-review-gate", action="store_true",
                    help="Skip Step 2 review count check (debug/bulk mode)")
@@ -514,8 +514,8 @@ def main() -> None:
     # --- Step 1: EA age gate ---
     if args.appid:
         # Single-appid mode bypasses DB candidate query
-        candidates = [{"appid": args.appid, "ea_start_date": None, 
-                       "ea_start_ts": None, "review_count": None, 
+        candidates = [{"appid": args.appid, "ea_start_date": None,
+                       "ea_start_ts": None, "review_count": None,
                        "review_checked_at": None}]
         log.info("Single-appid mode: %d", args.appid)
     else:
@@ -572,17 +572,17 @@ def main() -> None:
 
         # --- Step 2: Review count gate ---
         review_count = None
-        
-        # Fast path for delta runs: skip API call 
+
+        # Fast path for delta runs: skip API call
         # if we know it's already safely > MIN_REVIEW_COUNT + 10
         bypass_api = args.skip_review_gate
-        if (args.delta 
-            and prev_review_count is not None 
+        if (args.delta
+            and prev_review_count is not None
             and prev_review_count > MIN_REVIEW_COUNT + 10):
             bypass_api = True
             review_count = prev_review_count
             log.debug("[%d/%d] appid %d: bypass review API (previous count %d > %d)",
-                      i, len(candidates), appid, 
+                      i, len(candidates), appid,
                       prev_review_count, MIN_REVIEW_COUNT + 10)
 
         # If bypassing via CLI flag
@@ -610,7 +610,7 @@ def main() -> None:
                     "[%d/%d] appid %d: SKIP — %d reviews (need %d)",
                     i, len(candidates), appid, review_count, MIN_REVIEW_COUNT,
                 )
-                conn = write_availability(conn, appid, "SKIP_LOW_REVIEWS", 
+                conn = write_availability(conn, appid, "SKIP_LOW_REVIEWS",
                                           review_count, review_checked_at, 0)
                 n_skip_reviews += 1
                 continue
@@ -628,7 +628,7 @@ def main() -> None:
 
         if status == "AVAILABLE":
             inserted, conn = upsert_ccu_rows(conn, rows, delta=args.delta)
-            conn = write_availability(conn, appid, "AVAILABLE", 
+            conn = write_availability(conn, appid, "AVAILABLE",
                                       review_count, review_checked_at, inserted)
             n_available += 1
             total_months += inserted
@@ -639,7 +639,7 @@ def main() -> None:
             )
 
         elif status == "UNAVAILABLE":
-            conn = write_availability(conn, appid, "UNAVAILABLE", 
+            conn = write_availability(conn, appid, "UNAVAILABLE",
                                       review_count, review_checked_at, 0)
             n_unavailable += 1
             log.info(
@@ -650,7 +650,7 @@ def main() -> None:
             )
 
         else:  # ERROR
-            conn = write_availability(conn, appid, "ERROR", 
+            conn = write_availability(conn, appid, "ERROR",
                                       review_count, review_checked_at, 0)
             n_error += 1
             log.warning(
@@ -665,7 +665,7 @@ def main() -> None:
     log.info("=" * 60)
     log.info("CCU collection complete")
     log.info("  Candidates processed : %d", len(candidates))
-    log.info("  Available (stored)   : %d  (%d monthly rows)", 
+    log.info("  Available (stored)   : %d  (%d monthly rows)",
                                             n_available, total_months)
     log.info("  Unavailable (500/dead): %d", n_unavailable)
     log.info("  Skipped (< %d reviews): %d", MIN_REVIEW_COUNT, n_skip_reviews)

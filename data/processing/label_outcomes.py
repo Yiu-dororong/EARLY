@@ -14,7 +14,7 @@ Logic (in priority order):
   falls back to flat FLOOR_GAP_DAYS (365) for games with insufficient history.
 
   NOTE: EXIT_SILENT requires event_history with type 28 (dev posts).
-  If event_history is absent, 
+  If event_history is absent,
   EXIT_SILENT collapses into STAYS_ACTIVE — logged as warning.
 
 Writes to:
@@ -98,7 +98,7 @@ def compute_allowable_build_gap(historical_build_gaps: list[int]) -> int:
     if len(historical_build_gaps) < MIN_EVENTS_FOR_PERSONAL_THRESHOLD:
         return FLOOR_GAP_DAYS
     from statistics import median
-    return max(FLOOR_GAP_DAYS, 
+    return max(FLOOR_GAP_DAYS,
                int(median(historical_build_gaps) * TOLERANCE_MULTIPLIER))
 
 
@@ -142,7 +142,7 @@ def compute_outcome(
                                     ).replace(tzinfo=timezone.utc)
             ea_age_days = (now - ea_start).days
         except ValueError:
-            log.warning("appid=%s — unparseable ea_start_date: %r", 
+            log.warning("appid=%s — unparseable ea_start_date: %r",
                         appid, ea_start_date)
 
     # ── Build gap ─────────────────────────────────────────────────────────
@@ -274,7 +274,7 @@ def compute_outcome(
 # ---------------------------------------------------------------------------
 
 def fetch_last_build_update_dates(
-        conn, 
+        conn,
         appids: list[int]
         ) -> tuple[dict[int, str | None], libsql.Connection]:
     cursor = conn.execute(
@@ -292,12 +292,12 @@ def fetch_last_build_update_dates(
     for i in range(0, len(appids), chunk_size):
         chunk = appids[i : i + chunk_size]
         placeholders = ",".join("?" * len(chunk))
-        
+
         for attempt in range(1, DB_MAX_RETRIES + 1):
             try:
                 rows = conn.execute(
                     f"""
-                    SELECT appid, 
+                    SELECT appid,
                         datetime(MAX(event_ts), 'unixepoch') AS last_build_update_date
                     FROM event_history
                     WHERE appid IN ({placeholders})
@@ -312,12 +312,12 @@ def fetch_last_build_update_dates(
             except Exception as e:
                 if attempt == DB_MAX_RETRIES:
                     raise
-                log.warning("DB read error attempt %d: %s - retrying in %ds", 
+                log.warning("DB read error attempt %d: %s - retrying in %ds",
                             attempt, e, DB_RETRY_DELAY)
                 time.sleep(DB_RETRY_DELAY)
-                try: 
+                try:
                     conn.close()
-                except Exception as e: 
+                except Exception as e:
                     log.warning("Error closing database connection: %s", e)
                 conn = get_conn()
     for appid in appids:
@@ -326,7 +326,7 @@ def fetch_last_build_update_dates(
 
 
 def fetch_last_dev_post_dates(
-        conn, 
+        conn,
         appids: list[int]
         ) -> tuple[dict[int, str | None], libsql.Connection]:
     cursor = conn.execute(
@@ -344,12 +344,12 @@ def fetch_last_dev_post_dates(
     for i in range(0, len(appids), chunk_size):
         chunk = appids[i : i + chunk_size]
         placeholders = ",".join("?" * len(chunk))
-        
+
         for attempt in range(1, DB_MAX_RETRIES + 1):
             try:
                 rows = conn.execute(
                     f"""
-                    SELECT appid, 
+                    SELECT appid,
                             datetime(MAX(event_ts), 'unixepoch') AS last_dev_post_date
                     FROM event_history
                     WHERE appid IN ({placeholders})
@@ -364,12 +364,12 @@ def fetch_last_dev_post_dates(
             except Exception as e:
                 if attempt == DB_MAX_RETRIES:
                     raise
-                log.warning("DB read error attempt %d: %s - retrying in %ds", 
+                log.warning("DB read error attempt %d: %s - retrying in %ds",
                             attempt, e, DB_RETRY_DELAY)
                 time.sleep(DB_RETRY_DELAY)
-                try: 
+                try:
                     conn.close()
-                except Exception as e: 
+                except Exception as e:
                     log.warning("Error closing database connection: %s", e)
                 conn = get_conn()
     for appid in appids:
@@ -378,7 +378,7 @@ def fetch_last_dev_post_dates(
 
 
 def fetch_historical_build_gaps(
-        conn, 
+        conn,
         appids: list[int]
         ) -> tuple[dict[int, list[int]], libsql.Connection]:
     cursor = conn.execute(
@@ -392,7 +392,7 @@ def fetch_historical_build_gaps(
     for i in range(0, len(appids), chunk_size):
         chunk = appids[i : i + chunk_size]
         placeholders = ",".join("?" * len(chunk))
-        
+
         for attempt in range(1, DB_MAX_RETRIES + 1):
             try:
                 rows = conn.execute(
@@ -425,12 +425,12 @@ def fetch_historical_build_gaps(
             except Exception as e:
                 if attempt == DB_MAX_RETRIES:
                     raise
-                log.warning("DB read error attempt %d: %s - retrying in %ds", 
+                log.warning("DB read error attempt %d: %s - retrying in %ds",
                             attempt, e, DB_RETRY_DELAY)
                 time.sleep(DB_RETRY_DELAY)
-                try: 
+                try:
                     conn.close()
-                except Exception as e: 
+                except Exception as e:
                     log.warning("Error closing database connection: %s", e)
                 conn = get_conn()
 
@@ -438,16 +438,16 @@ def fetch_historical_build_gaps(
 
 
 def fetch_games_v2(
-        conn, 
-        appid_filter: int | None = None, 
+        conn,
+        appid_filter: int | None = None,
         delta: bool = False
         ) -> tuple[list[dict], libsql.Connection]:
     delta_filter = ""
     if delta:
-        delta_filter = f"""AND (currently_in_ea = 1 
-                            OR (currently_in_ea = 0 
-                            AND graduation_date IS NOT NULL 
-                            AND graduation_date >= 
+        delta_filter = f"""AND (currently_in_ea = 1
+                            OR (currently_in_ea = 0
+                            AND graduation_date IS NOT NULL
+                            AND graduation_date >=
                             date('now', '-{DELTA_GRADUATION_DAYS} days')))"""
 
     where = f"""
@@ -484,12 +484,12 @@ def fetch_games_v2(
         except Exception as e:
             if attempt == DB_MAX_RETRIES:
                 raise
-            log.warning("DB fetch_games_v2 error attempt %d: %s - retrying in %ds", 
+            log.warning("DB fetch_games_v2 error attempt %d: %s - retrying in %ds",
                         attempt, e, DB_RETRY_DELAY)
             time.sleep(DB_RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 log.warning("Error closing database connection: %s", e)
             conn = get_conn()
 
@@ -504,8 +504,8 @@ def fetch_games_v2(
 # ---------------------------------------------------------------------------
 
 def write_outcomes_v2(
-        conn, 
-        decisions: list[dict], 
+        conn,
+        decisions: list[dict],
         dry_run: bool = False) -> libsql.Connection:
     existing_cols = set()
     for attempt in range(1, DB_MAX_RETRIES + 1):
@@ -517,15 +517,15 @@ def write_outcomes_v2(
         except Exception as e:
             if attempt == DB_MAX_RETRIES:
                 raise
-            log.warning("DB PRAGMA read error attempt %d: %s - retrying in %ds", 
+            log.warning("DB PRAGMA read error attempt %d: %s - retrying in %ds",
                         attempt, e, DB_RETRY_DELAY)
             time.sleep(DB_RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 log.warning("Error closing database connection: %s", e)
             conn = get_conn()
-            
+
     if "abandoned_date" not in existing_cols:
         if not dry_run:
             for attempt in range(1, DB_MAX_RETRIES + 1):
@@ -539,9 +539,9 @@ def write_outcomes_v2(
                     log.warning("DB ALTER TABLE error attempt %d: %s - retrying in %ds",
                                 attempt, e, DB_RETRY_DELAY)
                     time.sleep(DB_RETRY_DELAY)
-                    try: 
+                    try:
                         conn.close()
-                    except Exception as e: 
+                    except Exception as e:
                         log.warning("Error closing database connection: %s", e)
                     conn = get_conn()
             log.info("Added column games_v2.abandoned_date")
@@ -554,7 +554,7 @@ def write_outcomes_v2(
         for i in range(0, len(decisions), chunk_size):
             chunk = decisions[i : i + chunk_size]
             update_tuples = [
-                (d["outcome"], d["outcome_date"], 
+                (d["outcome"], d["outcome_date"],
                  d["outcome_source"], d["abandoned_date"], d["appid"])
                 for d in chunk
             ]
@@ -579,9 +579,9 @@ def write_outcomes_v2(
                     log.warning("DB write batch error attempt %d: %s - retrying in %ds",
                                 attempt, e, DB_RETRY_DELAY)
                     time.sleep(DB_RETRY_DELAY)
-                    try: 
+                    try:
                         conn.close()
-                    except Exception as e: 
+                    except Exception as e:
                         log.warning("Error closing database connection: %s", e)
                     conn = get_conn()
             updated += len(chunk)

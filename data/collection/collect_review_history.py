@@ -127,7 +127,7 @@ def ensure_tables(conn: libsql.Connection) -> None:
 
 
 def get_candidates(
-        conn: libsql.Connection, 
+        conn: libsql.Connection,
         delta: bool = False
         ) -> tuple[list[int], libsql.Connection]:
     """
@@ -140,10 +140,10 @@ def get_candidates(
     if delta:
         delta_filter = f"""
         AND appid IN (
-            SELECT appid FROM games_v2 
-            WHERE currently_in_ea = 1 
-               OR (currently_in_ea = 0 
-               AND graduation_date IS NOT NULL 
+            SELECT appid FROM games_v2
+            WHERE currently_in_ea = 1
+               OR (currently_in_ea = 0
+               AND graduation_date IS NOT NULL
                AND graduation_date >= date('now', '-{DELTA_GRADUATION_DAYS} days'))
         )
         """
@@ -160,19 +160,19 @@ def get_candidates(
             rows = conn.execute(query).fetchall()
             return [r[0] for r in rows], conn
         except Exception as e:
-            if attempt == DB_MAX_RETRIES: 
+            if attempt == DB_MAX_RETRIES:
                 log.warning("DB read error: %s", e)
                 time.sleep(DB_RETRY_DELAY)
                 raise e
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 log.warning("Error closing database connection: %s", e)
             conn = get_conn()
 
 
 def get_latest_bucket_dates(
-        conn: libsql.Connection, 
+        conn: libsql.Connection,
         appids: list[int]
         ) -> tuple[dict[int, str], libsql.Connection]:
     """
@@ -193,19 +193,19 @@ def get_latest_bucket_dates(
             """, appids).fetchall()
             return {r[0]: r[1] for r in rows}, conn
         except Exception as e:
-            if attempt == DB_MAX_RETRIES: 
+            if attempt == DB_MAX_RETRIES:
                 log.warning("DB read error: %s", e)
                 time.sleep(DB_RETRY_DELAY)
                 raise e
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 log.warning("Error closing database connection: %s", e)
             conn = get_conn()
 
 
 def insert_buckets(
-        conn: libsql.Connection, 
+        conn: libsql.Connection,
         rows: list[dict]
         ) -> tuple[int, libsql.Connection]:
     """
@@ -215,10 +215,10 @@ def insert_buckets(
     """
     if not rows:
         return 0, conn
-        
+
     now_ts = int(datetime.now(timezone.utc).timestamp())
     tuples = [
-        (row["appid"], row["bucket_start"], row["bucket_end"], 
+        (row["appid"], row["bucket_start"], row["bucket_end"],
          row["positive"], row["negative"], now_ts)
         for row in rows
     ]
@@ -238,9 +238,9 @@ def insert_buckets(
                 return 0, conn
             log.warning("DB insert error attempt %d: %s - reconnecting", attempt, e)
             time.sleep(DB_RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 log.warning("Error closing database connection: %s", e)
             conn = get_conn()
 
@@ -290,7 +290,7 @@ def fetch_histogram(appid: int, session: requests.Session) -> dict | None:
         resp.raise_for_status()
         data = resp.json()
         if data.get("success") != 1:
-            log.warning("appid %d: histogram API returned success=%s", 
+            log.warning("appid %d: histogram API returned success=%s",
                         appid, data.get("success"))
             return None
         return data
@@ -333,7 +333,7 @@ def parse_histogram(appid: int, data: dict) -> list[dict]:
     for i, rollup in enumerate(rollups):
         # bucket_start: unix ts → ISO date
         try:
-            bucket_start_dt = datetime.fromtimestamp(rollup["date"], 
+            bucket_start_dt = datetime.fromtimestamp(rollup["date"],
                                                      tz=timezone.utc).date()
             bucket_start = bucket_start_dt.isoformat()
         except (KeyError, ValueError, OSError) as e:
@@ -343,7 +343,7 @@ def parse_histogram(appid: int, data: dict) -> list[dict]:
         # bucket_end: start of next rollup, or today for the last bucket
         if i + 1 < len(rollups):
             try:
-                next_dt = datetime.fromtimestamp(rollups[i + 1]["date"], 
+                next_dt = datetime.fromtimestamp(rollups[i + 1]["date"],
                                                  tz=timezone.utc).date()
                 bucket_end = next_dt.isoformat()
             except (KeyError, ValueError, OSError):
@@ -402,19 +402,19 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Collect review histogram buckets for EARLY pipeline"
     )
-    p.add_argument("--appid", type=int, 
+    p.add_argument("--appid", type=int,
                    help="Single appid (debug)")
     p.add_argument("--force", action="store_true",
                    help="Re-fetch and replace all buckets (overrides append logic)")
     p.add_argument("--delta", action="store_true",
                    help="Delta run: only fetch for active and recently graduated games")
-    p.add_argument("--limit", type=int, 
+    p.add_argument("--limit", type=int,
                    help="Cap number of appids processed (testing)")
-    p.add_argument("--dry-run", action="store_true", 
+    p.add_argument("--dry-run", action="store_true",
                    help="Plan only, no API calls or writes")
     p.add_argument("--delay", type=float, default=REQUEST_DELAY,
                    help=f"Seconds between histogram requests (default {REQUEST_DELAY})")
-    p.add_argument("--verbose", action="store_true", 
+    p.add_argument("--verbose", action="store_true",
                    help="Debug logging")
     return p.parse_args()
 
@@ -482,7 +482,7 @@ def main() -> None:
 
         if data is None:
             n_error += 1
-            log.warning("[%d/%d] appid %d: fetch failed — skipping", 
+            log.warning("[%d/%d] appid %d: fetch failed — skipping",
                         i, len(candidates), appid)
             if i < len(candidates):
                 time.sleep(delay)

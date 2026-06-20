@@ -121,7 +121,7 @@ def init_schema(conn):
         stmt = stmt.strip()
         if stmt:
             conn.execute(stmt)
-            
+
     conn.commit()
     log.info("Schema initialised.")
 
@@ -139,9 +139,9 @@ def load_existing_games(conn) -> tuple[dict, libsql.Connection]:
             log.warning(f"DB load_existing_games error attempt {attempt}: {e} — "
                         f"retrying in {RETRY_DELAY}s")
             time.sleep(RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 log.warning("Error closing database connection: %s", e)
             conn = get_conn()
     return {}, conn
@@ -160,9 +160,9 @@ def get_last_run_ts(conn) -> tuple[int, libsql.Connection]:
             log.warning(f"DB get_last_run_ts error attempt {attempt}: {e} — "
                         f"retrying in {RETRY_DELAY}s")
             time.sleep(RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 log.warning("Error closing database connection: %s", e)
             conn = get_conn()
     return 0, conn
@@ -184,9 +184,9 @@ def save_run_ts(conn, ts: int):
             log.warning(f"DB save_run_ts error attempt {attempt}: {e} "
                         f"— retrying in {RETRY_DELAY}s")
             time.sleep(RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 log.warning("Error closing database connection: %s", e)
             conn = get_conn()
     return conn
@@ -208,9 +208,9 @@ def log_step(conn, appid, step, status, message=""):
             log.warning(f"DB log_step error attempt {attempt} for appid {appid}: {e} "
                         f"— retrying in {RETRY_DELAY}s")
             time.sleep(RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 log.warning("Error closing database connection: %s", e)
             conn = get_conn()
     return conn
@@ -238,9 +238,9 @@ def upsert_game(conn, row: dict):
                 f"DB upsert error attempt {attempt} for appid {row.get('appid')}: {e} "
                 f"— retrying in {RETRY_DELAY}s")
             time.sleep(RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 log.warning("Error closing database connection: %s", e)
             conn = get_conn()
     return conn
@@ -304,7 +304,7 @@ def fetch_app_list(if_modified_since: int = 0) -> list[dict]:
             if if_modified_since == 0
             else f"delta since "
                  f"""{datetime.fromtimestamp(
-                     if_modified_since, 
+                     if_modified_since,
                      tz=timezone.utc
                      ).isoformat()}"""
         )
@@ -393,7 +393,7 @@ def check_eligibility(appid: int) -> tuple[str, dict]:
     developers = info.get("developers", [])
     publishers = info.get("publishers", [])
     categories_raw = info.get("categories", [])
-    categories = [c.get("description", "") for c in categories_raw 
+    categories = [c.get("description", "") for c in categories_raw
                   if isinstance(c, dict)]
 
     meta = {
@@ -439,8 +439,8 @@ def fetch_ea_start(appid: int) -> int | None:
 
 
 def check_and_update_graduation(
-        conn, 
-        appid: int, 
+        conn,
+        appid: int,
         name: str) -> tuple[str, libsql.Connection]:
     """
     Checks appdetails for graduation.
@@ -471,7 +471,7 @@ def check_and_update_graduation(
 
         graduation_date = None
         if release_ts:
-            graduation_date = datetime.fromtimestamp(release_ts, 
+            graduation_date = datetime.fromtimestamp(release_ts,
                                                      tz=timezone.utc).date().isoformat()
 
         log.info(f"  ✓ GRADUATED — {name} | graduation_date={graduation_date}")
@@ -480,8 +480,8 @@ def check_and_update_graduation(
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 conn.execute(
-                    """UPDATE games_v2 
-                    SET currently_in_ea = 0, graduation_date = ?, fetched_at = ? 
+                    """UPDATE games_v2
+                    SET currently_in_ea = 0, graduation_date = ?, fetched_at = ?
                     WHERE appid = ?""",
                     (graduation_date, now_iso, appid)
                 )
@@ -493,18 +493,18 @@ def check_and_update_graduation(
                 log.warning(f"DB update error attempt {attempt} for appid {appid}: "
                             f"{e} — retrying in {RETRY_DELAY}s")
                 time.sleep(RETRY_DELAY)
-                try: 
+                try:
                     conn.close()
-                except Exception as e: 
+                except Exception as e:
                     log.warning("Error closing database connection: %s", e)
                 conn = get_conn()
 
-        conn = log_step(conn, appid, 
-                        "check_graduated", 
-                        "GRADUATED", 
+        conn = log_step(conn, appid,
+                        "check_graduated",
+                        "GRADUATED",
                         f"graduation_date={graduation_date}")
         return "GRADUATED", conn
-    
+
     return "STILL_EA", conn
 
 
@@ -516,8 +516,8 @@ def run_check_graduated(dry_run: bool = False):
     # Select all current EA appids from the database
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            rows = conn.execute("""SELECT appid, name, ea_start_ts 
-                                FROM games_v2 
+            rows = conn.execute("""SELECT appid, name, ea_start_ts
+                                FROM games_v2
                                 WHERE currently_in_ea = 1""").fetchall()
             break
         except Exception as e:
@@ -526,9 +526,9 @@ def run_check_graduated(dry_run: bool = False):
             log.warning(f"DB load check_graduated error attempt {attempt}: "
                         f"{e} — retrying in {RETRY_DELAY}s")
             time.sleep(RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 log.warning("Error closing database connection: %s", e)
             conn = get_conn()
 
@@ -558,8 +558,8 @@ def run_check_graduated(dry_run: bool = False):
     )
 
 # ── Main pipeline ─────────────────────────────────────────────────────────────
-def run_pipeline(force_bootstrap: bool = False, 
-                 dry_run: bool = False, 
+def run_pipeline(force_bootstrap: bool = False,
+                 dry_run: bool = False,
                  retry_errors: bool = False):
 
     run_start_ts = int(datetime.now(timezone.utc).timestamp())
@@ -574,8 +574,8 @@ def run_pipeline(force_bootstrap: bool = False,
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 rows = conn.execute(
-                    """SELECT appid, name, last_modified_steam 
-                    FROM games_v2 
+                    """SELECT appid, name, last_modified_steam
+                    FROM games_v2
                     WHERE eligibility_status = 'ERROR'"""
                 ).fetchall()
                 break
@@ -585,13 +585,13 @@ def run_pipeline(force_bootstrap: bool = False,
                 log.warning(f"DB load errors attempt {attempt}: "
                             f"{e} — retrying in {RETRY_DELAY}s")
                 time.sleep(RETRY_DELAY)
-                try: 
+                try:
                     conn.close()
-                except Exception as e: 
+                except Exception as e:
                     log.warning("Error closing database connection: %s", e)
                 conn = get_conn()
-        to_process = [{"appid": r[0], 
-                       "name": r[1], 
+        to_process = [{"appid": r[0],
+                       "name": r[1],
                        "last_modified": r[2]} for r in rows]
         log.info(f"Retry errors run — "
                  f"Found {len(to_process)} games with ERROR status to retry.")
@@ -608,7 +608,7 @@ def run_pipeline(force_bootstrap: bool = False,
             )
 
         apps = fetch_app_list(if_modified_since=last_run_ts)
-        
+
         for a in apps:
             appid = a["appid"]
             if appid not in existing_games:
@@ -754,8 +754,8 @@ def run_pipeline(force_bootstrap: bool = False,
                 f"  SKIP_PRE_2022 via histogram (ea_start={ea_date_str}) "
                 f"— {meta['name']}"
             )
-            conn = log_step(conn, appid, 
-                            "temporal_filter", "SKIP_PRE_2022", 
+            conn = log_step(conn, appid,
+                            "temporal_filter", "SKIP_PRE_2022",
                             ea_date_str)
             conn = upsert_game(conn, {
                 **base_row,
@@ -856,5 +856,5 @@ if __name__ == "__main__":
     if args.check_graduated:
         run_check_graduated(dry_run=args.dry_run)
     else:
-        run_pipeline(force_bootstrap=args.bootstrap, 
+        run_pipeline(force_bootstrap=args.bootstrap,
                      dry_run=args.dry_run, retry_errors=args.retry_errors)

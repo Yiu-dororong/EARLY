@@ -304,9 +304,9 @@ def render_browse():
     st.markdown("""
     **Welcome to the EARLY Intelligence Dashboard.**
 
-    EARLY analyzes public Steam data (update cadence, player retention, 
-                community sentiment, developer behavior, and more) 
-                to estimate the probability that an Early Access game 
+    EARLY analyzes public Steam data (update cadence, player retention,
+                community sentiment, developer behavior, and more)
+                to estimate the probability that an Early Access game
                 will **stop updating** before reaching full release (1.0).
     """)
 
