@@ -103,7 +103,7 @@ Designed for **zero** ongoing operating cost. This constraint heavily influenced
 |--------------------|--------------------------|----------|
 | LLM Inference      | Groq                     | Free     |
 | Vector Store       | Zilliz Cloud (Milvus)    | Free     |
-| Experiment Tracking| MLflow                   | Free     |
+| Experiment Tracking| MLflow (Databrick)       | Free     |
 | Database           | Turso (libSQL)           | Free     |
 | API                | Render                   | Free*    |
 | Frontend           | Streamlit Cloud          | Free     |
@@ -173,14 +173,14 @@ The baseline heuristic scorecard is calibrated by tracking the final lifecycle s
 | Layer | Tools |
 |---|---|
 | Data collection | Python, Steam Web API, ITAD API, Requests |
-| ML model | XGBoost, scikit-learn, SHAP |
+| ML model | XGBoost, scikit-learn, SHAP, Optuna |
 | Scorecard | Custom weighted engine |
 | Agent layer | LangGraph, Groq (Llama 4 Scout + Llama 3.3 70B), Langfuse |
 | Vector search | Zilliz (Milvus), cosine similarity, 25-dim SHAP vectors |
 | API | FastAPI, Turso (libSQL) |
 | Frontend | Streamlit |
 | MLOps | MLflow model registry, PSI drift monitoring, DeepEval |
-| Infrastructure | Docker, Docker Compose, GitHub Actions |
+| Infrastructure | Docker, Docker Compose, GitHub Actions, Render, Streamlit Cloud |
 
 ---
 
