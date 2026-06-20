@@ -137,16 +137,16 @@ def list_games(
                 ls.days_since_last_build_update,
                 -- Risk + Log scale for popularity - EA age - Build staleness
                 (
-                    (  
-                        (ls.p_distressed * 100.0) +                  
-                        (LOG(MAX(ls.review_count_at_T, 1)) * 25.0) - 
-                        (ls.ea_age_days * 0.05)                      
+                    (
+                        (ls.p_distressed * 100.0) +
+                        (LOG(MAX(ls.review_count_at_T, 1)) * 25.0) -
+                        (ls.ea_age_days * 0.05)
                     )
-                    * (MAX(ls.days_since_last_build_update, 300) * 0.1)          
+                    * (MAX(ls.days_since_last_build_update, 300) * 0.1)
                 ) AS triage_priority_score
             FROM latest
-            JOIN live_scores ls 
-            ON ls.appid = latest.appid 
+            JOIN live_scores ls
+            ON ls.appid = latest.appid
             AND ls.scored_at = latest.latest
             LEFT JOIN games_v2 g ON g.appid = ls.appid
             {where}
@@ -176,7 +176,7 @@ def list_games(
     """
 
     row = db.execute(query, params + [limit, offset]).fetchone()
-    
+
     total = row[0] or 0
     items_json = json.loads(row[1] or "[]")
 
@@ -230,16 +230,16 @@ def get_game_score(appid: int, request: Request):
     }
 
     null_list = (
-        json.loads(row_dict["null_features"]) 
-        if isinstance(row_dict["null_features"], str) 
+        json.loads(row_dict["null_features"])
+        if isinstance(row_dict["null_features"], str)
         else (row_dict["null_features"] or []))
     data_quality = (
-        "high" if len(null_list) <= 5 
-        else "medium" 
+        "high" if len(null_list) <= 5
+        else "medium"
         if len(null_list) <= 15 else "low")
 
     return GameScore(
-        **{k: v for k, v in row_dict.items() 
+        **{k: v for k, v in row_dict.items()
            if k not in _DIMENSION_COLS and k != "null_features"},
         null_features=row_dict["null_features"],
         data_quality=data_quality,
@@ -272,7 +272,7 @@ def get_game_history(appid: int, request: Request):
         raise HTTPException(status_code=404, detail=f"Game {appid} not found.")
 
     name_row = db.execute(
-        "SELECT name FROM games_v2 WHERE appid = ?", 
+        "SELECT name FROM games_v2 WHERE appid = ?",
         (appid,)
         ).fetchone()
 
@@ -286,7 +286,7 @@ def get_game_history(appid: int, request: Request):
             "days_since_last_build_update": r[12],
         }
         snapshots.append(ScoreSnapshot(
-            **{k: v for k, v in row_dict.items() 
+            **{k: v for k, v in row_dict.items()
                if k not in _DIMENSION_COLS and k != "null_features"},
             null_features=row_dict["null_features"],
             dimensions=_build_dimensions(row_dict),
@@ -318,11 +318,11 @@ def get_game_features(appid: int, request: Request):
     """, (appid,)).fetchone()
 
     if not row:
-        raise HTTPException(status_code=404, 
+        raise HTTPException(status_code=404,
                             detail=f"No live snapshot found for game {appid}.")
 
     name_row = db.execute(
-        "SELECT name FROM games_v2 WHERE appid = ?", 
+        "SELECT name FROM games_v2 WHERE appid = ?",
         (appid,)
         ).fetchone()
 
@@ -333,7 +333,7 @@ def get_game_features(appid: int, request: Request):
         ea_age_days=row[1],
         primary_genre=row[2],
         review_count_at_T=row[3],
-        features="{}",          
+        features="{}",
         shap_values=row[4],     # parsed by field_validator
     )
 
@@ -403,7 +403,7 @@ def get_game_analysis(appid: int, request: Request):
 
     l1_state = score_row[0]
     name_row = db.execute(
-        "SELECT name FROM games_v2 WHERE appid = ?", 
+        "SELECT name FROM games_v2 WHERE appid = ?",
         (appid,)
         ).fetchone()
 

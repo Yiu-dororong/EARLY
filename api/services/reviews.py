@@ -65,7 +65,7 @@ def _fetch_raw_reviews(
         data = resp.json()
         return data.get("reviews", [])
     except Exception as e:
-        logger.warning("Steam review fetch failed appid=%d filter=%s: %s", 
+        logger.warning("Steam review fetch failed appid=%d filter=%s: %s",
                        appid, filter_type, e)
         return []
 
@@ -228,16 +228,16 @@ def fetch_reviews_for_auditor(
     # Recent pool: Steam's "recent" filter is last 30d by default for
     # day_range purposes, but returns reviews sorted by date regardless.
     # Fetch a larger pool and let scoring + day-window filtering handle it.
-    recent_raw = _fetch_raw_reviews(appid, 
-                                    filter_type="all", 
-                                    day_range=90, 
+    recent_raw = _fetch_raw_reviews(appid,
+                                    filter_type="all",
+                                    day_range=90,
                                     num_per_page=100)
 
     # Helpful pool: sorted by helpfulness, no day_range — gives us older
     # high-signal reviews that "recent" would miss.
-    helpful_raw = _fetch_raw_reviews(appid, 
-                                     filter_type="all", 
-                                     day_range=None, 
+    helpful_raw = _fetch_raw_reviews(appid,
+                                     filter_type="all",
+                                     day_range=None,
                                      num_per_page=100)
 
     # Partition by age
@@ -258,7 +258,7 @@ def fetch_reviews_for_auditor(
     logger.info(
         "appid=%d reviews: %d recent (from %d candidates), "
         "%d older (from %d candidates)",
-        appid, len(recent_reviews), len(recent_pool), 
+        appid, len(recent_reviews), len(recent_pool),
         len(older_reviews), len(older_pool),
     )
 

@@ -73,7 +73,7 @@ def find_similar_games(request: Request, appid: int, n_results: int = 5):
     try:
         shap_dict: dict[str, float | None] = json.loads(shap_json_str)
     except (json.JSONDecodeError, TypeError):
-        raise HTTPException(status_code=500, 
+        raise HTTPException(status_code=500,
                             detail="Malformed SHAP JSON in live_snapshots.")
 
     # Load canonical feature order from model artifact to guarantee dimension alignment

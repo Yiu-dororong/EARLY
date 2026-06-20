@@ -144,7 +144,7 @@ class GameFeatures(BaseModel):
     primary_genre:     str | None
     review_count_at_T: int | None
     features:          dict[str, float | int | str | None]
-    shap_values:       dict[str, float] | None   
+    shap_values:       dict[str, float] | None
 
     @field_validator("features", mode="before")
     @classmethod

@@ -139,21 +139,21 @@ def _fetch_announcements(
     """
     Fetch recent announcements for the Forensic Agent and compute
     days_since_last_build_update.
- 
+
     Args:
         db:       libsql connection
         appid:    Steam appid
         snap_ts:  Unix timestamp of the scoring snapshot (used as "now")
- 
+
     Returns:
         (announcements, days_since_last_build_update)
- 
+
         announcements:
             List of AnnouncementEvent, all event types, within
             LOOKBACK_DAYS of snap_ts, sorted most recent first.
             The orchestrator's _select_announcements() will trim this to
             the last 3 within the 60-day forensic window.
- 
+
         days_since_last_build_update:
             Days between snap_ts and the most recent type-12/13/14 event.
             9999 if no build-type event exists in the DB for this game.
@@ -162,7 +162,7 @@ def _fetch_announcements(
     """
     snapshot_date = datetime.fromtimestamp(snap_ts, tz=timezone.utc).date()
     cutoff_ts     = snap_ts - (LOOKBACK_DAYS * 86400)
- 
+
     # ── Query 1: recent announcements (all types, within fetch window) ──────
     rows = db.execute("""
         SELECT event_type, event_name, announcement_body, word_count, event_ts
@@ -172,7 +172,7 @@ def _fetch_announcements(
         ORDER BY event_ts DESC
         LIMIT 20
     """, (appid, cutoff_ts)).fetchall()
- 
+
     announcements = []
     for r in rows:
         try:
@@ -186,7 +186,7 @@ def _fetch_announcements(
             ))
         except (ValueError, TypeError, OSError):
             continue
- 
+
     # ── Query 2: days since last build-type event (no date limit) ───────────
     # Separate query so we get the correct staleness even when the most
     # recent build event is older than _ANNOUNCEMENT_FETCH_DAYS.
@@ -198,17 +198,17 @@ def _fetch_announcements(
         ORDER BY event_ts DESC
         LIMIT 1
     """, (appid,)).fetchone()
- 
+
     if build_row and build_row[0]:
         try:
-            last_build_date = datetime.fromtimestamp(build_row[0], 
+            last_build_date = datetime.fromtimestamp(build_row[0],
                                                      tz=timezone.utc).date()
             days_since_last_build_update = (snapshot_date - last_build_date).days
         except (ValueError, TypeError, OSError):
             days_since_last_build_update = _NO_BUILD_SENTINEL
     else:
         days_since_last_build_update = _NO_BUILD_SENTINEL
- 
+
     return announcements, days_since_last_build_update
 
 
@@ -243,19 +243,19 @@ def _persist_result(
     db.execute("""
         INSERT OR REPLACE INTO agent_analysis (
             appid, snapshot_date, analysed_at, trigger_reason, l1_state_at_analysis,
-            forensic_ran, update_substance_score, fake_heartbeat_flag, momentum, 
+            forensic_ran, update_substance_score, fake_heartbeat_flag, momentum,
             event_state_mismatch, forensic_reasoning,
-            auditor_ran, sentiment_shift, sentiment_alignment, key_concerns, 
+            auditor_ran, sentiment_shift, sentiment_alignment, key_concerns,
             theme_clusters, auditor_summary,
-            signal_alignment, critic_ran, consumer_verdict, developer_brief, 
+            signal_alignment, critic_ran, consumer_verdict, developer_brief,
             confidence_note, error
         ) VALUES (
             ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, 
+            ?, ?, ?, ?,
             ?, ?,
-            ?, ?, ?, ?, 
+            ?, ?, ?, ?,
             ?, ?,
-            ?, ?, ?, ?, 
+            ?, ?, ?, ?,
             ?, ?
         )
     """, (
@@ -275,9 +275,9 @@ def _persist_result(
         int(result.auditor_ran),
         auditor.sentiment_shift if auditor else None,
         auditor.sentiment_alignment if auditor else None,
-        (json.dumps(auditor.key_concerns) 
+        (json.dumps(auditor.key_concerns)
          if auditor and auditor.key_concerns else None),
-        (json.dumps(auditor.theme_clusters) 
+        (json.dumps(auditor.theme_clusters)
          if auditor and auditor.theme_clusters else None),
         auditor.auditor_summary if auditor else None,
         # Critic
@@ -287,8 +287,8 @@ def _persist_result(
         critic.developer_brief if critic else None,
         critic.confidence_note if critic else None,
         # Error
-        ((forensic.error if forensic else None) 
-         or (auditor.error if auditor else None) 
+        ((forensic.error if forensic else None)
+         or (auditor.error if auditor else None)
          or (critic.error if critic else None)),
     ))
     db.commit()
@@ -313,7 +313,7 @@ def trigger_analysis(db: libsql.Connection, appid: int, force: bool = False) -> 
 
         l1_state = score["l1_state"]
         if not is_analysis_eligible(l1_state):
-            return {"status": "not_eligible", 
+            return {"status": "not_eligible",
                     "message": f"l1_state={l1_state} does not require analysis"}
 
         existing = _fetch_existing_analysis(db, appid)
@@ -326,12 +326,12 @@ def trigger_analysis(db: libsql.Connection, appid: int, force: bool = False) -> 
 
         meta        = _fetch_game_meta(db, appid)
         snap_ts     = score["scored_at"]
-        snap_date   = score.get("snapshot_date") or datetime.fromtimestamp(snap_ts, 
+        snap_date   = score.get("snapshot_date") or datetime.fromtimestamp(snap_ts,
                                                                            tz=timezone.utc).strftime("%Y-%m-%d")
         announcements, days_since_last_build = _fetch_announcements(db, appid, snap_ts)
         recent_reviews, older_reviews = fetch_reviews_for_auditor(
         appid,
-        n_recent=MAX_REVIEWS_PER_WINDOW,   # existing constant, default 50 
+        n_recent=MAX_REVIEWS_PER_WINDOW,   # existing constant, default 50
         n_older=MAX_REVIEWS_PER_WINDOW,
         )
 
@@ -358,7 +358,7 @@ def trigger_analysis(db: libsql.Connection, appid: int, force: bool = False) -> 
             days_since_last_build_update=days_since_last_build,
             recent_reviews=recent_reviews,
             older_reviews=older_reviews,
-            review_score_at_T=0.0,   # not stored in live_scores; auditor handles 
+            review_score_at_T=0.0,   # not stored in live_scores; auditor handles
             review_score_last_90d=None,
             review_count_at_T=score.get("review_count_at_T") or 0,
             session_id=f"analysis-{appid}-{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"

@@ -145,19 +145,19 @@ def _context(state: CriticState) -> str:
 def _get_llm() -> ChatGroq:
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        raise EnvironmentError("GROQ_API_KEY not set")
+        raise OSError("GROQ_API_KEY not set")
     return ChatGroq(model=MODEL_NAME, temperature=0.3, max_tokens=512, api_key=api_key)
 
 
 def _llm_call(
-        system: str, 
-        prompt: str, 
+        system: str,
+        prompt: str,
         config: RunnableConfig
         ) -> tuple[str | None, str | None]:
     llm = _get_llm()
     try:
-        response: AIMessage = llm.invoke([SystemMessage(content=system), 
-                                          HumanMessage(content=prompt)], 
+        response: AIMessage = llm.invoke([SystemMessage(content=system),
+                                          HumanMessage(content=prompt)],
                                           config=config)
         return response.content.strip(), None
     except Exception as e:
@@ -267,7 +267,7 @@ def run_critic_agent(
         "is_distressed": is_distressed, "ml_eligible": ml_eligible,
         "forensic_ran": forensic_ran, "update_substance_score": update_substance_score,
         "fake_heartbeat_flag": fake_heartbeat_flag, "momentum": momentum,
-        "event_state_mismatch": event_state_mismatch, 
+        "event_state_mismatch": event_state_mismatch,
         "forensic_reasoning": forensic_reasoning,
         "auditor_ran": auditor_ran, "theme_clusters": theme_clusters,
         "sentiment_shift": sentiment_shift, "sentiment_alignment": sentiment_alignment,

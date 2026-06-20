@@ -88,7 +88,7 @@ Produce:
      "theme": str, "valence": "positive"|"negative"|"mixed",
      "frequency": "high"|"medium"|"low",
      "representative_quote": "<verbatim fragment under 60 chars or null>",
-     "quote_translation": "<English translation 
+     "quote_translation": "<English translation
                             if the quote is not in English, else null>"
    }]
 2. sentiment_shift: "improving"|"declining"|"stable"|"mixed"|"insufficient_data"
@@ -106,25 +106,25 @@ Produce:
    reviews say) — this is the most important thing to surface.
 
 RULES:
-- representative_quote must come verbatim from provided reviews 
+- representative_quote must come verbatim from provided reviews
   (under 60 chars) or be null.
-- If representative_quote is NOT in English, you MUST provide an English translation 
+- If representative_quote is NOT in English, you MUST provide an English translation
   in quote_translation.
-- IMPORTANT: Carefully escape any double quotes inside your quote to maintain 
+- IMPORTANT: Carefully escape any double quotes inside your quote to maintain
   valid JSON.
 
 # Quantifier & Scale Rules
-You must strictly assess data density (the total count of reviews provided) before 
+You must strictly assess data density (the total count of reviews provided) before
   summarizing player sentiment:
-1. If ONLY 1-5 reviews are available, you have an insufficient sample size. You are 
-  forbidden from using macro-generalizations like "overwhelmingly positive," 
+1. If ONLY 1-5 reviews are available, you have an insufficient sample size. You are
+  forbidden from using macro-generalizations like "overwhelmingly positive,"
   "widespread consensus," or "the community agrees."
-2. Instead, frame your summary around the lack of data. 
-  Use exact, restricted qualifiers like: 
+2. Instead, frame your summary around the lack of data.
+  Use exact, restricted qualifiers like:
    - "Based on a single isolated user report..."
    - "Initial limited feedback shows..."
-3. Explicitly state that the current metrics cannot be debunked or verified by review 
-  trends due to the near-absence of recent qualitative data. Set sentiment_shift and 
+3. Explicitly state that the current metrics cannot be debunked or verified by review
+  trends due to the near-absence of recent qualitative data. Set sentiment_shift and
   sentiment_alignment to "insufficient_data".
 
 OUTPUT FORMAT — JSON only, no markdown fences:
@@ -136,7 +136,7 @@ OUTPUT FORMAT — JSON only, no markdown fences:
 # Critic Agent
 # ---------------------------------------------------------------------------
 
-CRITIC_CONSUMER_SYSTEM = """You are writing a risk assessment for a Steam player 
+CRITIC_CONSUMER_SYSTEM = """You are writing a risk assessment for a Steam player
 considering buying or continuing to play an Early Access game.
 
 You will be told a "signal alignment" verdict:
@@ -147,13 +147,13 @@ You will be told a "signal alignment" verdict:
                    player needs to know, more important than any single score.
   - "partial"    — some signals weren't available. Be appropriately tentative.
 
-Avoid using soft guessing phrases ("I'd be cautious", "seems to", 
-"while it's possible"). Speak strictly about the presence or absence 
-of data using descriptive, objective phrasing: "The data shows a contradiction," 
+Avoid using soft guessing phrases ("I'd be cautious", "seems to",
+"while it's possible"). Speak strictly about the presence or absence
+of data using descriptive, objective phrasing: "The data shows a contradiction,"
 "Records confirm a gap," or "Available platform history is insufficient to evaluate."
 
-If a fake heartbeat or event_content_mismatch was detected, mention it in plain 
-language — something like "an update announcement that turned out to contain 
+If a fake heartbeat or event_content_mismatch was detected, mention it in plain
+language — something like "an update announcement that turned out to contain
 no real development substance."
 
 Direct, honest, non-alarmist. 2-4 sentences max. Do NOT mention model scores,
@@ -172,9 +172,9 @@ You will be told a "signal alignment" verdict:
                    reverse) and suggest what might explain the gap.
   - "partial"    — some signals unavailable, note what's missing.
 
-Avoid using soft guessing phrases ("suggests a discrepancy", "it appears", "may be"). 
-Speak strictly about the presence or absence of data using descriptive, objective 
-phrasing: "Our tracking shows a discrepancy," "The data indicates," or "Available 
+Avoid using soft guessing phrases ("suggests a discrepancy", "it appears", "may be").
+Speak strictly about the presence or absence of data using descriptive, objective
+phrasing: "Our tracking shows a discrepancy," "The data indicates," or "Available
 platform history is currently insufficient to baseline."
 
 Respectful, specific, action-oriented. 3-5 sentences. End with one concrete

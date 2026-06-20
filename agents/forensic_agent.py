@@ -14,7 +14,7 @@ Analyzes the last 3 announcements within 180 days of snapshot to produce:
 Triangulation note:
   Steam event types (12/13/14) are announcement categories, not proof a
   build shipped. A game can post "Major Update" announcements with zero
-  development content. event_state_mismatch=1 flags exactly 
+  development content. event_state_mismatch=1 flags exactly
   this — the ML model sees "recent event → looks active",
   but the actual content says otherwise. This is the signal the Critic
   Agent uses to override or soften the ML-derived l1_state.
@@ -47,8 +47,8 @@ MODEL_NAME = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 def _event_label(event_type: int) -> str:
     return {
-        12: "Minor build update", 
-        13: "Regular update", 
+        12: "Minor build update",
+        13: "Regular update",
         14: "Major update",
         28: "News/Announcement"
     }.get(event_type, f"Unknown type {event_type}")
@@ -90,7 +90,7 @@ def _build_user_prompt(state: ForensicState) -> str:
 def _get_llm() -> ChatGroq:
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        raise EnvironmentError("GROQ_API_KEY not set")
+        raise OSError("GROQ_API_KEY not set")
     return ChatGroq(model=MODEL_NAME, temperature=0.0, max_tokens=350, api_key=api_key)
 
 
@@ -130,7 +130,7 @@ def assess_updates(state: ForensicState, config: RunnableConfig) -> dict:
 
     llm    = _get_llm().with_structured_output(ForensicOutputModel, method="json_mode")
     prompt = _build_user_prompt(state)
-    messages_in = [SystemMessage(content=FORENSIC_SYSTEM_PROMPT), 
+    messages_in = [SystemMessage(content=FORENSIC_SYSTEM_PROMPT),
                    HumanMessage(content=prompt)]
 
     try:
@@ -140,9 +140,9 @@ def assess_updates(state: ForensicState, config: RunnableConfig) -> dict:
 
         score = max(0.0, min(10.0, float(parsed.update_substance_score)))
         momentum = parsed.momentum
-        if momentum not in ("consistent_progress", 
-                            "single_update", 
-                            "declining", 
+        if momentum not in ("consistent_progress",
+                            "single_update",
+                            "declining",
                             "hollow_pattern"):
             momentum = "single_update"
 
@@ -156,7 +156,7 @@ def assess_updates(state: ForensicState, config: RunnableConfig) -> dict:
         }
 
     except Exception as e:
-        return {"update_substance_score": None, "fake_heartbeat_flag": None, 
+        return {"update_substance_score": None, "fake_heartbeat_flag": None,
                 "momentum": None, "event_state_mismatch": None, "reasoning": None,
                 "error_msg": f"LLM call failed: {type(e).__name__}: {e}"}
 
@@ -169,9 +169,9 @@ def validate_output(state: ForensicState) -> dict:
     most_recent = state["announcements"][0] if state.get("announcements") else None
 
     # Secondary heuristic: very low score + very short most-recent post → force flag
-    if (most_recent 
-        and score is not None 
-        and score < 4.0 
+    if (most_recent
+        and score is not None
+        and score < 4.0
         and most_recent["word_count"] < 20
         ):
         flag = 1

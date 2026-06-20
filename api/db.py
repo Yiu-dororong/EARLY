@@ -12,8 +12,8 @@ Tables:
     live_scores       — pre-computed weekly scores (serving layer)
     live_snapshots    — latest feature vector per game (overwritten weekly)
     agent_analysis    — cached LangGraph agent output (on-demand, user-triggered)
-    review_history    — historical review buckets (owned by collect pipeline, 
-                                                                read-only here)
+    review_history    — historical review buckets
+                        (owned by collect pipeline, read-only here)
 """
 
 import logging
@@ -91,16 +91,16 @@ CREATE TABLE IF NOT EXISTS agent_analysis (
     appid                   INTEGER PRIMARY KEY,
 
     -- YYYY-MM-DD of the live_scores row used
-    snapshot_date           TEXT    NOT NULL,   
+    snapshot_date           TEXT    NOT NULL,
 
     -- Unix ts of agent run
-    analysed_at             INTEGER NOT NULL,   
+    analysed_at             INTEGER NOT NULL,
 
     -- "user_request" | "state_change" | "stale"
-    trigger_reason          TEXT    NOT NULL,   
+    trigger_reason          TEXT    NOT NULL,
 
     -- l1_state when analysis ran (staleness check)
-    l1_state_at_analysis    TEXT,               
+    l1_state_at_analysis    TEXT,
 
     -- Forensic Agent
     forensic_ran            INTEGER NOT NULL DEFAULT 0,
@@ -159,7 +159,7 @@ ALL_TABLES = [
 
 async def init_db() -> None:
     global _conn
-    
+
     use_local = os.getenv("USE_LOCAL_DB", "false").lower() == "true"
     if use_local:
         db_path = "./demo_data/early_sample.db"
@@ -192,7 +192,7 @@ class ResilientDB:
             except Exception as e:
                 if attempt == 3:
                     raise
-                logger.warning("DB execute error (attempt %d): %s — reconnecting", 
+                logger.warning("DB execute error (attempt %d): %s — reconnecting",
                                attempt, e)
                 self._reconnect()
 

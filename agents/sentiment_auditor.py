@@ -1,6 +1,6 @@
 """
 agents/sentiment_auditor.py
-EARLY — Sentiment Auditor 
+EARLY — Sentiment Auditor
 
 Clusters recent Steam reviews into thematic signals.
 Only runs when ml_eligible = True.
@@ -74,7 +74,7 @@ Return JSON only."""
 def _get_llm() -> ChatGroq:
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        raise EnvironmentError("GROQ_API_KEY not set")
+        raise OSError("GROQ_API_KEY not set")
     return ChatGroq(model=MODEL_NAME, temperature=0.0, max_tokens=1024, api_key=api_key)
 
 
@@ -84,7 +84,7 @@ def check_eligibility(state: SentimentState) -> dict:
         return {
             "theme_clusters": [], "sentiment_shift": "insufficient_data",
             "sentiment_alignment": "insufficient_data",
-            "key_concerns": [], "auditor_summary": "No reviews available.", 
+            "key_concerns": [], "auditor_summary": "No reviews available.",
             "error_msg": None,
         }
     return {}
@@ -97,7 +97,7 @@ def should_skip(state: SentimentState) -> str:
 def analyse_sentiment(state: SentimentState, config: RunnableConfig) -> dict:
     llm    = _get_llm().with_structured_output(SentimentOutputModel, method="json_mode")
     prompt = _build_prompt(state)
-    msgs   = [SystemMessage(content=AUDITOR_SYSTEM_PROMPT), 
+    msgs   = [SystemMessage(content=AUDITOR_SYSTEM_PROMPT),
               HumanMessage(content=prompt)]
 
     try:
@@ -110,7 +110,7 @@ def analyse_sentiment(state: SentimentState, config: RunnableConfig) -> dict:
             alignment = "insufficient_data"
 
         # Safely extract dicts for the graph state (handles Pydantic v1 vs v2)
-        clusters = [c.model_dump() if hasattr(c, 'model_dump') else c.dict() 
+        clusters = [c.model_dump() if hasattr(c, 'model_dump') else c.dict()
                     for c in parsed.theme_clusters]
 
         return {
@@ -123,7 +123,7 @@ def analyse_sentiment(state: SentimentState, config: RunnableConfig) -> dict:
         }
 
     except Exception as e:
-        return {"theme_clusters": None, "sentiment_shift": None, 
+        return {"theme_clusters": None, "sentiment_shift": None,
                 "sentiment_alignment": None,
                 "key_concerns": None, "auditor_summary": None,
                 "error_msg": f"LLM call failed: {type(e).__name__}: {e}"}
@@ -134,7 +134,7 @@ def _build_graph() -> StateGraph:
     g.add_node("check_eligibility", check_eligibility)
     g.add_node("analyse_sentiment", analyse_sentiment)
     g.set_entry_point("check_eligibility")
-    g.add_conditional_edges("check_eligibility", should_skip, 
+    g.add_conditional_edges("check_eligibility", should_skip,
                             {"end": END, "analyse": "analyse_sentiment"})
     g.add_edge("analyse_sentiment", END)
     return g

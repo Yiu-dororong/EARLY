@@ -28,7 +28,7 @@ class ForensicState(TypedDict):
     snapshot_date: str
     ea_age_days: int
     days_since_last_build_update: int
-    announcements: list[AnnouncementInput]   
+    announcements: list[AnnouncementInput]
     update_substance_score: float | None
     fake_heartbeat_flag: int | None
     momentum: str | None
@@ -59,10 +59,10 @@ class SentimentState(TypedDict):
     review_count_at_T: int
     recent_reviews: list[dict]
     older_reviews: list[dict]
-    l1_state: str | None              
+    l1_state: str | None
     theme_clusters: list[dict] | None
     sentiment_shift: str | None
-    sentiment_alignment: str | None   
+    sentiment_alignment: str | None
     key_concerns: list[str] | None
     auditor_summary: str | None
     error_msg: str | None
