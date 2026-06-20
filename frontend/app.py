@@ -82,7 +82,7 @@ def _get_scorecard_stats():
         if files:
             files.sort(reverse=True)
             try:
-                with open(files[0], "r") as f:
+                with open(files[0]) as f:
                     SCORECARD_STATS = json.load(f)
             except Exception:
                 pass
@@ -92,14 +92,14 @@ def _map_dimension_score(dim_key: str, raw_value: float | None) -> float | None:
     if raw_value is None:
         return None
     stats = _get_scorecard_stats()
-    if (not stats 
-        or "dimension_stats" not in stats 
+    if (not stats
+        or "dimension_stats" not in stats
         or dim_key not in stats["dimension_stats"]):
         return raw_value  # fallback
-    
+
     dim_data = stats["dimension_stats"][dim_key]
     p25, p50, p75 = dim_data["p25"], dim_data["p50"], dim_data["p75"]
-    
+
     val = np.clip(raw_value, 0.0, 1.0)
     if val <= p25:
         mapped = np.interp(val, [0.0, p25], [0, 25])
@@ -109,7 +109,7 @@ def _map_dimension_score(dim_key: str, raw_value: float | None) -> float | None:
         mapped = np.interp(val, [p50, p75], [50, 75])
     else:
         mapped = np.interp(val, [p75, 1.0], [75, 100])
-        
+
     return float(mapped / 100.0)
 
 DIMENSION_LABELS = {
@@ -146,7 +146,7 @@ def _history_chart(snapshots: list[dict]) -> go.Figure:
     """Distress probability over time with threshold line."""
     dates = []
     for s in snapshots:
-        dt = _resolve_date_obj(s.get("snap_date") or s.get("snapshot_date"), 
+        dt = _resolve_date_obj(s.get("snap_date") or s.get("snapshot_date"),
                                s.get("scored_at"))
         dates.append(dt.strftime("%Y-%m-%d") if dt else "—")
     values = [s.get("p_distressed") for s in snapshots]
@@ -204,10 +204,10 @@ def _get_cached_health():
 
 
 @st.cache_data(ttl=600)
-def _get_cached_games(state_filter: str, 
-                      min_reviews: int, 
-                      max_days_since_build: int, 
-                      search_name: str, 
+def _get_cached_games(state_filter: str,
+                      min_reviews: int,
+                      max_days_since_build: int,
+                      search_name: str,
                       limit: int):
     kwargs: dict = {}
     if state_filter != "All":
@@ -238,7 +238,7 @@ def _build_dataframe(items: list[dict]):
             "Days Since Build": g.get("days_since_last_build_update"),
             "Reviews":      g.get("review_count_at_T") or 0,
             "Scored":       _resolve_date_obj(
-                            g.get("snap_date") or g.get("snapshot_date"), 
+                            g.get("snap_date") or g.get("snapshot_date"),
                             g.get("scored_at")),
         })
     return pd.DataFrame(rows)
@@ -259,22 +259,22 @@ def render_browse():
         st.divider()
 
         st.markdown("**Filters**")
-        state_filter    = st.selectbox("State", ["All", "Healthy", "Watch", "At Risk"], 
+        state_filter    = st.selectbox("State", ["All", "Healthy", "Watch", "At Risk"],
                                        on_change=_reset_limit)
-        min_reviews     = st.number_input("Min Reviews", 
-                                          min_value=0, value=0, step=10, 
+        min_reviews     = st.number_input("Min Reviews",
+                                          min_value=0, value=0, step=10,
                                           on_change=_reset_limit)
-        max_days_since_build = st.number_input("Max Days Since Build", 
-                                               min_value=0, value=0, step=30, 
-                                               help="0 to ignore", 
+        max_days_since_build = st.number_input("Max Days Since Build",
+                                               min_value=0, value=0, step=30,
+                                               help="0 to ignore",
                                                on_change=_reset_limit)
-        search_name     = st.text_input("Search by name", 
-                                        placeholder="e.g. Nightingale", 
+        search_name     = st.text_input("Search by name",
+                                        placeholder="e.g. Nightingale",
                                         on_change=_reset_limit)
 
     # Fetch games
     data = _get_cached_games(
-        state_filter, min_reviews, max_days_since_build, 
+        state_filter, min_reviews, max_days_since_build,
         search_name, st.session_state.browse_limit
     )
 
@@ -357,7 +357,7 @@ def render_browse():
     if health:
         status = health.get("status", "unknown")
         color  = "#238636" if status == "ok" else "#da3633"
-        last_scored_date = (health.get("snapshot_date") 
+        last_scored_date = (health.get("snapshot_date")
                             or _ts_to_date(health.get("last_scored_at")))
         st.markdown(
             f'<span style="color:{color};font-size:0.8em;">● '
@@ -390,11 +390,11 @@ def render_browse():
         on_select="rerun",
         selection_mode="single-row",
         column_config={
-            "Days Since Build": st.column_config.NumberColumn("Days Since Build", 
+            "Days Since Build": st.column_config.NumberColumn("Days Since Build",
                                                               format="%d"),
-            "State": st.column_config.TextColumn("State", 
+            "State": st.column_config.TextColumn("State",
                                                  width="small"),
-            "Scored": st.column_config.DateColumn("Scored", 
+            "Scored": st.column_config.DateColumn("Scored",
                                                   format="YYYY-MM-DD"),
         },
     )
@@ -421,7 +421,7 @@ def render_game_header(score: dict):
     name    = score.get("name") or f"appid {score['appid']}"
     state   = score.get("l1_state")
     ea_age  = score.get("ea_age_days") or 0
-    scored_dt = _resolve_date_obj(score.get("snap_date") or score.get("snapshot_date"), 
+    scored_dt = _resolve_date_obj(score.get("snap_date") or score.get("snapshot_date"),
                                   score.get("scored_at"))
     scored  = scored_dt.strftime("%Y-%m-%d") if scored_dt else "—"
     quality = score.get("data_quality", "medium")
@@ -449,13 +449,13 @@ def render_game_header(score: dict):
 
     btn1, btn2, btn3, _ = st.columns([1.5, 1.5, 2.5, 4])
     with btn1:
-        st.link_button("Steam Storefront", f"https://store.steampowered.com/app/{appid}", 
+        st.link_button("Steam Storefront", f"https://store.steampowered.com/app/{appid}",
                        use_container_width=True)
     with btn2:
-        st.link_button("Steam Community", f"https://steamcommunity.com/app/{appid}", 
+        st.link_button("Steam Community", f"https://steamcommunity.com/app/{appid}",
                        use_container_width=True)
     with btn3:
-        st.link_button("SteamDB (Third-party)", f"https://steamdb.info/app/{appid}", 
+        st.link_button("SteamDB (Third-party)", f"https://steamdb.info/app/{appid}",
                        use_container_width=True)
     st.markdown("")
     _render_how_to_read()
@@ -470,7 +470,7 @@ def render_player_tab(score: dict, history: dict | None):
     rev     = score.get("review_count_at_T") or 0
     quality = score.get("data_quality", "medium")
     dims    = score.get("dimensions") or {}
-    
+
     # Key metrics
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -489,7 +489,7 @@ def render_player_tab(score: dict, history: dict | None):
     st.markdown("")
 
     # Dimension signal meters
-    st.markdown("**Health Dimensions**", 
+    st.markdown("**Health Dimensions**",
                 help="Percentages are relative to historical training data.")
     bars_html = "".join(
         ui.signal_bar(label, _map_dimension_score(key, dims.get(key)))
@@ -509,7 +509,7 @@ def render_player_tab(score: dict, history: dict | None):
     st.divider()
     _render_analysis_section(score, audience="player")
     st.markdown("<br><br>", unsafe_allow_html=True)
-    
+
 
 # ---------------------------------------------------------------------------
 # Developer tab
@@ -535,14 +535,14 @@ def render_developer_tab(score: dict):
         st.markdown("**Model Output**")
         val = f"{p_dist:.1%}" if p_dist is not None else "N/A"
         st.metric("P(distressed)", val)
-        
+
         state_help = None
         stats = _get_scorecard_stats()
         if stats and "state_agreement" in stats and state in stats["state_agreement"]:
             sa = stats["state_agreement"][state]
             state_help = (f"Historically, {sa['agreement_rate']:.1%} of games "
             f"in this state ended up as {sa['expected_outcome']}.")
-            
+
         st.metric("State", state or "—", help=state_help)
         st.metric("Model", score.get("model_version") or "—")
 
@@ -822,42 +822,42 @@ def _render_how_to_read():
         EARLY classifies games into three risk tiers based on a **weighted
         scorecard** across five health dimensions:
 
-        - **🟢 Healthy** Strong momentum across most dimensions.  
+        - **🟢 Healthy** Strong momentum across most dimensions.
           **Historical outcome**: High likelihood of a successful 1.0 full
-          launch.  
+          launch.
 
         - **🟡 Watch** Mixed or weakening signals. Worth monitoring. Acts as a
-          transitional boundary.  
+          transitional boundary.
           **Historical outcome**: Unstable middle tier—some games stabilize
-          and launch, while others degrade further.  
+          and launch, while others degrade further.
 
-        - **🔴 At Risk** Clear signs of stagnation or structural decline.  
+        - **🔴 At Risk** Clear signs of stagnation or structural decline.
           **Historical outcome**: High probability of developer abandonment
-          or permanent radio silence.  
+          or permanent radio silence.
         """
         )
 
         st.markdown("""
         ### Distress Probability (Layer 2 Machine Learning)
 
-        This is our **machine learning model's** estimated probability 
+        This is our **machine learning model's** estimated probability
         (0–100%) that a game is on a distressed or failing trajectory.
 
         - **&lt; 45%** → Generally healthy footprint
         - **45–65%** → Gray zone / Watch territory
         - **&gt; 65%** → Elevated risk / High operational distress
 
-        The ML model evaluates the whole ecosystem simultaneously, meaning it 
+        The ML model evaluates the whole ecosystem simultaneously, meaning it
         often catches subtle, compounding warning signs that simple checkboxes miss.
-                    
-        Please note that the probability **does not refer to an instantaneous 
-        risk of abandonment**, but rather the overall likelihood that the game 
-        will fail to reach a successful full release based on 
+
+        Please note that the probability **does not refer to an instantaneous
+        risk of abandonment**, but rather the overall likelihood that the game
+        will fail to reach a successful full release based on
         its current trajectory and historical patterns.
         """)
 
         st.markdown(
-            (
+
                 "### Dimension Scores (0–100 Rating)\n\n"
                 "To ensure fairness, these 5 key indicators are **normalized "
                 "against our entire historical training database**. A score of "
@@ -879,35 +879,35 @@ def _render_how_to_read():
                 "context | Long-term commercial viability |\n\n"
                 "Each dimension factors in a **backbone** (long-term history) "
                 "and a **momentum** (recent change) component."
-            )
+
         )
 
         st.markdown("""
         ### Data Quality & Missing Features
 
-        Stalled projects often stop generating clean signals, 
-        which can cause data gaps (null values) in our trackers. 
-        
-        If a game has a high number of missing features, 
-        treat its predictive scores with extra caution. 
-        A sudden drop in data density is frequently 
+        Stalled projects often stop generating clean signals,
+        which can cause data gaps (null values) in our trackers.
+
+        If a game has a high number of missing features,
+        treat its predictive scores with extra caution.
+        A sudden drop in data density is frequently
         an early indicator that a project's operational wheels have stopped turning.
         """)
 
     with st.expander("🧠 AI Analysis & Similar Games"):
         st.markdown("""
-        **For complex or borderline games**, 
+        **For complex or borderline games**,
         you can trigger an **on-demand AI Deep Analysis**:
 
-        - **Forensic Agent**: Evaluates the technical substance of 
+        - **Forensic Agent**: Evaluates the technical substance of
         recent patches against actual code deployment gaps.
-        - **Sentiment Auditor**: Reads between the lines of text reviews 
+        - **Sentiment Auditor**: Reads between the lines of text reviews
         to surface core player complaints.
         - **Critic Agent**: Synthesizes the data into a clear, unified verdict.
 
-        **Lookalike Projects (Similarity Search):** Instantly scans 
-        our historical database to find past games with the exact same data footprint. 
-        This allows you to see how previous projects 
+        **Lookalike Projects (Similarity Search):** Instantly scans
+        our historical database to find past games with the exact same data footprint.
+        This allows you to see how previous projects
         with identical patterns ultimately turned out.
         """)
 
@@ -958,10 +958,10 @@ tab1, tab2, tab3 = st.tabs(["Overview", "Technical Details", "Performance"])
 
 with tab1:
     st.markdown("""
-    **EARLY** is a solo-built hybrid ML system designed to give 
+    **EARLY** is a solo-built hybrid ML system designed to give
     consumers and developers early warning signals about Early Access game health.
-    
-    It combines rule-based scoring with machine learning 
+
+    It combines rule-based scoring with machine learning
     and LLM agents to deliver transparent, explainable risk assessments.
     """)
 
@@ -985,7 +985,7 @@ with tab2:
         Turso (libSQL), Zilliz Cloud
         """
         )
-    
+
     with st.expander("Key Design Principles"):
         st.markdown("""
         - Developer-relative abandonment thresholds
@@ -998,18 +998,18 @@ with tab2:
 with tab3:
     st.markdown("""
     ### Current Model Performance (v1.3)
-    
+
     - **Holdout AUC-ROC**: 0.9127
     - **Holdout PR-AUC**: 0.7382
     - **Lift over Scorecard**: +0.262
     """)
-    
+
     st.info("""
     Three risk tiers:
     - **Healthy** — 98.2% success rate
-    - **Watch** — 74.9% success rate  
+    - **Watch** — 74.9% success rate
     - **At Risk** — ~48% success rate
     """)
-    
+
     st.caption("Metrics are for resolved games (2022+). "
                "Performance can vary on new titles.")

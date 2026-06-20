@@ -4,8 +4,8 @@ from langchain_groq import ChatGroq
 
 
 class DeepEvalGroqAdapter(DeepEvalBaseLLM):
-    def __init__(self, 
-                 model_name: str = "llama-3.3-70b-versatile", 
+    def __init__(self,
+                 model_name: str = "llama-3.3-70b-versatile",
                  temperature: float = 0.0):
         # 1. Instantiate the raw LangChain ChatGroq model internally
         self.chat_model = ChatGroq(

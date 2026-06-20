@@ -201,8 +201,8 @@ def state_badge(state: str | None) -> str:
 
 def data_quality_badge(quality: str | None) -> str:
     colors = {"high": "#238636", "medium": "#d29922", "low": "#da3633"}
-    labels = {"high": "High confidence", 
-              "medium": "Medium confidence", 
+    labels = {"high": "High confidence",
+              "medium": "Medium confidence",
               "low": "Low confidence"}
     color = colors.get(quality or "", "#30363d")
     label = labels.get(quality or "", "Unknown confidence")

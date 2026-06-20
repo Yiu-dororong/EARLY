@@ -106,35 +106,35 @@ CONFLICTING_REVIEWS_RECENT = [
     {"text": "Dev literally hasn't patched the inventory bug in 3 months. "
      "Unplayable now.",
      "voted_up": False},
-    {"text": "Roadmap items from 2023 still aren't in the game. Feels abandoned.", 
+    {"text": "Roadmap items from 2023 still aren't in the game. Feels abandoned.",
      "voted_up": False},
-    {"text": "No response from devs on the forum in months. Sad to see this die.", 
+    {"text": "No response from devs on the forum in months. Sad to see this die.",
      "voted_up": False},
-    {"text": "Performance has gotten worse with every patch, not better.", 
+    {"text": "Performance has gotten worse with every patch, not better.",
      "voted_up": False},
-    {"text": "Used to love this game but development clearly stopped a while ago.", 
+    {"text": "Used to love this game but development clearly stopped a while ago.",
      "voted_up": False},
 ]
 CONFLICTING_REVIEWS_OLDER = [
-    {"text": "Really promising early build, dev was super active and responsive.", 
+    {"text": "Really promising early build, dev was super active and responsive.",
      "voted_up": True},
-    {"text": "Update pace is great for a solo dev, lots of communication.", 
+    {"text": "Update pace is great for a solo dev, lots of communication.",
      "voted_up": True},
 ]
 
 # Reviews that AGREE with l1_state="Healthy" — positive, active development
 ALIGNED_REVIEWS_RECENT = [
-    {"text": "New zone added last month is stunning, dev keeps delivering.", 
+    {"text": "New zone added last month is stunning, dev keeps delivering.",
      "voted_up": True},
-    {"text": "Devs replied to my bug report within a day, great support.", 
+    {"text": "Devs replied to my bug report within a day, great support.",
      "voted_up": True},
-    {"text": "Solid foundation, updates are frequent and meaningful.", 
+    {"text": "Solid foundation, updates are frequent and meaningful.",
      "voted_up": True},
-    {"text": "Performance improved a lot since the last patch, very playable now.", 
+    {"text": "Performance improved a lot since the last patch, very playable now.",
      "voted_up": True},
 ]
 ALIGNED_REVIEWS_OLDER = [
-    {"text": "Promising early build, excited to see where this goes.", 
+    {"text": "Promising early build, excited to see where this goes.",
      "voted_up": True},
 ]
 
