@@ -1,0 +1,23 @@
+# Database & Storage
+libsql==0.1.11
+
+# Data Manipulation & Analysis
+numpy==2.2.6
+pandas==2.3.3
+
+# Machine Learning & Optimization
+scikit-learn==1.7.2
+xgboost==3.2.0
+optuna==4.9.0
+
+# Experiment Tracking, Tracing & Monitoring
+mlflow==3.13.0
+langfuse==4.7.1
+
+# Visualization
+plotly==6.8.0
+
+# HTTP & Environment Utilities
+requests==2.33.1
+urllib3==2.7.0
+python-dotenv==1.2.2
