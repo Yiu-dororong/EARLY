@@ -52,9 +52,12 @@ def _build_prompt(state: SentimentState) -> str:
     recent = state.get("recent_reviews", [])
     older  = state.get("older_reviews", [])
     l1     = state.get("l1_state") or "unknown"
+
+    score_90d = state.get("review_score_last_90d")
+    last_90d_str = f"{score_90d:.1%}" if score_90d else "N/A"
     return f"""Game: {state['game_name']} (appid {state['appid']})
 Snapshot: {state['snapshot_date']} | Reviews: {state['review_count_at_T']}
-Overall score: {state['review_score_at_T']:.1%} | Last 90d: {f"{state['review_score_last_90d']:.1%}" if state.get('review_score_last_90d') else 'N/A'}
+Overall score: {state['review_score_at_T']:.1%} | Last 90d: {last_90d_str}
 
 Current ML classification (l1_state): {l1}
 Check whether player sentiment below AGREES or CONFLICTS with "{l1}".
@@ -81,7 +84,8 @@ def check_eligibility(state: SentimentState) -> dict:
         return {
             "theme_clusters": [], "sentiment_shift": "insufficient_data",
             "sentiment_alignment": "insufficient_data",
-            "key_concerns": [], "auditor_summary": "No reviews available.", "error_msg": None,
+            "key_concerns": [], "auditor_summary": "No reviews available.", 
+            "error_msg": None,
         }
     return {}
 
@@ -93,7 +97,8 @@ def should_skip(state: SentimentState) -> str:
 def analyse_sentiment(state: SentimentState, config: RunnableConfig) -> dict:
     llm    = _get_llm().with_structured_output(SentimentOutputModel, method="json_mode")
     prompt = _build_prompt(state)
-    msgs   = [SystemMessage(content=AUDITOR_SYSTEM_PROMPT), HumanMessage(content=prompt)]
+    msgs   = [SystemMessage(content=AUDITOR_SYSTEM_PROMPT), 
+              HumanMessage(content=prompt)]
 
     try:
         parsed = llm.invoke(msgs, config=config)
@@ -105,7 +110,8 @@ def analyse_sentiment(state: SentimentState, config: RunnableConfig) -> dict:
             alignment = "insufficient_data"
 
         # Safely extract dicts for the graph state (handles Pydantic v1 vs v2)
-        clusters = [c.model_dump() if hasattr(c, 'model_dump') else c.dict() for c in parsed.theme_clusters]
+        clusters = [c.model_dump() if hasattr(c, 'model_dump') else c.dict() 
+                    for c in parsed.theme_clusters]
 
         return {
             "theme_clusters": clusters,
@@ -117,7 +123,8 @@ def analyse_sentiment(state: SentimentState, config: RunnableConfig) -> dict:
         }
 
     except Exception as e:
-        return {"theme_clusters": None, "sentiment_shift": None, "sentiment_alignment": None,
+        return {"theme_clusters": None, "sentiment_shift": None, 
+                "sentiment_alignment": None,
                 "key_concerns": None, "auditor_summary": None,
                 "error_msg": f"LLM call failed: {type(e).__name__}: {e}"}
 
@@ -127,7 +134,8 @@ def _build_graph() -> StateGraph:
     g.add_node("check_eligibility", check_eligibility)
     g.add_node("analyse_sentiment", analyse_sentiment)
     g.set_entry_point("check_eligibility")
-    g.add_conditional_edges("check_eligibility", should_skip, {"end": END, "analyse": "analyse_sentiment"})
+    g.add_conditional_edges("check_eligibility", should_skip, 
+                            {"end": END, "analyse": "analyse_sentiment"})
     g.add_edge("analyse_sentiment", END)
     return g
 

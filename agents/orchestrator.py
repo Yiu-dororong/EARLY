@@ -89,14 +89,17 @@ def _select_announcements(
     snapshot_date: date,
 ) -> list[AnnouncementInput]:
     """
-    Return announcements within last year(LOOKBACK_DAYS), capped at MAX_EVENTS_CONSIDERED.
+    Return announcements within last year(LOOKBACK_DAYS), 
+    capped at MAX_EVENTS_CONSIDERED.
     Sorted: most recent first, major type preferred as tiebreaker.
     No hard date cutoff — days_ago in the prompt communicates staleness.
     """
 
     cutoff = snapshot_date - timedelta(days=LOOKBACK_DAYS)
     in_window = [e for e in events if e.posted_at >= cutoff]
-    in_window.sort(key=lambda e: (e.posted_at, e.event_type // 28), reverse=True) # News < Update
+    # News (Type 28 will return 0) < Update
+    in_window.sort(key=lambda e: (e.posted_at, e.event_type // 28), reverse=True) 
+    
 
     selected = []
     for e in in_window[:MAX_EVENTS_CONSIDERED]:
@@ -154,9 +157,12 @@ class AnalysisResult:
         return self.auditor.key_concerns if self.auditor else None
     @property
     def success(self) -> bool:
-        if self.forensic and self.forensic.error: return False
-        if self.auditor  and self.auditor.error:  return False
-        if self.critic   and self.critic.error:   return False
+        if self.forensic and self.forensic.error: 
+            return False
+        if self.auditor  and self.auditor.error:  
+            return False
+        if self.critic   and self.critic.error:   
+            return False
         return True
 
 
@@ -169,7 +175,9 @@ def run_analysis(ctx: GameContext) -> AnalysisResult:
     )
 
     if not should_run_phase2(ctx.scorecard):
-        logger.info("Phase 2 not triggered for appid=%d (state=%s)", ctx.appid, ctx.scorecard.l1_state)
+        logger.info("Phase 2 not triggered for appid=%d (state=%s)", 
+                    ctx.appid, 
+                    ctx.scorecard.l1_state)
         return result
 
     result.phase2_triggered = True
@@ -190,12 +198,14 @@ def run_analysis(ctx: GameContext) -> AnalysisResult:
     with contextlib.ExitStack() as stack:
         if langfuse_client and trace:
             from langfuse import propagate_attributes
-            stack.enter_context(langfuse_client.start_as_current_observation(as_type="span", name="run_analysis"))
+            stack.enter_context(langfuse_client.start_as_current_observation(as_type="span", 
+                                                                             name="run_analysis"))
             if ctx.session_id:
                 stack.enter_context(propagate_attributes(session_id=ctx.session_id))
 
         # --- Forensic Agent ---
-        announcements = _select_announcements(ctx.recent_announcements, ctx.snapshot_date)
+        announcements = _select_announcements(ctx.recent_announcements, 
+                                              ctx.snapshot_date)
         if announcements:
             logger.info(
                 "Forensic Agent: running for appid=%d (%d announcements in last %dd)",
@@ -203,7 +213,8 @@ def run_analysis(ctx: GameContext) -> AnalysisResult:
             )
             try:
                 forensic = run_forensic_agent(
-                    appid=ctx.appid, game_name=ctx.game_name, snapshot_date=snap_date_str,
+                    appid=ctx.appid, game_name=ctx.game_name, 
+                    snapshot_date=snap_date_str,
                     ea_age_days=ctx.ea_age_days,
                     days_since_last_build_update=ctx.days_since_last_build_update,
                     announcements=announcements,
@@ -212,18 +223,25 @@ def run_analysis(ctx: GameContext) -> AnalysisResult:
                 result.forensic = forensic
                 result.forensic_ran = True
                 if forensic.error:
-                    logger.warning("Forensic error appid=%d: %s", ctx.appid, forensic.error)
+                    logger.warning("Forensic error appid=%d: %s", 
+                                   ctx.appid, 
+                                   forensic.error)
             except Exception as e:
-                logger.error("Forensic exception appid=%d: %s", ctx.appid, e)
+                logger.error("Forensic exception appid=%d: %s", 
+                             ctx.appid, 
+                             e)
         else:
-            logger.info("Forensic skipped appid=%d (no announcements in last %dd)", ctx.appid, LOOKBACK_DAYS)
+            logger.info("Forensic skipped appid=%d (no announcements in last %dd)", 
+                        ctx.appid, 
+                        LOOKBACK_DAYS)
     
         # --- Sentiment Auditor ---
         if ctx.xgboost.ml_eligible:
             logger.info("Sentiment Auditor: running for appid=%d", ctx.appid)
             try:
                 auditor = run_sentiment_auditor(
-                    appid=ctx.appid, game_name=ctx.game_name, snapshot_date=snap_date_str,
+                    appid=ctx.appid, game_name=ctx.game_name, 
+                    snapshot_date=snap_date_str,
                     review_score_at_T=ctx.review_score_at_T,
                     review_score_last_90d=ctx.review_score_last_90d,
                     review_count_at_T=ctx.review_count_at_T,
@@ -234,9 +252,13 @@ def run_analysis(ctx: GameContext) -> AnalysisResult:
                 result.auditor = auditor
                 result.auditor_ran = True
                 if auditor.error:
-                    logger.warning("Auditor error appid=%d: %s", ctx.appid, auditor.error)
+                    logger.warning("Auditor error appid=%d: %s", 
+                                   ctx.appid, 
+                                   auditor.error)
             except Exception as e:
-                logger.error("Auditor exception appid=%d: %s", ctx.appid, e)
+                logger.error("Auditor exception appid=%d: %s", 
+                             ctx.appid, 
+                             e)
         else:
             logger.info("Auditor skipped appid=%d (ml_eligible=False)", ctx.appid)
     
@@ -249,20 +271,40 @@ def run_analysis(ctx: GameContext) -> AnalysisResult:
                 appid=ctx.appid, game_name=ctx.game_name, snapshot_date=snap_date_str,
                 ea_age_days=ctx.ea_age_days, l1_state=ctx.scorecard.l1_state,
                 l1_composite_score=ctx.scorecard.composite_score,
-                update_health=ctx.scorecard.update_health, player_retention=ctx.scorecard.player_retention,
-                dev_engagement=ctx.scorecard.dev_engagement, sentiment=ctx.scorecard.sentiment,
-                price_market=ctx.scorecard.price_market, p_distressed=ctx.xgboost.p_distressed,
-                is_distressed=ctx.xgboost.is_distressed, ml_eligible=ctx.xgboost.ml_eligible,
-                forensic_ran=result.forensic_ran and not (forensic_res and forensic_res.error),
-                update_substance_score=forensic_res.update_substance_score if forensic_res else None,
-                fake_heartbeat_flag=forensic_res.fake_heartbeat_flag if forensic_res else None,
-                momentum=forensic_res.momentum if forensic_res else None,
-                event_state_mismatch=forensic_res.event_state_mismatch if forensic_res else None,
-                forensic_reasoning=forensic_res.reasoning if forensic_res else None,
-                auditor_ran=result.auditor_ran and not (auditor_res and auditor_res.error),
+                update_health=ctx.scorecard.update_health, 
+                player_retention=ctx.scorecard.player_retention,
+                dev_engagement=ctx.scorecard.dev_engagement, 
+                sentiment=ctx.scorecard.sentiment,
+                price_market=ctx.scorecard.price_market, 
+                p_distressed=ctx.xgboost.p_distressed,
+                is_distressed=ctx.xgboost.is_distressed, 
+                ml_eligible=ctx.xgboost.ml_eligible,
+                forensic_ran=(
+                    result.forensic_ran and not (forensic_res and forensic_res.error)
+                    ),
+                update_substance_score=(
+                    forensic_res.update_substance_score if forensic_res else None
+                    ),
+                fake_heartbeat_flag=(
+                    forensic_res.fake_heartbeat_flag if forensic_res else None
+                    ),
+                momentum=(
+                    forensic_res.momentum if forensic_res else None
+                    ),
+                event_state_mismatch=(
+                    forensic_res.event_state_mismatch if forensic_res else None
+                    ),
+                forensic_reasoning=(
+                    forensic_res.reasoning if forensic_res else None
+                    ),
+                auditor_ran=(
+                    result.auditor_ran and not (auditor_res and auditor_res.error)
+                    ),
                 theme_clusters=auditor_res.theme_clusters if auditor_res else None,
                 sentiment_shift=auditor_res.sentiment_shift if auditor_res else None,
-                sentiment_alignment=auditor_res.sentiment_alignment if auditor_res else None,
+                sentiment_alignment=(
+                    auditor_res.sentiment_alignment if auditor_res else None
+                    ),
                 key_concerns=auditor_res.key_concerns if auditor_res else None,
                 auditor_summary=auditor_res.auditor_summary if auditor_res else None,
                 trace=trace,

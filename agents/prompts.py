@@ -88,7 +88,8 @@ Produce:
      "theme": str, "valence": "positive"|"negative"|"mixed",
      "frequency": "high"|"medium"|"low",
      "representative_quote": "<verbatim fragment under 60 chars or null>",
-     "quote_translation": "<English translation if the quote is not in English, else null>"
+     "quote_translation": "<English translation 
+                            if the quote is not in English, else null>"
    }]
 2. sentiment_shift: "improving"|"declining"|"stable"|"mixed"|"insufficient_data"
 3. sentiment_alignment: does review sentiment AGREE with the stated l1_state?
@@ -105,17 +106,26 @@ Produce:
    reviews say) — this is the most important thing to surface.
 
 RULES:
-- representative_quote must come verbatim from provided reviews (under 60 chars) or be null.
-- If representative_quote is NOT in English, you MUST provide an English translation in quote_translation.
-- IMPORTANT: Carefully escape any double quotes inside your quote to maintain valid JSON.
+- representative_quote must come verbatim from provided reviews 
+  (under 60 chars) or be null.
+- If representative_quote is NOT in English, you MUST provide an English translation 
+  in quote_translation.
+- IMPORTANT: Carefully escape any double quotes inside your quote to maintain 
+  valid JSON.
 
 # Quantifier & Scale Rules
-You must strictly assess data density (the total count of reviews provided) before summarizing player sentiment:
-1. If ONLY 1-5 reviews are available, you have an insufficient sample size. You are forbidden from using macro-generalizations like "overwhelmingly positive," "widespread consensus," or "the community agrees."
-2. Instead, frame your summary around the lack of data. Use exact, restricted qualifiers like: 
+You must strictly assess data density (the total count of reviews provided) before 
+  summarizing player sentiment:
+1. If ONLY 1-5 reviews are available, you have an insufficient sample size. You are 
+  forbidden from using macro-generalizations like "overwhelmingly positive," 
+  "widespread consensus," or "the community agrees."
+2. Instead, frame your summary around the lack of data. 
+  Use exact, restricted qualifiers like: 
    - "Based on a single isolated user report..."
    - "Initial limited feedback shows..."
-3. Explicitly state that the current metrics cannot be debunked or verified by review trends due to the near-absence of recent qualitative data. Set sentiment_shift and sentiment_alignment to "insufficient_data".
+3. Explicitly state that the current metrics cannot be debunked or verified by review 
+  trends due to the near-absence of recent qualitative data. Set sentiment_shift and 
+  sentiment_alignment to "insufficient_data".
 
 OUTPUT FORMAT — JSON only, no markdown fences:
 {"theme_clusters": [...], "sentiment_shift": "...", "sentiment_alignment": "...",
@@ -137,10 +147,10 @@ You will be told a "signal alignment" verdict:
                    player needs to know, more important than any single score.
   - "partial"    — some signals weren't available. Be appropriately tentative.
 
-Avoid using soft guessing phrases ("I'd be cautious", "seems to", "while it's possible"). 
-Speak strictly about the presence or absence of data using descriptive, objective 
-phrasing:: "The data shows a contradiction," "Records confirm a gap," or 
-"Available platform history is insufficient to evaluate."
+Avoid using soft guessing phrases ("I'd be cautious", "seems to", 
+"while it's possible"). Speak strictly about the presence or absence 
+of data using descriptive, objective phrasing: "The data shows a contradiction," 
+"Records confirm a gap," or "Available platform history is insufficient to evaluate."
 
 If a fake heartbeat or event_content_mismatch was detected, mention it in plain 
 language — something like "an update announcement that turned out to contain 
@@ -150,7 +160,8 @@ Direct, honest, non-alarmist. 2-4 sentences max. Do NOT mention model scores,
 numbers, internal metric names, or the words "signal alignment"/"triangulation"
 themselves — translate into plain language a player would say to a friend."""
 
-CRITIC_DEVELOPER_SYSTEM = """You are writing a brief for the developer of an Early Access game.
+CRITIC_DEVELOPER_SYSTEM = """
+You are writing a brief for the developer of an Early Access game.
 
 You will be told a "signal alignment" verdict:
   - "aligned"    — activity metrics and player sentiment agree. Confirm and move on.
