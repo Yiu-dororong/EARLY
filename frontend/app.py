@@ -540,8 +540,8 @@ def render_developer_tab(score: dict):
         stats = _get_scorecard_stats()
         if stats and "state_agreement" in stats and state in stats["state_agreement"]:
             sa = stats["state_agreement"][state]
-            state_help = f"Historically, {sa['agreement_rate']:.1%} of games "
-            f"in this state ended up as {sa['expected_outcome']}."
+            state_help = (f"Historically, {sa['agreement_rate']:.1%} of games "
+            f"in this state ended up as {sa['expected_outcome']}.")
             
         st.metric("State", state or "—", help=state_help)
         st.metric("Model", score.get("model_version") or "—")
@@ -844,8 +844,8 @@ def _render_how_to_read():
         (0–100%) that a game is on a distressed or failing trajectory.
 
         - **&lt; 45%** → Generally healthy footprint
-        - **45–60%** → Gray zone / Watch territory
-        - **&gt; 60%** → Elevated risk / High operational distress
+        - **45–65%** → Gray zone / Watch territory
+        - **&gt; 65%** → Elevated risk / High operational distress
 
         The ML model evaluates the whole ecosystem simultaneously, meaning it 
         often catches subtle, compounding warning signs that simple checkboxes miss.
