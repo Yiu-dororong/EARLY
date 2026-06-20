@@ -190,8 +190,8 @@ def load_latest_live_snapshots(
                 FROM live_snapshots
                 {where}
                 AND snapshot_date = (
-                    SELECT MAX(snapshot_date) 
-                    FROM live_snapshots ls2 
+                    SELECT MAX(snapshot_date)
+                    FROM live_snapshots ls2
                     WHERE ls2.appid = live_snapshots.appid
                 )
                 ORDER BY appid
@@ -204,9 +204,9 @@ def load_latest_live_snapshots(
             log.warning("DB read error in load_latest_live_snapshots: "
                         "%s - reconnecting", e)
             time.sleep(DB_RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 log.warning("Error occurred while closing connection: %s", e)
             conn = get_conn()
     return [], conn
@@ -221,7 +221,7 @@ def upsert_score(conn: libsql.Connection, score: dict) -> libsql.Connection:
                     p_distressed, is_distressed, l1_state,
                     ml_eligible, model_version,
                     null_features, review_count_at_T,
-                    update_health, player_retention, dev_engagement, 
+                    update_health, player_retention, dev_engagement,
                     sentiment, price_market,
                     shap_json, days_since_last_build_update, l1_composite_score
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -253,9 +253,9 @@ def upsert_score(conn: libsql.Connection, score: dict) -> libsql.Connection:
                 raise
             log.warning("DB write error in upsert_score: %s - reconnecting", e)
             time.sleep(DB_RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 log.warning("Error occurred while closing connection: %s", e)
             conn = get_conn()
     return conn
@@ -265,9 +265,9 @@ def upsert_score(conn: libsql.Connection, score: dict) -> libsql.Connection:
 # Model artifact loading
 # ---------------------------------------------------------------------------
 
-def load_model_artifacts(version: str) -> tuple[xgb.Booster, 
-                                                list[str], 
-                                                list[str], 
+def load_model_artifacts(version: str) -> tuple[xgb.Booster,
+                                                list[str],
+                                                list[str],
                                                 float]:
     """
     Load model booster + feature metadata from models/{version}.json and
@@ -417,7 +417,7 @@ def assemble_feature_row(
             except (TypeError, ValueError):
                 # Non-numeric feature (e.g. price_trend text before encoding)
                 # These should have been encoded upstream; log and null-route.
-                log.warning("Non-numeric value for feature %r: %r — treating as null", 
+                log.warning("Non-numeric value for feature %r: %r — treating as null",
                             col, val)
                 null_features.append(col)
                 row.append(float("nan"))
@@ -502,7 +502,7 @@ def score_game(
         price_market = l1_result.get("l1_price_market_score")
         l1_composite_score = l1_result.get("l1_composite_score")
 
-        # Inject scores back into features dict 
+        # Inject scores back into features dict
         # using column names from build_snapshots.py
         features["l1_composite_score"] = l1_result.get("l1_composite_score")
         features["l1_update_health_score"] = update_health
@@ -536,8 +536,8 @@ def score_game(
         genre_encoded = encode_genre(features.get("primary_genre"), genre_cols)
 
         # Assemble ordered feature row
-        row, null_features = assemble_feature_row(features, 
-                                                  genre_encoded, 
+        row, null_features = assemble_feature_row(features,
+                                                  genre_encoded,
                                                   all_feature_cols)
 
         # Predict
@@ -601,13 +601,13 @@ def score_game(
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Score STAYS_ACTIVE games with EARLY model")
-    p.add_argument("--appid",   type=int,  
+    p.add_argument("--appid",   type=int,
                    help="Single appid (debug)")
     p.add_argument("--model",   type=str,  default=DEFAULT_MODEL_VERSION,
                    help="Model version string, e.g. v1.0 (default) or v1.1")
-    p.add_argument("--dry-run", action="store_true", 
+    p.add_argument("--dry-run", action="store_true",
                    help="Compute but don't write scores")
-    p.add_argument("--no-itad", action="store_true", 
+    p.add_argument("--no-itad", action="store_true",
                    help="Skip ITAD price features")
     p.add_argument("--verbose", action="store_true")
     return p.parse_args()
@@ -684,7 +684,7 @@ def main() -> None:
                     i, len(candidates),
                     score["appid"],
                     score["ea_age_days"],
-                    f"{score['p_distressed']:.4f}" 
+                    f"{score['p_distressed']:.4f}"
                     if score["p_distressed"] is not None else "N/A",
                     score["l1_state"] or "N/A",
                     len(score["null_features"]),

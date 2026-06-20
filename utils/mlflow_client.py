@@ -155,7 +155,8 @@ def log_training_run(
 
     # Params — XGBoost params + cohort metadata + config versions
     loggable_params = {
-        **{f"xgb_{k}": v for k, v in params.items() if not isinstance(v, (dict, list))},
+        **{f"xgb_{k}": v for k, v in params.items()
+           if not isinstance(v, (dict | list))},
         "scorecard_config_version": scorecard_config_version,
         **{f"cohort_{k}": v for k, v in training_cohort.items()},
     }
@@ -163,7 +164,7 @@ def log_training_run(
 
     # Metrics — only scalar numeric values
     for k, v in metrics.items():
-        if isinstance(v, (int, float)) and not isinstance(v, bool):
+        if isinstance(v, (int | float)) and not isinstance(v, bool):
             mlflow.log_metric(k, v)
 
     # Artifacts

@@ -485,7 +485,7 @@ def build_features(
         sum(build_gaps) / len(build_gaps) if build_gaps else None
     )
     f["std_days_between_build_updates"] = std_dev(build_gaps) if build_gaps else None
-    f["max_hiatus_ever_days"]           = (max(build_gaps) 
+    f["max_hiatus_ever_days"]           = (max(build_gaps)
                                            if build_gaps else plan.ea_age_days)
     # Hiatus recovery count: transitions from gap > 90d back to activity
     hiatus_recoveries = 0

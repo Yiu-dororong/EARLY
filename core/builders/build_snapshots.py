@@ -236,7 +236,7 @@ def ensure_snapshots_table(conn: libsql.Connection) -> None:
 
         PRIMARY KEY (appid, snapshot_date)
     """
-    
+
     conn.execute(f"CREATE TABLE IF NOT EXISTS snapshots ({schema_cols})")
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_snapshots_appid ON snapshots (appid)
@@ -250,7 +250,7 @@ def ensure_snapshots_table(conn: libsql.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_live_snapshots_appid ON live_snapshots (appid)
     """)
     conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_live_snapshots_outcome 
+        CREATE INDEX IF NOT EXISTS idx_live_snapshots_outcome
                  ON live_snapshots (outcome)
     """)
     conn.commit()
@@ -378,7 +378,7 @@ def plan_snapshots(
 # Data loaders
 # ---------------------------------------------------------------------------
 
-def load_ccu_history(conn: libsql.Connection, appid: int) -> tuple[list[dict], 
+def load_ccu_history(conn: libsql.Connection, appid: int) -> tuple[list[dict],
                                                             libsql.Connection]:
     for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
@@ -390,19 +390,19 @@ def load_ccu_history(conn: libsql.Connection, appid: int) -> tuple[list[dict],
             """, (appid,)).fetchall()
             return [{"month": r[0], "avg": r[1], "peak": r[2]} for r in rows], conn
         except Exception as e:
-            if attempt == DB_MAX_RETRIES: 
+            if attempt == DB_MAX_RETRIES:
                 log.warning("DB read error in load_ccu_history: "
                                   "%s - reconnecting", e)
                 raise e
             time.sleep(DB_RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 pass
             conn = get_conn()
 
 
-def load_review_history(conn: libsql.Connection, appid: int) -> tuple[list[dict], 
+def load_review_history(conn: libsql.Connection, appid: int) -> tuple[list[dict],
                                                                 libsql.Connection]:
     for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
@@ -417,19 +417,19 @@ def load_review_history(conn: libsql.Connection, appid: int) -> tuple[list[dict]
                 for r in rows
             ], conn
         except Exception as e:
-            if attempt == DB_MAX_RETRIES: 
+            if attempt == DB_MAX_RETRIES:
                 log.warning("DB read error in load_review_history: "
                                   "%s - reconnecting", e)
                 raise e
             time.sleep(DB_RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 pass
             conn = get_conn()
 
 
-def load_event_history(conn: libsql.Connection, appid: int) -> tuple[list[dict], 
+def load_event_history(conn: libsql.Connection, appid: int) -> tuple[list[dict],
                                                                 libsql.Connection]:
     for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
@@ -443,23 +443,23 @@ def load_event_history(conn: libsql.Connection, appid: int) -> tuple[list[dict],
                   AND is_automated = 0
                 ORDER BY event_ts ASC
             """, (appid,)).fetchall()
-            return [{"date": r[0], 
-                     "type": r[1], 
+            return [{"date": r[0],
+                     "type": r[1],
                      "word_count": r[2]} for r in rows], conn
         except Exception as e:
-            if attempt == DB_MAX_RETRIES: 
+            if attempt == DB_MAX_RETRIES:
                 log.warning("DB read error in load_event_history: "
                                   "%s - reconnecting", e)
                 raise e
             time.sleep(DB_RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 pass
             conn = get_conn()
 
 
-def load_ccu_availability(conn: libsql.Connection, appid: int) -> tuple[str, 
+def load_ccu_availability(conn: libsql.Connection, appid: int) -> tuple[str,
                                                                         libsql.Connection]:
     for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
@@ -468,19 +468,19 @@ def load_ccu_availability(conn: libsql.Connection, appid: int) -> tuple[str,
             """, (appid,)).fetchone()
             return (row[0] if row else "UNKNOWN"), conn
         except Exception as e:
-            if attempt == DB_MAX_RETRIES: 
+            if attempt == DB_MAX_RETRIES:
                 log.warning("DB read error in load_ccu_availability: "
                                   "%s - reconnecting", e)
                 raise e
             time.sleep(DB_RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 pass
             conn = get_conn()
 
 
-def load_initial_price(conn: libsql.Connection, appid: int) -> tuple[float | None, 
+def load_initial_price(conn: libsql.Connection, appid: int) -> tuple[float | None,
                                                                 libsql.Connection]:
     for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
@@ -489,14 +489,14 @@ def load_initial_price(conn: libsql.Connection, appid: int) -> tuple[float | Non
             """, (appid,)).fetchone()
             return (row[0] if row else None), conn
         except Exception as e:
-            if attempt == DB_MAX_RETRIES: 
+            if attempt == DB_MAX_RETRIES:
                 log.warning("DB read error in load_initial_price: "
                                   "%s - reconnecting", e)
                 raise e
             time.sleep(DB_RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 pass
             conn = get_conn()
 
@@ -571,14 +571,14 @@ def insert_snapshot(conn: libsql.Connection, features: dict) -> libsql.Connectio
             )
             return conn
         except Exception as e:
-            if attempt == DB_MAX_RETRIES: 
+            if attempt == DB_MAX_RETRIES:
                 log.warning("DB write error in insert_snapshot: "
                                   "%s - reconnecting", e)
                 raise e
             time.sleep(DB_RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 pass
             conn = get_conn()
 
@@ -596,14 +596,14 @@ def insert_live_snapshot(conn: libsql.Connection, features: dict) -> libsql.Conn
             )
             return conn
         except Exception as e:
-            if attempt == DB_MAX_RETRIES: 
+            if attempt == DB_MAX_RETRIES:
                 log.warning("DB write error in insert_live_snapshot: "
                                   "%s - reconnecting", e)
                 raise e
             time.sleep(DB_RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 pass
             conn = get_conn()
 
@@ -636,9 +636,9 @@ def load_candidates(
     if delta:
         where += f"""
           AND games_v2.appid IN (
-              SELECT appid FROM games_v2 
-              WHERE currently_in_ea = 1 
-                 OR (currently_in_ea = 0 AND graduation_date IS NOT NULL 
+              SELECT appid FROM games_v2
+              WHERE currently_in_ea = 1
+                 OR (currently_in_ea = 0 AND graduation_date IS NOT NULL
                  AND graduation_date >= date('now', '-{DELTA_GRADUATION_DAYS} days'))
           )
         """
@@ -650,7 +650,7 @@ def load_candidates(
     for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
             rows = conn.execute(f"""
-                SELECT games_v2.appid, ea_start_date, 
+                SELECT games_v2.appid, ea_start_date,
                                 graduation_date, outcome, abandoned_date
                 FROM games_v2
                 JOIN ccu_availability c ON c.appid = games_v2.appid
@@ -670,14 +670,14 @@ def load_candidates(
             ]
             return res, conn
         except Exception as e:
-            if attempt == DB_MAX_RETRIES: 
+            if attempt == DB_MAX_RETRIES:
                 log.warning("DB read error in load_candidates: "
                                   "%s - reconnecting", e)
                 raise e
             time.sleep(DB_RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 pass
             conn = get_conn()
 
@@ -691,14 +691,14 @@ def load_existing_snapshot_dates(conn: libsql.Connection, appid: int) -> tuple[s
             ).fetchall()
             return {r[0] for r in rows}, conn
         except Exception as e:
-            if attempt == DB_MAX_RETRIES: 
+            if attempt == DB_MAX_RETRIES:
                 log.warning("DB read error in load_existing_snapshot_dates: "
                         "%s - reconnecting", e)
                 raise e
             time.sleep(DB_RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 pass
             conn = get_conn()
 
@@ -707,12 +707,12 @@ def load_existing_snapshot_dates(conn: libsql.Connection, appid: int) -> tuple[s
 # Delta helpers
 # ---------------------------------------------------------------------------
 
-def load_all_dev_features_current(conn: libsql.Connection) -> tuple[dict[int, dict], 
+def load_all_dev_features_current(conn: libsql.Connection) -> tuple[dict[int, dict],
                                                                     libsql.Connection]:
     for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
             rows = conn.execute("""
-                SELECT appid, dev_previous_ea_count, 
+                SELECT appid, dev_previous_ea_count,
                                 dev_has_prior_success, dev_total_games_shipped
                 FROM game_dev_features_current
             """).fetchall()
@@ -732,15 +732,15 @@ def load_all_dev_features_current(conn: libsql.Connection) -> tuple[dict[int, di
             log.warning("DB read error in load_all_dev_features_current: "
                         "%s - reconnecting", e)
             time.sleep(DB_RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 pass
             conn = get_conn()
 
 
 def load_all_genre_and_price_medians(
-        conn: libsql.Connection, 
+        conn: libsql.Connection,
         delta: bool = False
         ) -> tuple[dict[int, dict], libsql.Connection]:
     table = "live_genre_price_medians" if delta else "genre_price_medians"
@@ -751,7 +751,7 @@ def load_all_genre_and_price_medians(
                 FROM game_genres gg
                 LEFT JOIN {table} gpm ON gg.primary_genre = gpm.primary_genre
             """).fetchall()
-            res = {r[0]: {"primary_genre": r[1], 
+            res = {r[0]: {"primary_genre": r[1],
                           "median_price_usd": r[2]} for r in rows}
             return res, conn
         except Exception as e:
@@ -761,9 +761,9 @@ def load_all_genre_and_price_medians(
             log.warning("DB read error in load_all_genre_and_price_medians: "
                         "%s - reconnecting", e)
             time.sleep(DB_RETRY_DELAY)
-            try: 
+            try:
                 conn.close()
-            except Exception as e: 
+            except Exception as e:
                 pass
             conn = get_conn()
 
@@ -774,26 +774,26 @@ def load_all_genre_and_price_medians(
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Build EARLY training snapshots")
-    p.add_argument("--appid",    type=int,  
+    p.add_argument("--appid",    type=int,
                             help="Single appid (debug)")
-    p.add_argument("--force",    action="store_true", 
+    p.add_argument("--force",    action="store_true",
                             help="Rebuild all (INSERT OR REPLACE)")
-    p.add_argument("--delta",    action="store_true", 
+    p.add_argument("--delta",    action="store_true",
                             help="Delta run: create latest snapshots in live_snapshots")
     p.add_argument("--dry-run",  action="store_true", help="Plan only, no writes")
-    p.add_argument("--stays-active", action="store_true", 
+    p.add_argument("--stays-active", action="store_true",
                             help="Include STAYS_ACTIVE games")
     p.add_argument("--verbose",  action="store_true")
-    p.add_argument("--no-itad",  action="store_true", 
+    p.add_argument("--no-itad",  action="store_true",
                             help="Skip ITAD price features")
     p.add_argument("--lower",    type=float, default=DEFAULT_LOWER)
     p.add_argument("--upper",    type=float, default=DEFAULT_UPPER)
     p.add_argument("--n-base",   type=int,   default=DEFAULT_N_BASE)
-    p.add_argument("--elastic-threshold", type=int, 
+    p.add_argument("--elastic-threshold", type=int,
                             default=DEFAULT_ELASTIC_THRESHOLD_DAYS)
-    p.add_argument("--elastic-interval",  type=int, 
+    p.add_argument("--elastic-interval",  type=int,
                             default=DEFAULT_ELASTIC_INTERVAL_DAYS)
-    p.add_argument("--max-snapshots",     type=int, 
+    p.add_argument("--max-snapshots",     type=int,
                             default=DEFAULT_MAX_SNAPSHOTS)
     return p.parse_args()
 
@@ -818,7 +818,7 @@ def main() -> None:
             log.warning("ITAD client unavailable (%s) — price features will be NULL", e)
 
     candidates, conn = load_candidates(conn, args.appid, args.stays_active, args.delta)
-    log.info("Candidates: %d games (stays_active=%s, delta=%s)", 
+    log.info("Candidates: %d games (stays_active=%s, delta=%s)",
              len(candidates), args.stays_active, args.delta)
 
     if not candidates:
@@ -894,18 +894,18 @@ def main() -> None:
             )
 
             if not plans:
-                log.debug("[%d/%d] appid %d: no valid snapshots", i, len(candidates), 
+                log.debug("[%d/%d] appid %d: no valid snapshots", i, len(candidates),
                           appid)
                 n_games_skipped += 1
                 continue
 
             if not args.force:
                 existing, conn = load_existing_snapshot_dates(conn, appid)
-                plans    = [p for p in plans 
+                plans    = [p for p in plans
                             if p.snapshot_date.isoformat() not in existing]
 
         if not plans:
-            log.debug("[%d/%d] appid %d: all snapshots already built", 
+            log.debug("[%d/%d] appid %d: all snapshots already built",
                       i, len(candidates), appid)
             n_games_skipped += 1
             continue
@@ -928,7 +928,7 @@ def main() -> None:
             ccu_available, conn     = load_ccu_availability(conn, appid)
             initial_price_usd, conn = load_initial_price(conn, appid)
         except Exception as e:
-            log.error("[%d/%d] appid %d: data load error: %s", 
+            log.error("[%d/%d] appid %d: data load error: %s",
                       i, len(candidates), appid, e)
             n_games_error += 1
             continue
@@ -997,9 +997,9 @@ def main() -> None:
     log.info("=" * 64)
     log.info("build_snapshots complete")
     log.info("  Games processed   : %d", n_games_ok)
-    log.info("  Games skipped     : %d  (no valid plans or already built)", 
+    log.info("  Games skipped     : %d  (no valid plans or already built)",
                                                                 n_games_skipped)
-    log.info("  Games errored     : %d  (data load failures)", 
+    log.info("  Games errored     : %d  (data load failures)",
                                                                 n_games_error)
     log.info("  Snapshots written : %d", total_snaps)
     log.info("  Snapshots failed  : %d  (per-snapshot errors)", total_skipped)
