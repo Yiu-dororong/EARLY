@@ -73,7 +73,7 @@ FEATURE_SCALES = {
 
     "days_since_last_build_update": {
         "type": "inverted_cap",
-        "cap":  365,        # 0d → 1.0, 365d+ → 0.0 (Relaxed to account for v1.0 sprints)
+        "cap":  365,        # 0d → 1.0, 365d+ → 0.0 
     },
     "build_update_count_last_90d": {
         "type": "log_cap",
@@ -154,7 +154,8 @@ FEATURE_SCALES = {
     "ccu_trend_slope_90d": {
         "type": "symlog_norm",
         "cap":  1000,   # Map ±1000 absolute CCU change/month to 1.0/0.0
-                        # OWNER_MULTIPLIER_TIERS for 50 reviews is 20x, so 1000 is used as the threshold
+                        # OWNER_MULTIPLIER_TIERS for 50 reviews is 20x, 
+                        # so 1000 is used as the threshold
     },
 
     # ------------------------------------------------------------------
@@ -328,8 +329,12 @@ for _dim, _groups in DIMENSION_FEATURES.items():
     for _group, _weights in _groups.items():
         if _weights:
             _total = sum(_weights.values())
-            assert abs(_total - 1.0) < 1e-9, \
-                f"DIMENSION_FEATURES['{_dim}']['{_group}'] weights sum to {_total}, expected 1.0"
+            assert (
+                abs(_total - 1.0) < 1e-9
+            ), (
+                f"DIMENSION_FEATURES['{_dim}']['{_group}'] "
+                f"weights sum to {_total}, expected 1.0"
+            )
 
 # ---------------------------------------------------------------------------
 # State classification thresholds

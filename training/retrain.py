@@ -61,6 +61,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)-8s %(message)s",
@@ -76,13 +77,13 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from utils.mlflow_client import REGISTERED_MODEL_NAME  # noqa: E402
 from training.promote_model import (  # noqa: E402
+    compare_to_production,
     get_client,
     get_production_version,
-    compare_to_production,
     print_comparison,
 )
+from utils.mlflow_client import REGISTERED_MODEL_NAME  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -94,7 +95,8 @@ def run_training(extra_args: list[str]) -> bool:
     Run train_xgboost.py as a subprocess so its existing main()/argparse is
     reused unmodified. Returns True on success (exit code 0).
     """
-    cmd = [sys.executable, str(PROJECT_ROOT / "training" / "train_xgboost.py")] + extra_args
+    cmd = [sys.executable, 
+           str(PROJECT_ROOT / "training" / "train_xgboost.py")] + extra_args
     log.info("Running: %s", " ".join(cmd))
     result = subprocess.run(cmd, cwd=str(PROJECT_ROOT))
     return result.returncode == 0
@@ -118,7 +120,10 @@ def get_newly_registered_version(client, run_id_hint: str | None = None) -> str 
     return latest.version
 
 
-def shap_feature_sets_differ(prod_version: str | None, candidate_version: str, client) -> bool | None:
+def shap_feature_sets_differ(
+        prod_version: str | None, 
+        candidate_version: str, 
+        client) -> bool | None:
     """
     Compare the SHAP top-25 feature list between the Production model and
     the candidate, by reading shap_top25_{model_version}.json artifacts
@@ -130,9 +135,6 @@ def shap_feature_sets_differ(prod_version: str | None, candidate_version: str, c
     """
     if prod_version is None:
         return None
-
-    candidate_run = client.get_model_version(REGISTERED_MODEL_NAME, candidate_version)
-    candidate_tag = candidate_run.run_id  # not directly useful for filename matching
 
     # Best-effort: compare against whatever shap_top25_*.json files exist
     # locally. This is inherently approximate without a model_version tag
@@ -156,13 +158,16 @@ def shap_feature_sets_differ(prod_version: str | None, candidate_version: str, c
 def main() -> None:
     p = argparse.ArgumentParser(description="EARLY automated retraining cycle")
     trigger = p.add_mutually_exclusive_group(required=True)
-    trigger.add_argument("--scheduled", action="store_true", help="Routine scheduled retrain")
+    trigger.add_argument("--scheduled", action="store_true", 
+                         help="Routine scheduled retrain")
     trigger.add_argument("--drift-triggered", action="store_true",
                           help="Triggered by monitor_drift.py action_needed")
     p.add_argument("--no-auto-promote", action="store_true",
                    help="Run training + comparison only; do not assign aliases")
-    p.add_argument("--no-shap", action="store_true", help="Pass through to train_xgboost.py")
-    p.add_argument("--time-bounded-eval", action="store_true", help="Pass through to train_xgboost.py")
+    p.add_argument("--no-shap", action="store_true", 
+                   help="Pass through to train_xgboost.py")
+    p.add_argument("--time-bounded-eval", action="store_true", 
+                   help="Pass through to train_xgboost.py")
     args = p.parse_args()
 
     run_date = datetime.now(timezone.utc).date().isoformat()
@@ -204,7 +209,9 @@ def main() -> None:
     prod_mv = get_production_version(client)
     prod_version = prod_mv.version if prod_mv else None
 
-    zilliz_rebuild_needed = shap_feature_sets_differ(prod_version, candidate_version, client)
+    zilliz_rebuild_needed = shap_feature_sets_differ(prod_version, 
+                                                     candidate_version, 
+                                                     client)
 
     report = {
         "run_date": run_date,
@@ -221,24 +228,30 @@ def main() -> None:
     # ── Step 4: promote or hold ──────────────────────────────────────────
     if args.no_auto_promote:
         report["action_taken"] = "none (--no-auto-promote, awaiting manual review)"
-        log.info("Auto-promotion disabled. Candidate v%s left without aliases.", candidate_version)
+        log.info("Auto-promotion disabled. Candidate v%s left without aliases.", 
+                 candidate_version)
         log.info("Review the report, then run:")
-        log.info("  python promote_model.py --version %s --alias staging --yes", candidate_version)
-        log.info("  python promote_model.py --version %s --alias champion --yes", candidate_version)
+        log.info("  python promote_model.py --version %s --alias staging --yes", 
+                 candidate_version)
+        log.info("  python promote_model.py --version %s --alias champion --yes", 
+                 candidate_version)
 
     elif result["passed"]:
         client.set_registered_model_alias(
-            name=REGISTERED_MODEL_NAME, alias="staging", version=candidate_version,
+            name=REGISTERED_MODEL_NAME, 
+            alias="staging", version=candidate_version,
         )
         if prod_mv is not None:
             try:
-                client.delete_registered_model_alias(name=REGISTERED_MODEL_NAME, alias="champion")
+                client.delete_registered_model_alias(name=REGISTERED_MODEL_NAME, 
+                                                     alias="champion")
             except Exception:
                 pass
             log.info("Archived previous Production v%s", prod_mv.version)
 
         client.set_registered_model_alias(
-            name=REGISTERED_MODEL_NAME, alias="champion", version=candidate_version,
+            name=REGISTERED_MODEL_NAME, 
+            alias="champion", version=candidate_version,
         )
         report["action_taken"] = f"promoted v{candidate_version} to Production"
         log.info("Assigned champion alias to v%s", candidate_version)
@@ -251,7 +264,8 @@ def main() -> None:
 
     else:
         report["action_taken"] = "held (gate failed, no promotion)"
-        log.info("Gate failed — candidate v%s remains without aliases.", candidate_version)
+        log.info("Gate failed — candidate v%s remains without aliases.", 
+                 candidate_version)
         for r in result["reasons"]:
             log.info("  - %s", r)
 

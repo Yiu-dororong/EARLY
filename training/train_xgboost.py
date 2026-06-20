@@ -19,9 +19,11 @@ Usage:
   python train_xgboost.py --dry-run       # feature matrix only, no training
   python train_xgboost.py --no-shap       # skip SHAP (faster iteration)
   python train_xgboost.py --time-bounded-eval # time-bounded baseline evaluation
-  python train_xgboost.py --tune --n-trials 50 # Initialize an Optuna study with your specified search space.
-                                                Automatically generate interactive Plotly HTML visualizations for the Optimization History and Hyperparameter Importances, 
-                                                saving them directly into your outputs/ directory!
+  python train_xgboost.py --tune --n-trials 50 
+                        # Initialize an Optuna study with your specified search space.
+                        Automatically generate interactive Plotly HTML visualizations 
+                        for the Optimization History and Hyperparameter Importances, 
+                        saving them directly into your outputs/ directory!
                           --ignore-tuned 
 """
 
@@ -32,36 +34,34 @@ import json
 import logging
 import os
 import pickle
-import time
+import sys
 import warnings
 from datetime import datetime
 from pathlib import Path
-import sys
-
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
 
 import libsql
 import numpy as np
-import pandas as pd
-import shap
-import xgboost as xgb
 import optuna
 import optuna.visualization as vis
+import pandas as pd
+import xgboost as xgb
 from dotenv import load_dotenv
 from sklearn.metrics import (
     average_precision_score,
     confusion_matrix,
     precision_recall_curve,
     roc_auc_score,
-    f1_score,
 )
 from sklearn.model_selection import GroupKFold, StratifiedGroupKFold, cross_val_score
 from sklearn.preprocessing import LabelEncoder
 
-from utils.mlflow_client import start_run, log_training_run
+from utils.mlflow_client import log_training_run, start_run
+
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 warnings.filterwarnings("ignore", category=UserWarning)
 load_dotenv()
@@ -283,7 +283,8 @@ def load_data(conn) -> pd.DataFrame:
     df["ea_end_date"] = df["graduation_date"]
     mask_not_success = df["outcome"] != "EXIT_SUCCESS"
     df.loc[mask_not_success, "ea_end_date"] = (
-        df.loc[mask_not_success, "abandoned_date"].fillna(df.loc[mask_not_success, "outcome_date"])
+        df.loc[mask_not_success, "abandoned_date"].fillna(
+                                            df.loc[mask_not_success, "outcome_date"])
     )
     start_dt = pd.to_datetime(df["ea_start_date"].str[:10], errors="coerce")
     end_dt = pd.to_datetime(df["ea_end_date"].str[:10], errors="coerce")
@@ -305,7 +306,8 @@ def load_data(conn) -> pd.DataFrame:
         df["review_score_at_T"] * (1 - df["update_frequency_trend"].clip(-1, 1))
     )
 
-    # Force null stubs and missing integers to float to prevent XGBoost object-type errors
+    # Force null stubs and missing integers to float 
+    # to prevent XGBoost object-type errors
     for col in [
         "dev_previous_ea_count", "dev_has_prior_success",
         "ccu_vs_genre_weighted_median", "update_freq_vs_genre_median",
@@ -518,7 +520,8 @@ def analyze_scorecard_thresholds(df, thresholds=[0.60, 0.52, 0.44, 0.32]):
     ).round(4)
     
     # Reorder index to display Healthy at the top
-    summary = summary.reindex(["Healthy", "Slow but Honest", "Stalled", "High Risk", "Abandoned"])
+    summary = summary.reindex(["Healthy", "Slow but Honest", 
+                               "Stalled", "High Risk", "Abandoned"])
     
     log.info("\n%s", summary.to_string())
     return summary
@@ -594,14 +597,16 @@ def evaluate(
     tn, fp, fn, tp = cm.ravel()
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0
     recall    = tp / (tp + fn) if (tp + fn) > 0 else 0
-    f1        = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+    f1        = (2 * precision * recall / (precision + recall) 
+                 if (precision + recall) > 0 else 0)
 
     log.info("Confusion matrix (threshold=%.4f):", threshold)
     log.info("  TP: %d  FP: %d  TN: %d  FN: %d", tp, fp, tn, fn)
     log.info("  Precision: %.4f  Recall: %.4f  F1: %.4f", precision, recall, f1)
 
     # ── LIFT vs Scorecard baseline ─────────────────────────────────────────
-    # Invert composite score: higher score = healthier → invert so higher = more abandoned
+    # Invert composite score: 
+    # higher score = healthier → invert so higher = more abandoned
     scorecard_signal = 1.0 - df_train_val["l1_composite_score"].values
     baseline_prauc   = average_precision_score(y_train_val, scorecard_signal)
 
@@ -610,12 +615,18 @@ def evaluate(
 
     log.info("-" * 60)
     log.info("LIFT COMPARISON (PR-AUC):")
-    log.info("  Scorecard baseline (train_val) : %.4f", baseline_prauc)
-    log.info("  XGBoost OOF        (train_val) : %.4f", oof_prauc)
-    log.info("  Data-Driven Lift   (train_val) : %+.4f", oof_prauc - baseline_prauc)
-    log.info("  Scorecard baseline (holdout)   : %.4f", baseline_prauc_test)
-    log.info("  XGBoost            (holdout)   : %.4f", test_prauc)
-    log.info("  Data-Driven Lift   (holdout)   : %+.4f", test_prauc - baseline_prauc_test)
+    log.info("  Scorecard baseline (train_val) : %.4f", 
+             baseline_prauc)
+    log.info("  XGBoost OOF        (train_val) : %.4f", 
+             oof_prauc)
+    log.info("  Data-Driven Lift   (train_val) : %+.4f", 
+             oof_prauc - baseline_prauc)
+    log.info("  Scorecard baseline (holdout)   : %.4f", 
+             baseline_prauc_test)
+    log.info("  XGBoost            (holdout)   : %.4f", 
+             test_prauc)
+    log.info("  Data-Driven Lift   (holdout)   : %+.4f", 
+             test_prauc - baseline_prauc_test)
     
     res = {
         "oof_auc":    float(oof_auc),
@@ -634,20 +645,28 @@ def evaluate(
         log.info("TIME-BOUNDED BASELINE EVALUATION")
         test_durations = df_test.groupby("appid")["ea_duration_days"].first().dropna()
         holdout_horizon = test_durations.quantile(0.95)
-        log.info("Holdout horizon (95th percentile of 2024 durations): %.1f days", holdout_horizon)
+        log.info("Holdout horizon (95th percentile of 2024 durations): %.1f days", 
+                 holdout_horizon)
 
-        fast_mask = (df_train_val["ea_duration_days"] <= holdout_horizon) & (df_train_val["ea_duration_days"].notna())
+        fast_mask = ((df_train_val["ea_duration_days"] <= holdout_horizon) 
+                     & (df_train_val["ea_duration_days"].notna()))
         y_train_val_fast = y_train_val[fast_mask]
         oof_preds_fast = oof_preds[fast_mask]
         
         oof_auc_fast = roc_auc_score(y_train_val_fast, oof_preds_fast)
         oof_prauc_fast = average_precision_score(y_train_val_fast, oof_preds_fast)
-        log.info("Time-Bounded OOF (fast games only) — AUC-ROC: %.4f  PR-AUC: %.4f", oof_auc_fast, oof_prauc_fast)
+        log.info("Time-Bounded OOF (fast games only) — AUC-ROC: %.4f  PR-AUC: %.4f", 
+                 oof_auc_fast, oof_prauc_fast)
         
-        scorecard_signal_fast = 1.0 - df_train_val.loc[fast_mask, "l1_composite_score"].values
-        baseline_prauc_fast = average_precision_score(y_train_val_fast, scorecard_signal_fast)
-        log.info("Time-Bounded Scorecard baseline        : %.4f", baseline_prauc_fast)
-        log.info("Time-Bounded Data-Driven Lift        : %+.4f", oof_prauc_fast - baseline_prauc_fast)
+        scorecard_signal_fast = 1.0 - (
+            df_train_val.loc[fast_mask, "l1_composite_score"].values
+        )
+        baseline_prauc_fast = average_precision_score(y_train_val_fast, 
+                                                      scorecard_signal_fast)
+        log.info("Time-Bounded Scorecard baseline        : %.4f", 
+                 baseline_prauc_fast)
+        log.info("Time-Bounded Data-Driven Lift        : %+.4f", 
+                 oof_prauc_fast - baseline_prauc_fast)
         
         res["oof_auc_fast"] = float(oof_auc_fast)
         res["oof_prauc_fast"] = float(oof_prauc_fast)
@@ -725,7 +744,7 @@ def run_shap(model, X_sample: pd.DataFrame, feature_names: list[str]):
             "cumulative_variance_pct": float(round(
                 cumulative_variance.iloc[24] * 100, 2
             )),
-            "features": top25,           # ordered by mean |SHAP|, index = vector position
+            "features": top25,         # ordered by mean |SHAP|, index = vector position
         }, f, indent=2)
     log.info("Top 25 features exported → %s", top25_path)
 
@@ -747,7 +766,13 @@ def run_shap(model, X_sample: pd.DataFrame, feature_names: list[str]):
 # SECTION 6.5 — Error Analysis
 # ---------------------------------------------------------------------------
 
-def analyze_errors_shap(model, df_test: pd.DataFrame, genre_enc, feature_names: list[str], threshold: float):
+def analyze_errors_shap(
+        model, 
+        df_test: pd.DataFrame, 
+        genre_enc, 
+        feature_names: list[str], 
+        threshold: float
+        ):
     log.info("Computing SHAP for Error Analysis (Holdout)...")
 
     X_test, y_test, _, _ = build_feature_matrix(df_test, genre_enc)
@@ -766,8 +791,10 @@ def analyze_errors_shap(model, df_test: pd.DataFrame, genre_enc, feature_names: 
     shap_values = contributions[:, :-1]
 
     # SHAP means on each error type
-    shap_fn = np.abs(shap_values[fn_mask]).mean(axis=0) if fn_mask.sum() > 0 else np.zeros(len(feature_names))
-    shap_fp = np.abs(shap_values[fp_mask]).mean(axis=0) if fp_mask.sum() > 0 else np.zeros(len(feature_names))
+    shap_fn = (np.abs(shap_values[fn_mask]).mean(axis=0) 
+               if fn_mask.sum() > 0 else np.zeros(len(feature_names)))
+    shap_fp = (np.abs(shap_values[fp_mask]).mean(axis=0) 
+               if fp_mask.sum() > 0 else np.zeros(len(feature_names)))
 
     # What features characterise each error type?
     error_df = pd.DataFrame({
@@ -792,13 +819,16 @@ def run_tuning(df_train_val: pd.DataFrame, scale_pos_weight: float, n_trials: in
         params = {
             "n_estimators":      trial.suggest_int("n_estimators", 100, 500),
             "max_depth":         trial.suggest_int("max_depth", 3, 8),
-            "learning_rate":     trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
+            "learning_rate":     trial.suggest_float("learning_rate", 0.01, 0.3, 
+                                                     log=True),
             "subsample":         trial.suggest_float("subsample", 0.5, 1.0),
             "colsample_bytree":  trial.suggest_float("colsample_bytree", 0.5, 1.0),
             "min_child_weight":  trial.suggest_int("min_child_weight", 1, 10),
             "gamma":             trial.suggest_float("gamma", 0.0, 5.0),
-            "reg_alpha":         trial.suggest_float("reg_alpha", 1e-8, 10.0, log=True),
-            "reg_lambda":        trial.suggest_float("reg_lambda", 1e-8, 10.0, log=True),
+            "reg_alpha":         trial.suggest_float("reg_alpha", 1e-8, 10.0, 
+                                                     log=True),
+            "reg_lambda":        trial.suggest_float("reg_lambda", 1e-8, 10.0, 
+                                                     log=True),
             "scale_pos_weight":  scale_pos_weight,  
             "objective":         "binary:logistic",
             "eval_metric":       "aucpr",          
@@ -809,7 +839,9 @@ def run_tuning(df_train_val: pd.DataFrame, scale_pos_weight: float, n_trials: in
 
         clf = xgb.XGBClassifier(**params)
         
-        cv = StratifiedGroupKFold(n_splits=N_FOLDS, shuffle=True, random_state=RANDOM_SEED)
+        cv = StratifiedGroupKFold(n_splits=N_FOLDS, 
+                                  shuffle=True, 
+                                  random_state=RANDOM_SEED)
         
         scores = cross_val_score(
             clf, 
@@ -852,9 +884,11 @@ def run_tuning(df_train_val: pd.DataFrame, scale_pos_weight: float, n_trials: in
         fig_history.write_html(str(history_path))
         fig_importances.write_html(str(importances_path))
         
-        log.info("Saved Optuna visualizations to %s and %s", history_path, importances_path)
+        log.info("Saved Optuna visualizations to %s and %s", 
+                 history_path, importances_path)
     except Exception as e:
-        log.warning("Failed to save visualizations. Do you have plotly installed? Error: %s", e)
+        log.warning("Failed to save visualizations. "
+                    "Do you have plotly installed? Error: %s", e)
 
     return study
 
@@ -933,13 +967,18 @@ def main():
     n_pos = (df_train_val["label"] == 1).sum()
     
     if n_pos == 0:
-        raise ValueError("No positive labels (EXIT_ABANDONED/EXIT_SILENT) found in the train/val set!")
+        raise ValueError("No positive labels (EXIT_ABANDONED/EXIT_SILENT) found "
+                         "in the train/val set!")
         
     scale_pos_weight = round(n_neg / n_pos, 2)
     log.info("scale_pos_weight: %.2f", scale_pos_weight)
 
-    log.info("Train/val positive label rate: %.4f  (expected ~0.25 given 3:1 ratio)", df_train_val["label"].mean())
-    log.info("Holdout positive label rate:   %.4f  (if much higher, the holdout is easier)", df_test["label"].mean())
+    log.info("Train/val positive label rate: %.4f  "
+             "(expected ~0.25 given 3:1 ratio)", 
+             df_train_val["label"].mean())
+    log.info("Holdout positive label rate:   %.4f  "
+             "(if much higher, the holdout is easier)", 
+             df_test["label"].mean())
 
     if args.dry_run:
         X, y, groups, enc = build_feature_matrix(df_train_val)
@@ -961,9 +1000,11 @@ def main():
             tuned_params = json.load(f)
         XGB_PARAMS.update(tuned_params)
     elif not args.ignore_tuned:
-        log.info("No tuned parameters found at %s. Using default XGB_PARAMS.", TUNED_PARAMS_PATH)
+        log.info("No tuned parameters found at %s. Using default XGB_PARAMS.", 
+                 TUNED_PARAMS_PATH)
     else:
-        log.info("Ignoring tuned parameters (--ignore-tuned). Using default XGB_PARAMS.")
+        log.info("Ignoring tuned parameters (--ignore-tuned). "
+                 "Using default XGB_PARAMS.")
 
     with start_run(model_version=MODEL_VERSION) as mlflow_run:
 
@@ -977,7 +1018,8 @@ def main():
 
         # ── Section 4: Final model ───────────────────────────────────────
         model = train_final_model(
-            df_train_val, best_iters, scale_pos_weight, genre_enc, feature_names, threshold
+            df_train_val, best_iters, scale_pos_weight, 
+            genre_enc, feature_names, threshold
         )
 
         # ── Section 5: Evaluation + Lift ─────────────────────────────────

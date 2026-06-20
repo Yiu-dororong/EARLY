@@ -51,14 +51,15 @@ USAGE (inference.py / populate_zilliz.py)
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from contextlib import contextmanager
 from pathlib import Path
-from dotenv import load_dotenv
 from typing import Optional
+
 import pandas as pd
+from dotenv import load_dotenv
+
 
 load_dotenv()
 
@@ -147,7 +148,9 @@ def log_training_run(
     if not _MLFLOW_AVAILABLE:
         log.info(
             "[no-op] Would log training run: model_version=%s metrics=%s",
-            model_version, {k: round(v, 4) if isinstance(v, float) else v for k, v in metrics.items()},
+            model_version, {k: round(v, 4) 
+                            if isinstance(v, float) 
+                            else v for k, v in metrics.items()},
         )
         return None
 
@@ -169,7 +172,8 @@ def log_training_run(
         import xgboost as xgb
         bst = xgb.Booster()
         bst.load_model(str(model_path)) 
-        mlflow.xgboost.log_model(xgb_model=bst, name="model", input_example=input_example)
+        mlflow.xgboost.log_model(xgb_model=bst, name="model", 
+                                 input_example=input_example)
     if features_path.exists():
         mlflow.log_artifact(str(features_path), artifact_path="features")
     if shap_top25_path and shap_top25_path.exists():
@@ -200,7 +204,8 @@ def log_training_run(
 
 def _setup_mlflow_uris():
     """Ensure tracking and registry URIs are set consistently."""
-    tracking_uri = "databricks" if os.getenv("DATABRICKS_HOST") else os.getenv("MLFLOW_TRACKING_URI", "./mlruns")
+    tracking_uri = ("databricks" if os.getenv("DATABRICKS_HOST") 
+                    else os.getenv("MLFLOW_TRACKING_URI", "./mlruns"))
     mlflow.set_tracking_uri(tracking_uri)
     if tracking_uri == "databricks":
         registry_uri = os.getenv("MLFLOW_REGISTRY_URI", "databricks-uc")
@@ -219,12 +224,14 @@ def get_production_model_uri() -> str | None:
     client = MlflowClient()
 
     try:
-        mv = client.get_model_version_by_alias(name=REGISTERED_MODEL_NAME, alias="champion")
+        mv = client.get_model_version_by_alias(name=REGISTERED_MODEL_NAME, 
+                                               alias="champion")
     except Exception as e:
         log.warning("Could not query registry: %s", e)
         return None
 
-    log.info("Production model: %s v%s (run_id=%s)", REGISTERED_MODEL_NAME, mv.version, mv.run_id)
+    log.info("Production model: %s v%s (run_id=%s)", REGISTERED_MODEL_NAME, 
+             mv.version, mv.run_id)
     return f"models:/{REGISTERED_MODEL_NAME}@champion"
 
 
@@ -242,7 +249,9 @@ def get_run_metrics(run_id: str) -> dict:
         return {}
 
 
-def download_artifact(model_uri: str, artifact_relpath: str, dst_dir: str | Path = "models") -> Path | None:
+def download_artifact(model_uri: str, 
+                      artifact_relpath: str, 
+                      dst_dir: str | Path = "models") -> Path | None:
     """
     Download a single artifact (e.g. 'model/xgb_v1.3.json') from a model
     version's artifact store to dst_dir. Returns local path or None.
@@ -257,5 +266,6 @@ def download_artifact(model_uri: str, artifact_relpath: str, dst_dir: str | Path
         )
         return Path(local_path)
     except Exception as e:
-        log.warning("Artifact download failed (%s / %s): %s", model_uri, artifact_relpath, e)
+        log.warning("Artifact download failed (%s / %s): %s", 
+                    model_uri, artifact_relpath, e)
         return None

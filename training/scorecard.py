@@ -32,12 +32,9 @@ import logging
 import math
 import os
 from datetime import datetime, timezone
-from dotenv import load_dotenv
-
-load_dotenv()
 
 import libsql
-import pandas as pd
+from dotenv import load_dotenv
 
 from training.scorecard_config import (
     CONFIG_VERSION,
@@ -50,6 +47,9 @@ from training.scorecard_config import (
     MOMENTUM_LR,
     STATE_THRESHOLDS,
 )
+
+
+load_dotenv()
 
 # ---------------------------------------------------------------------------
 # DB
@@ -500,7 +500,8 @@ def upsert_batch(conn: libsql.Connection, results: list[dict]) -> None:
         conn.commit()
 
         processed = i + len(chunk)
-        log.info("  Upserted %d/%d rows (%.1f%%)", processed, total, processed / total * 100)
+        log.info("  Upserted %d/%d rows (%.1f%%)", 
+                 processed, total, processed / total * 100)
 
 
 # ---------------------------------------------------------------------------
@@ -512,11 +513,14 @@ def run(dry_run: bool, appid: int | None, limit: int | None) -> None:
     conn.execute(CREATE_SCORECARD_TABLE)
     conn.commit()
 
-    existing_versions = {r[0] for r in conn.execute("SELECT DISTINCT config_version FROM scorecard").fetchall() if r[0]}
+    existing_versions = {r[0] for r in conn.execute(
+        "SELECT DISTINCT config_version FROM scorecard"
+        ).fetchall() if r[0]}
     if CONFIG_VERSION in existing_versions:
         log.warning(
             "CONFIG_VERSION '%s' already exists in the database. "
-            "Records will be overwritten. Did you forget to bump the version?", CONFIG_VERSION
+            "Records will be overwritten. Did you forget to bump the version?", 
+            CONFIG_VERSION
         )
 
     log.info("Loading snapshots (config=%s)...", CONFIG_VERSION)
@@ -548,7 +552,8 @@ def run(dry_run: bool, appid: int | None, limit: int | None) -> None:
     total = len(results)
     for state, count in sorted(state_dist.items(), key=lambda x: -x[1]):
         log.info("  %-20s %4d  (%.1f%%)", state, count, 100 * count / total)
-    log.info("Hard abandon overrides: %d snapshots (%d games)", hard_overrides, len(hard_override_appids))
+    log.info("Hard abandon overrides: %d snapshots (%d games)", 
+             hard_overrides, len(hard_override_appids))
     log.info("=" * 60)
 
     if dry_run:

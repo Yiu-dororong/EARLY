@@ -60,6 +60,7 @@ from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+
 load_dotenv()
 log = logging.getLogger(__name__)
 
@@ -169,7 +170,10 @@ class ITADClient:
             log.warning("ITAD GET request error — %s: %s", url, e)
             return None
 
-    def _post(self, endpoint: str, payload: Any, params: dict | None = None) -> Any | None:
+    def _post(self, 
+              endpoint: str, 
+              payload: Any, 
+              params: dict | None = None) -> Any | None:
         url = f"{ITAD_BASE_URL}{endpoint}"
         try:
             resp = self.session.post(url, json=payload, params=params or {}, timeout=10)
@@ -271,7 +275,9 @@ class ITADClient:
     # Step 3 — Fetch full price change log via GET /games/history/v2
     # -----------------------------------------------------------------------
 
-    def _fetch_price_history(self, game_id: str, since_date: str | None = None) -> list[dict]:
+    def _fetch_price_history(self, 
+                             game_id: str, 
+                             since_date: str | None = None) -> list[dict]:
         """
         GET /games/history/v2?id=<uuid>&country=US&since=<iso>
 
@@ -332,7 +338,8 @@ class ITADClient:
         # Retry without since to get whatever history exists.
         if not records and since_date:
             log.info(
-                "game_id=%s: no history with since=%s — retrying without since (ITAD data gap)",
+                "game_id=%s: no history with since=%s — "
+                "retrying without since (ITAD data gap)",
                 game_id, since_date,
             )
             time.sleep(RATE_LIMIT_DELAY)
@@ -442,7 +449,9 @@ class ITADClient:
                 signals.lowest_price_usd = min(valid_prices)
 
         # ── price_trend ───────────────────────────────────────────────────
-        if signals.initial_price_usd is not None and signals.current_price_usd is not None and signals.current_price_source == "history":
+        if (signals.initial_price_usd is not None 
+            and signals.current_price_usd is not None 
+            and signals.current_price_source == "history"):
             delta = signals.current_price_usd - signals.initial_price_usd
             if delta > 0.5:
                 signals.price_trend = "increased"
@@ -463,7 +472,8 @@ class ITADClient:
         # ── discount_frequency + early_deep_discount_flag ─────────────────
         if ea_start_date:
             try:
-                ea_start    = datetime.fromisoformat(ea_start_date).replace(tzinfo=timezone.utc)
+                ea_start    = datetime.fromisoformat(
+                                ea_start_date).replace(tzinfo=timezone.utc)
                 ea_months   = max((snap_dt - ea_start).days / 30.0, 1.0)
                 signals.discount_frequency = round(
                     signals.discount_count_to_date / ea_months, 3
@@ -471,7 +481,8 @@ class ITADClient:
 
                 # Early deep discount: >50% within first 180 days of EA
                 ea_start_iso        = ea_start.date().isoformat()
-                early_window_end    = (ea_start + timedelta(days=EARLY_DEEP_DISCOUNT_WINDOW_DAYS))
+                early_window_end    = (ea_start + timedelta(
+                                                    days=EARLY_DEEP_DISCOUNT_WINDOW_DAYS))
                 early_window_end_iso = early_window_end.date().isoformat()
 
                 early_deep = [
@@ -482,7 +493,8 @@ class ITADClient:
                 signals.early_deep_discount_flag = len(early_deep) > 0
 
             except ValueError:
-                log.warning("appid=%d — unparseable ea_start_date: %r", appid, ea_start_date)
+                log.warning("appid=%d — unparseable ea_start_date: %r", 
+                            appid, ea_start_date)
 
         return signals
 

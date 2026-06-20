@@ -31,14 +31,17 @@ import argparse
 import json
 import logging
 import os
+import sys
 import time
 from pathlib import Path
-from dotenv import load_dotenv
-
-load_dotenv()
 
 import numpy as np
 import xgboost as xgb
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
 
 log = logging.getLogger(__name__)
 logging.basicConfig(
@@ -53,7 +56,6 @@ logging.basicConfig(
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-import sys
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -78,7 +80,9 @@ def get_db():
 # Helpers
 # ---------------------------------------------------------------------------
 
-def load_model_and_features(model_version: str) -> tuple[xgb.Booster, list[str], list[str]]:
+def load_model_and_features(model_version: str) -> tuple[xgb.Booster, 
+                                                         list[str], 
+                                                         list[str]]:
     """Load XGBoost booster, top-25 feature list, and genre columns."""
     model_path = MODEL_DIR / f"xgb_{model_version}.json"
     top25_path = MODEL_DIR / f"shap_top25_{model_version}.json"
@@ -228,7 +232,9 @@ def compute_shap_vectors(
         if rev_score is not None and upd_trend is not None:
             try:
                 clipped_trend = max(-1.0, min(1.0, float(upd_trend)))
-                features["review_update_divergence"] = float(rev_score) * (1.0 - clipped_trend)
+                features["review_update_divergence"] = (
+                    float(rev_score) * (1.0 - clipped_trend)
+                )
             except (ValueError, TypeError):
                 features["review_update_divergence"] = None
         else:
@@ -299,7 +305,8 @@ def upsert_to_zilliz(snapshots: list[dict], dry_run: bool = False) -> tuple[int,
 
     client = get_client()
     if client is None:
-        raise RuntimeError("Zilliz client not available — check ZILLIZ_URI and ZILLIZ_TOKEN")
+        raise RuntimeError("Zilliz client not available — "
+                           "check ZILLIZ_URI and ZILLIZ_TOKEN")
 
     if not ensure_collection():
         raise RuntimeError("Failed to ensure Zilliz collection exists")
@@ -344,7 +351,8 @@ def upsert_to_zilliz(snapshots: list[dict], dry_run: bool = False) -> tuple[int,
             )
         except Exception as e:
             error += len(rows)
-            log.error("Batch %d–%d failed: %s", batch_start, batch_start + len(batch), e)
+            log.error("Batch %d–%d failed: %s", 
+                      batch_start, batch_start + len(batch), e)
 
     return success, error
 
@@ -354,10 +362,14 @@ def upsert_to_zilliz(snapshots: list[dict], dry_run: bool = False) -> tuple[int,
 # ---------------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(description="Populate Zilliz with historical SHAP anchors")
+    parser = argparse.ArgumentParser(
+        description="Populate Zilliz with historical SHAP anchors"
+    )
     parser.add_argument("--model-version", default=DEFAULT_MODEL_VERSION)
-    parser.add_argument("--dry-run",  action="store_true", help="Validate without writing to Zilliz")
-    parser.add_argument("--rebuild",  action="store_true", help="Drop and recreate collection first")
+    parser.add_argument("--dry-run",  action="store_true", 
+                        help="Validate without writing to Zilliz")
+    parser.add_argument("--rebuild",  action="store_true", 
+                        help="Drop and recreate collection first")
     args = parser.parse_args()
 
     log.info("=== seed_vector_db.py ===")
@@ -389,7 +401,8 @@ def main():
         return
 
     # Compute SHAP vectors
-    snapshots = compute_shap_vectors(snapshots, booster, all_feature_cols, top25_features, genre_cols)
+    snapshots = compute_shap_vectors(snapshots, booster, 
+                                     all_feature_cols, top25_features, genre_cols)
 
     # Upsert to Zilliz
     t0 = time.time()

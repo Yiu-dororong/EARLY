@@ -36,29 +36,31 @@ Usage:
 """
 
 import argparse
+import json
 import logging
 import os
-import json
-from dotenv import load_dotenv
-
-load_dotenv()
+import sys
 
 import libsql
 import pandas as pd
-import sys
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from training.scorecard_config import (
+
+from training.scorecard_config import (  # noqa: E402
     CONFIG_VERSION,
     DIMENSION_FEATURES,
     FEATURE_SCALES,
-    STATE_THRESHOLDS,
     HARD_ABANDON_BUILD_GAP_DAYS,
+    STATE_THRESHOLDS,
 )
+
 
 # ---------------------------------------------------------------------------
 # DB
@@ -165,12 +167,20 @@ def analyse_distribution(df: pd.DataFrame) -> None:
         )
 
     # Hard abandon overrides
-    hard_abandon_mask = (df["l1_state"] == "At Risk") & (df["l1_composite_score"] == 0.0)
+    hard_abandon_mask = (
+        (df["l1_state"] == "At Risk") 
+        & (df["l1_composite_score"] == 0.0)
+        )
     n_hard_snaps = hard_abandon_mask.sum()
     n_hard_games = df.loc[hard_abandon_mask, "appid"].nunique()
     log.info("")
-    log.info("Hard abandon overrides (>= %d days without build): %d snapshots across %d games", 
-             HARD_ABANDON_BUILD_GAP_DAYS, n_hard_snaps, n_hard_games)
+    log.info(
+            "Hard abandon overrides (>= %d days without build): "
+            "%d snapshots across %d games",
+            HARD_ABANDON_BUILD_GAP_DAYS,
+            n_hard_snaps,
+            n_hard_games,
+        )
 
     # Per snapshot_pct breakdown
     if "snapshot_pct" in df.columns:
@@ -235,7 +245,8 @@ def analyse_outcome_agreement(df: pd.DataFrame) -> dict:
 
         n          = len(subset)
         n_success  = (subset["outcome"] == "EXIT_SUCCESS").sum()
-        n_abandoned = ((subset["outcome"] == "EXIT_ABANDONED") | (subset["outcome"] == "EXIT_SILENT")).sum()
+        n_abandoned = ((subset["outcome"] == "EXIT_ABANDONED") 
+                       | (subset["outcome"] == "EXIT_SILENT")).sum()
         pct_success  = 100 * n_success  / n
         pct_abandoned = 100 * n_abandoned / n
 
@@ -260,7 +271,8 @@ def analyse_outcome_agreement(df: pd.DataFrame) -> dict:
             
         if prev_state and pct_abandoned < prev_pct_abandoned:
             calibration_warnings.append(
-                f"  Monotonicity violation: '{state}' has a lower abandoned rate ({pct_abandoned:.1f}%) "
+                f"  Monotonicity violation: '{state}' "
+                f"has a lower abandoned rate ({pct_abandoned:.1f}%) "
                 f"than '{prev_state}' ({prev_pct_abandoned:.1f}%)."
             )
             
@@ -293,25 +305,32 @@ def analyse_outcome_agreement(df: pd.DataFrame) -> dict:
 
     # Generate Visualization (Decile Bins)
     try:
-        import plotly.express as px
         import numpy as np
+        import plotly.express as px
         
         bins = np.linspace(0, 1.0, 11)
         labels = [f"{bins[i]:.1f}-{bins[i+1]:.1f}" for i in range(len(bins)-1)]
         
         final_viz = final.copy()
-        final_viz["score_bin"] = pd.cut(final_viz["l1_composite_score"], bins=bins, labels=labels, include_lowest=True)
+        final_viz["score_bin"] = pd.cut(final_viz["l1_composite_score"], 
+                                        bins=bins, 
+                                        labels=labels, 
+                                        include_lowest=True)
         
         valid_outcomes = ["EXIT_SUCCESS", "EXIT_ABANDONED", "EXIT_SILENT"]
         final_viz = final_viz[final_viz["outcome"].isin(valid_outcomes)]
         
-        bin_counts = final_viz.groupby(["score_bin", "outcome"], observed=False).size().reset_index(name="count")
+        bin_counts = final_viz.groupby(["score_bin", "outcome"], 
+                                       observed=False).size().reset_index(name="count")
         
-        total_per_bin = bin_counts.groupby("score_bin", observed=False)["count"].transform("sum")
+        total_per_bin = bin_counts.groupby("score_bin", 
+                                           observed=False)["count"].transform("sum")
         bin_counts["Percentage"] = (bin_counts["count"] / total_per_bin * 100).fillna(0)
         bin_counts = bin_counts[bin_counts["Percentage"] > 0]
         
-        bin_counts["Label"] = bin_counts.apply(lambda row: f"{row['Percentage']:.1f}% ({row['count']})", axis=1)
+        bin_counts["Label"] = bin_counts.apply(lambda row: (
+            f"{row['Percentage']:.1f}% ({row['count']})"
+            ), axis=1)
         
         fig = px.bar(
             bin_counts,
@@ -331,12 +350,14 @@ def analyse_outcome_agreement(df: pd.DataFrame) -> dict:
         fig.update_traces(texttemplate='%{text}', textposition='inside')
         
         os.makedirs("outputs", exist_ok=True)
-        out_path = os.path.join("outputs", f"outcome_distribution_deciles_{CONFIG_VERSION}.html")
+        out_path = os.path.join("outputs", 
+                                f"outcome_distribution_deciles_{CONFIG_VERSION}.html")
         fig.write_html(out_path)
         log.info("")
         log.info("Saved Outcome Distribution visualization to %s", out_path)
     except ImportError:
-        log.warning("Plotly/numpy not installed. Skipping visualization. (Run: pip install plotly numpy)")
+        log.warning("Plotly/numpy not installed. Skipping visualization." 
+                    "(Run: pip install plotly numpy)")
 
     return state_agreement
 
@@ -499,7 +520,8 @@ def calibration_recommendations(sc_df: pd.DataFrame, raw_df: pd.DataFrame) -> No
         log.info("No specific cap adjustments flagged.")
 
     log.info("")
-    log.info("To recalibrate: edit scorecard_config.py, bump CONFIG_VERSION, re-run scorecard.py")
+    log.info("To recalibrate: edit scorecard_config.py, "
+             "bump CONFIG_VERSION, re-run scorecard.py")
 
 
 # ---------------------------------------------------------------------------
