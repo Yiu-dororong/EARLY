@@ -77,6 +77,7 @@ from datetime import date, datetime, timedelta, timezone
 from statistics import median
 from typing import Any
 
+
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------

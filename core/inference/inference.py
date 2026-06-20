@@ -91,15 +91,16 @@ import argparse
 import json
 import logging
 import os
-from pathlib import Path
+import sys
 import time
-from datetime import date, datetime, timezone
-from typing import Any
+from datetime import datetime, timezone
+from pathlib import Path
 
 import libsql
 import numpy as np
 import xgboost as xgb
 from dotenv import load_dotenv
+
 
 load_dotenv()
 
@@ -111,11 +112,12 @@ DB_RETRY_DELAY = 5.0
 
 DEFAULT_MODEL_VERSION = "v1.3"
 
-# Dynamically locate the project root to ensure models directory is found regardless of cwd
+# Dynamically locate the project root to ensure models directory is found
 PROJECT_ROOT          = Path(__file__).resolve().parent.parent.parent
 MODEL_DIR             = PROJECT_ROOT / "models"
 
-import sys
+
+
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -188,7 +190,9 @@ def load_latest_live_snapshots(
                 FROM live_snapshots
                 {where}
                 AND snapshot_date = (
-                    SELECT MAX(snapshot_date) FROM live_snapshots ls2 WHERE ls2.appid = live_snapshots.appid
+                    SELECT MAX(snapshot_date) 
+                    FROM live_snapshots ls2 
+                    WHERE ls2.appid = live_snapshots.appid
                 )
                 ORDER BY appid
             """, params).fetchall()
@@ -197,10 +201,13 @@ def load_latest_live_snapshots(
         except Exception as e:
             if attempt == DB_MAX_RETRIES:
                 raise
-            log.warning("DB read error in load_latest_live_snapshots: %s - reconnecting", e)
+            log.warning("DB read error in load_latest_live_snapshots: "
+                        "%s - reconnecting", e)
             time.sleep(DB_RETRY_DELAY)
-            try: conn.close()
-            except Exception: pass
+            try: 
+                conn.close()
+            except Exception as e: 
+                log.warning("Error occurred while closing connection: %s", e)
             conn = get_conn()
     return [], conn
 
@@ -214,7 +221,8 @@ def upsert_score(conn: libsql.Connection, score: dict) -> libsql.Connection:
                     p_distressed, is_distressed, l1_state,
                     ml_eligible, model_version,
                     null_features, review_count_at_T,
-                    update_health, player_retention, dev_engagement, sentiment, price_market,
+                    update_health, player_retention, dev_engagement, 
+                    sentiment, price_market,
                     shap_json, days_since_last_build_update, l1_composite_score
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
@@ -245,8 +253,10 @@ def upsert_score(conn: libsql.Connection, score: dict) -> libsql.Connection:
                 raise
             log.warning("DB write error in upsert_score: %s - reconnecting", e)
             time.sleep(DB_RETRY_DELAY)
-            try: conn.close()
-            except Exception: pass
+            try: 
+                conn.close()
+            except Exception as e: 
+                log.warning("Error occurred while closing connection: %s", e)
             conn = get_conn()
     return conn
 
@@ -255,7 +265,10 @@ def upsert_score(conn: libsql.Connection, score: dict) -> libsql.Connection:
 # Model artifact loading
 # ---------------------------------------------------------------------------
 
-def load_model_artifacts(version: str) -> tuple[xgb.Booster, list[str], list[str], float]:
+def load_model_artifacts(version: str) -> tuple[xgb.Booster, 
+                                                list[str], 
+                                                list[str], 
+                                                float]:
     """
     Load model booster + feature metadata from models/{version}.json and
     models/{version}_features.json.
@@ -315,7 +328,8 @@ def load_shap_features(version: str) -> list[str]:
         )
         return features
     else:
-        log.warning("shap_top25_%s.json not found — shap_json will not be computed", version)
+        log.warning("shap_top25_%s.json not found — "
+                    "shap_json will not be computed", version)
         return []
 
 
@@ -341,7 +355,8 @@ def encode_genre(primary_genre: str | None, genre_cols: list[str]) -> dict[str, 
         encoded[expected_col] = 1
     else:
         log.warning(
-            "Unknown genre %r (col %r not in training set) — all genre columns set to 0. "
+            "Unknown genre %r (col %r not in training set) — "
+            "all genre columns set to 0. "
             "Consider patching xgb_%s_features.json if this is a new Steam tag.",
             primary_genre, expected_col, DEFAULT_MODEL_VERSION,
         )
@@ -402,7 +417,8 @@ def assemble_feature_row(
             except (TypeError, ValueError):
                 # Non-numeric feature (e.g. price_trend text before encoding)
                 # These should have been encoded upstream; log and null-route.
-                log.warning("Non-numeric value for feature %r: %r — treating as null", col, val)
+                log.warning("Non-numeric value for feature %r: %r — treating as null", 
+                            col, val)
                 null_features.append(col)
                 row.append(float("nan"))
 
@@ -465,7 +481,9 @@ def score_game(
     if rev_score is not None and upd_trend is not None:
         try:
             clipped_trend = max(-1.0, min(1.0, float(upd_trend)))
-            features["review_update_divergence"] = float(rev_score) * (1.0 - clipped_trend)
+            features["review_update_divergence"] = (
+                float(rev_score) * (1.0 - clipped_trend)
+                )
         except (ValueError, TypeError):
             features["review_update_divergence"] = None
     else:
@@ -484,7 +502,8 @@ def score_game(
         price_market = l1_result.get("l1_price_market_score")
         l1_composite_score = l1_result.get("l1_composite_score")
 
-        # Inject scores back into features dict using column names from build_snapshots.py
+        # Inject scores back into features dict 
+        # using column names from build_snapshots.py
         features["l1_composite_score"] = l1_result.get("l1_composite_score")
         features["l1_update_health_score"] = update_health
         features["l1_player_retention_score"] = player_retention
@@ -517,7 +536,9 @@ def score_game(
         genre_encoded = encode_genre(features.get("primary_genre"), genre_cols)
 
         # Assemble ordered feature row
-        row, null_features = assemble_feature_row(features, genre_encoded, all_feature_cols)
+        row, null_features = assemble_feature_row(features, 
+                                                  genre_encoded, 
+                                                  all_feature_cols)
 
         # Predict
         dmat = xgb.DMatrix(
@@ -580,11 +601,14 @@ def score_game(
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Score STAYS_ACTIVE games with EARLY model")
-    p.add_argument("--appid",   type=int,  help="Single appid (debug)")
+    p.add_argument("--appid",   type=int,  
+                   help="Single appid (debug)")
     p.add_argument("--model",   type=str,  default=DEFAULT_MODEL_VERSION,
                    help="Model version string, e.g. v1.0 (default) or v1.1")
-    p.add_argument("--dry-run", action="store_true", help="Compute but don't write scores")
-    p.add_argument("--no-itad", action="store_true", help="Skip ITAD price features")
+    p.add_argument("--dry-run", action="store_true", 
+                   help="Compute but don't write scores")
+    p.add_argument("--no-itad", action="store_true", 
+                   help="Skip ITAD price features")
     p.add_argument("--verbose", action="store_true")
     return p.parse_args()
 
@@ -595,7 +619,6 @@ def main() -> None:
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    today = datetime.now(timezone.utc).date()
     conn  = get_conn()
     ensure_live_scores_table(conn)
 
@@ -661,7 +684,8 @@ def main() -> None:
                     i, len(candidates),
                     score["appid"],
                     score["ea_age_days"],
-                    f"{score['p_distressed']:.4f}" if score["p_distressed"] is not None else "N/A",
+                    f"{score['p_distressed']:.4f}" 
+                    if score["p_distressed"] is not None else "N/A",
                     score["l1_state"] or "N/A",
                     len(score["null_features"]),
                     "  [DRY RUN]" if args.dry_run else "",
