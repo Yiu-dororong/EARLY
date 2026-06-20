@@ -2,6 +2,8 @@
 
 **Detects early warning signs that a Steam Early Access game may be abandoned.**
 
+![CI](https://github.com/Yiu-dororong/EARLY/actions/workflows/score.yml/badge.svg) [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/) [![Docker](https://img.shields.io/badge/Infra-Docker-2496ED.svg?logo=docker&logoColor=white)](https://www.docker.com/) [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 EARLY monitors more than 1,000 active Early Access titles and draws on patterns from roughly 1,600 historically completed or abandoned games. It produces a distress risk score and a three-tier health label (**Healthy / Watch / At Risk**) to highlight games that are losing momentum — often well before the review scores reflect the decline.
 
 <!-- INSERT: screenshot or short GIF of the Streamlit dashboard (dark theme, risk meters, health labels) -->
