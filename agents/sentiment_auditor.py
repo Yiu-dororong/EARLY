@@ -17,19 +17,18 @@ Tracing: Langfuse generation span
 
 from __future__ import annotations
 
-import json
 import os
-import re
 from dataclasses import dataclass
 from typing import Any
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
-from langchain_core.runnables import RunnableConfig
 
-from agents.states import SentimentState, SentimentOutputModel
 from agents.prompts import AUDITOR_SYSTEM_PROMPT
+from agents.states import SentimentOutputModel, SentimentState
+
 
 MAX_RECENT_REVIEWS = 25
 MAX_OLDER_REVIEWS  = 15

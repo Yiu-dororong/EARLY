@@ -4,8 +4,9 @@ EARLY — Agent state typed dicts and Pydantic output models.
 """
 
 from typing import Annotated, TypedDict
-from pydantic import BaseModel
+
 from langgraph.graph.message import add_messages
+from pydantic import BaseModel
 
 
 # ---------------------------------------------------------------------------
@@ -27,7 +28,7 @@ class ForensicState(TypedDict):
     snapshot_date: str
     ea_age_days: int
     days_since_last_build_update: int
-    announcements: list[AnnouncementInput]   # most recent first, up to MAX_EVENTS_CONSIDERED
+    announcements: list[AnnouncementInput]   
     update_substance_score: float | None
     fake_heartbeat_flag: int | None
     momentum: str | None
@@ -58,10 +59,10 @@ class SentimentState(TypedDict):
     review_count_at_T: int
     recent_reviews: list[dict]
     older_reviews: list[dict]
-    l1_state: str | None              # NEW — for triangulation
+    l1_state: str | None              
     theme_clusters: list[dict] | None
     sentiment_shift: str | None
-    sentiment_alignment: str | None   # NEW
+    sentiment_alignment: str | None   
     key_concerns: list[str] | None
     auditor_summary: str | None
     error_msg: str | None

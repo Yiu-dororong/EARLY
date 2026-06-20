@@ -19,17 +19,17 @@ import contextlib
 import logging
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from typing import Any
 
-from agents.states import AnnouncementInput
+from agents.critic_agent import CriticResult, run_critic_agent
 from agents.forensic_agent import (
-    ForensicResult,
     LOOKBACK_DAYS,
     MAX_EVENTS_CONSIDERED,
+    ForensicResult,
     run_forensic_agent,
 )
 from agents.sentiment_auditor import SentimentResult, run_sentiment_auditor
-from agents.critic_agent import CriticResult, run_critic_agent
+from agents.states import AnnouncementInput
+
 
 logger = logging.getLogger(__name__)
 
@@ -178,8 +178,9 @@ def run_analysis(ctx: GameContext) -> AnalysisResult:
     trace = None
     langfuse_client = None
     try:
-        from utils.langfuse_client import get_callback_handler
         from langfuse import get_client
+
+        from utils.langfuse_client import get_callback_handler
         trace = get_callback_handler()
         if trace:
             langfuse_client = get_client()

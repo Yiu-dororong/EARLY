@@ -25,19 +25,18 @@ Tracing: Langfuse generation span (optional, no-op if disabled)
 
 from __future__ import annotations
 
-import json
 import os
-import re
 from dataclasses import dataclass
 from typing import Any
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
-from langchain_core.runnables import RunnableConfig
 
-from agents.states import AnnouncementInput, ForensicState, ForensicOutputModel
 from agents.prompts import FORENSIC_SYSTEM_PROMPT
+from agents.states import AnnouncementInput, ForensicOutputModel, ForensicState
+
 
 # Lookback window — see design note in module docstring
 MAX_EVENTS_CONSIDERED = 3
@@ -131,7 +130,8 @@ def assess_updates(state: ForensicState, config: RunnableConfig) -> dict:
 
     llm    = _get_llm().with_structured_output(ForensicOutputModel, method="json_mode")
     prompt = _build_user_prompt(state)
-    messages_in = [SystemMessage(content=FORENSIC_SYSTEM_PROMPT), HumanMessage(content=prompt)]
+    messages_in = [SystemMessage(content=FORENSIC_SYSTEM_PROMPT), 
+                   HumanMessage(content=prompt)]
 
     try:
         parsed = llm.invoke(messages_in, config=config)
@@ -140,7 +140,10 @@ def assess_updates(state: ForensicState, config: RunnableConfig) -> dict:
 
         score = max(0.0, min(10.0, float(parsed.update_substance_score)))
         momentum = parsed.momentum
-        if momentum not in ("consistent_progress", "single_update", "declining", "hollow_pattern"):
+        if momentum not in ("consistent_progress", 
+                            "single_update", 
+                            "declining", 
+                            "hollow_pattern"):
             momentum = "single_update"
 
         return {
@@ -153,8 +156,8 @@ def assess_updates(state: ForensicState, config: RunnableConfig) -> dict:
         }
 
     except Exception as e:
-        return {"update_substance_score": None, "fake_heartbeat_flag": None, "momentum": None,
-                "event_state_mismatch": None, "reasoning": None,
+        return {"update_substance_score": None, "fake_heartbeat_flag": None, 
+                "momentum": None, "event_state_mismatch": None, "reasoning": None,
                 "error_msg": f"LLM call failed: {type(e).__name__}: {e}"}
 
 
@@ -166,7 +169,11 @@ def validate_output(state: ForensicState) -> dict:
     most_recent = state["announcements"][0] if state.get("announcements") else None
 
     # Secondary heuristic: very low score + very short most-recent post → force flag
-    if most_recent and score is not None and score < 4.0 and most_recent["word_count"] < 20:
+    if (most_recent 
+        and score is not None 
+        and score < 4.0 
+        and most_recent["word_count"] < 20
+        ):
         flag = 1
 
     return {"fake_heartbeat_flag": flag}

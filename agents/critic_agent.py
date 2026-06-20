@@ -30,12 +30,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
-from langchain_core.runnables import RunnableConfig
 
-from agents.states import CriticState
 from agents.prompts import CRITIC_CONSUMER_SYSTEM, CRITIC_DEVELOPER_SYSTEM
+from agents.states import CriticState
+
 
 MODEL_NAME = "llama-3.3-70b-versatile"
 
@@ -86,10 +87,20 @@ def _context(state: CriticState) -> str:
         f"SIGNAL ALIGNMENT: {state.get('signal_alignment', 'partial')}",
         "",
         f"Scorecard: {state['l1_state']} (composite {state['l1_composite_score']:.3f})",
-        f"  Update Health: {_fmt(state.get('update_health'))}  Player Retention: {_fmt(state.get('player_retention'))}",
-        f"  Dev Engagement: {_fmt(state.get('dev_engagement'))}  Sentiment: {_fmt(state.get('sentiment'))}  Price/Market: {_fmt(state.get('price_market'))}",
+        (
+            f"  Update Health: {_fmt(state.get('update_health'))}  "
+            f"Player Retention: {_fmt(state.get('player_retention'))}"
+        ),
+        (
+            f"  Dev Engagement: {_fmt(state.get('dev_engagement'))}  "
+            f"Sentiment: {_fmt(state.get('sentiment'))}  "
+            f"Price/Market: {_fmt(state.get('price_market'))}"
+        ),
         "",
-        f"ML: {'eligible' if state['ml_eligible'] else 'not eligible'}  P(distressed): {_fmt(state.get('p_distressed'))}",
+        (
+            f"ML: {'eligible' if state['ml_eligible'] else 'not eligible'}  "
+            f"P(distressed): {_fmt(state.get('p_distressed'))}"
+        ),
     ]
 
     if state.get("forensic_ran"):
@@ -121,7 +132,8 @@ def _context(state: CriticState) -> str:
         ]
         if alignment == "conflicted":
             parts.append(
-                f"  >> NOTE: player sentiment CONFLICTS with l1_state={state['l1_state']} "
+                f"  >> NOTE: player sentiment CONFLICTS with "
+                f"l1_state={state['l1_state']} "
                 f"— see summary above for the specific discrepancy."
             )
     else:
@@ -137,10 +149,16 @@ def _get_llm() -> ChatGroq:
     return ChatGroq(model=MODEL_NAME, temperature=0.3, max_tokens=512, api_key=api_key)
 
 
-def _llm_call(system: str, prompt: str, config: RunnableConfig) -> tuple[str | None, str | None]:
+def _llm_call(
+        system: str, 
+        prompt: str, 
+        config: RunnableConfig
+        ) -> tuple[str | None, str | None]:
     llm = _get_llm()
     try:
-        response: AIMessage = llm.invoke([SystemMessage(content=system), HumanMessage(content=prompt)], config=config)
+        response: AIMessage = llm.invoke([SystemMessage(content=system), 
+                                          HumanMessage(content=prompt)], 
+                                          config=config)
         return response.content.strip(), None
     except Exception as e:
         return None, f"LLM call failed: {type(e).__name__}: {e}"
@@ -177,7 +195,8 @@ def write_developer_brief(state: CriticState, config: RunnableConfig) -> dict:
 def add_confidence_note(state: CriticState) -> dict:
     notes = []
     if not state.get("ml_eligible"):
-        notes.append("Score based on rule-based scorecard only — fewer than 50 reviews.")
+        notes.append("Score based on rule-based scorecard only "
+                     "— fewer than 50 reviews.")
     if not state.get("forensic_ran"):
         notes.append("No announcements in last 60 days at snapshot time.")
     if state.get("fake_heartbeat_flag") == 1:
@@ -248,7 +267,8 @@ def run_critic_agent(
         "is_distressed": is_distressed, "ml_eligible": ml_eligible,
         "forensic_ran": forensic_ran, "update_substance_score": update_substance_score,
         "fake_heartbeat_flag": fake_heartbeat_flag, "momentum": momentum,
-        "event_state_mismatch": event_state_mismatch, "forensic_reasoning": forensic_reasoning,
+        "event_state_mismatch": event_state_mismatch, 
+        "forensic_reasoning": forensic_reasoning,
         "auditor_ran": auditor_ran, "theme_clusters": theme_clusters,
         "sentiment_shift": sentiment_shift, "sentiment_alignment": sentiment_alignment,
         "key_concerns": key_concerns,
