@@ -53,7 +53,7 @@ MOMENTUM_LR = {
 #   binary           : 0 or 1 pass-through (1 = good)
 #   binary_inverted  : 0 or 1 inverted (0 = good, i.e. flag not set = good)
 #   inverted_distance: penalises distance from anchor, asymmetric by side
-#   symlog_norm      : symmetric log for absolute slopes. 
+#   symlog_norm      : symmetric log for absolute slopes.
 #                      v = sign(x) * log1p(abs(x)) / log1p(cap)
 #                      score = (v + 1) / 2  → maps to [0, 1] (0.5 = steady)
 #
@@ -73,7 +73,7 @@ FEATURE_SCALES = {
 
     "days_since_last_build_update": {
         "type": "inverted_cap",
-        "cap":  365,        # 0d → 1.0, 365d+ → 0.0 
+        "cap":  365,        # 0d → 1.0, 365d+ → 0.0
     },
     "build_update_count_last_90d": {
         "type": "log_cap",
@@ -154,7 +154,7 @@ FEATURE_SCALES = {
     "ccu_trend_slope_90d": {
         "type": "symlog_norm",
         "cap":  1000,   # Map ±1000 absolute CCU change/month to 1.0/0.0
-                        # OWNER_MULTIPLIER_TIERS for 50 reviews is 20x, 
+                        # OWNER_MULTIPLIER_TIERS for 50 reviews is 20x,
                         # so 1000 is used as the threshold
     },
 

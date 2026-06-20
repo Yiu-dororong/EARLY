@@ -170,9 +170,9 @@ class ITADClient:
             log.warning("ITAD GET request error — %s: %s", url, e)
             return None
 
-    def _post(self, 
-              endpoint: str, 
-              payload: Any, 
+    def _post(self,
+              endpoint: str,
+              payload: Any,
               params: dict | None = None) -> Any | None:
         url = f"{ITAD_BASE_URL}{endpoint}"
         try:
@@ -275,8 +275,8 @@ class ITADClient:
     # Step 3 — Fetch full price change log via GET /games/history/v2
     # -----------------------------------------------------------------------
 
-    def _fetch_price_history(self, 
-                             game_id: str, 
+    def _fetch_price_history(self,
+                             game_id: str,
                              since_date: str | None = None) -> list[dict]:
         """
         GET /games/history/v2?id=<uuid>&country=US&since=<iso>
@@ -449,8 +449,8 @@ class ITADClient:
                 signals.lowest_price_usd = min(valid_prices)
 
         # ── price_trend ───────────────────────────────────────────────────
-        if (signals.initial_price_usd is not None 
-            and signals.current_price_usd is not None 
+        if (signals.initial_price_usd is not None
+            and signals.current_price_usd is not None
             and signals.current_price_source == "history"):
             delta = signals.current_price_usd - signals.initial_price_usd
             if delta > 0.5:
@@ -493,7 +493,7 @@ class ITADClient:
                 signals.early_deep_discount_flag = len(early_deep) > 0
 
             except ValueError:
-                log.warning("appid=%d — unparseable ea_start_date: %r", 
+                log.warning("appid=%d — unparseable ea_start_date: %r",
                             appid, ea_start_date)
 
         return signals

@@ -2,8 +2,8 @@
 retrain.py — EARLY pipeline: scheduled retraining with conditional promotion
 ==============================================================================
 
-Wraps train_xgboost.py + promote_model.py into a single retraining cycle suitable 
-for a scheduled GitHub Actions workflow (retrain.yml), with the gate logic from 
+Wraps train_xgboost.py + promote_model.py into a single retraining cycle suitable
+for a scheduled GitHub Actions workflow (retrain.yml), with the gate logic from
 promote_model.compare_to_production.
 
 ─────────────────────────────────────────────────────────────────────────────
@@ -95,7 +95,7 @@ def run_training(extra_args: list[str]) -> bool:
     Run train_xgboost.py as a subprocess so its existing main()/argparse is
     reused unmodified. Returns True on success (exit code 0).
     """
-    cmd = [sys.executable, 
+    cmd = [sys.executable,
            str(PROJECT_ROOT / "training" / "train_xgboost.py")] + extra_args
     log.info("Running: %s", " ".join(cmd))
     result = subprocess.run(cmd, cwd=str(PROJECT_ROOT))
@@ -121,8 +121,8 @@ def get_newly_registered_version(client, run_id_hint: str | None = None) -> str 
 
 
 def shap_feature_sets_differ(
-        prod_version: str | None, 
-        candidate_version: str, 
+        prod_version: str | None,
+        candidate_version: str,
         client) -> bool | None:
     """
     Compare the SHAP top-25 feature list between the Production model and
@@ -158,15 +158,15 @@ def shap_feature_sets_differ(
 def main() -> None:
     p = argparse.ArgumentParser(description="EARLY automated retraining cycle")
     trigger = p.add_mutually_exclusive_group(required=True)
-    trigger.add_argument("--scheduled", action="store_true", 
+    trigger.add_argument("--scheduled", action="store_true",
                          help="Routine scheduled retrain")
     trigger.add_argument("--drift-triggered", action="store_true",
                           help="Triggered by monitor_drift.py action_needed")
     p.add_argument("--no-auto-promote", action="store_true",
                    help="Run training + comparison only; do not assign aliases")
-    p.add_argument("--no-shap", action="store_true", 
+    p.add_argument("--no-shap", action="store_true",
                    help="Pass through to train_xgboost.py")
-    p.add_argument("--time-bounded-eval", action="store_true", 
+    p.add_argument("--time-bounded-eval", action="store_true",
                    help="Pass through to train_xgboost.py")
     args = p.parse_args()
 
@@ -209,8 +209,8 @@ def main() -> None:
     prod_mv = get_production_version(client)
     prod_version = prod_mv.version if prod_mv else None
 
-    zilliz_rebuild_needed = shap_feature_sets_differ(prod_version, 
-                                                     candidate_version, 
+    zilliz_rebuild_needed = shap_feature_sets_differ(prod_version,
+                                                     candidate_version,
                                                      client)
 
     report = {
@@ -228,29 +228,29 @@ def main() -> None:
     # ── Step 4: promote or hold ──────────────────────────────────────────
     if args.no_auto_promote:
         report["action_taken"] = "none (--no-auto-promote, awaiting manual review)"
-        log.info("Auto-promotion disabled. Candidate v%s left without aliases.", 
+        log.info("Auto-promotion disabled. Candidate v%s left without aliases.",
                  candidate_version)
         log.info("Review the report, then run:")
-        log.info("  python promote_model.py --version %s --alias staging --yes", 
+        log.info("  python promote_model.py --version %s --alias staging --yes",
                  candidate_version)
-        log.info("  python promote_model.py --version %s --alias champion --yes", 
+        log.info("  python promote_model.py --version %s --alias champion --yes",
                  candidate_version)
 
     elif result["passed"]:
         client.set_registered_model_alias(
-            name=REGISTERED_MODEL_NAME, 
+            name=REGISTERED_MODEL_NAME,
             alias="staging", version=candidate_version,
         )
         if prod_mv is not None:
             try:
-                client.delete_registered_model_alias(name=REGISTERED_MODEL_NAME, 
+                client.delete_registered_model_alias(name=REGISTERED_MODEL_NAME,
                                                      alias="champion")
             except Exception:
                 pass
             log.info("Archived previous Production v%s", prod_mv.version)
 
         client.set_registered_model_alias(
-            name=REGISTERED_MODEL_NAME, 
+            name=REGISTERED_MODEL_NAME,
             alias="champion", version=candidate_version,
         )
         report["action_taken"] = f"promoted v{candidate_version} to Production"
@@ -264,7 +264,7 @@ def main() -> None:
 
     else:
         report["action_taken"] = "held (gate failed, no promotion)"
-        log.info("Gate failed — candidate v%s remains without aliases.", 
+        log.info("Gate failed — candidate v%s remains without aliases.",
                  candidate_version)
         for r in result["reasons"]:
             log.info("  - %s", r)

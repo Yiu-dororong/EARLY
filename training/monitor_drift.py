@@ -114,16 +114,16 @@ def ensure_drift_table(conn: libsql.Connection) -> None:
     conn.execute("""
         CREATE TABLE IF NOT EXISTS drift_reports (
             run_date     TEXT NOT NULL,
-                 
+
             -- 'feature' | 'prediction' | 'null_rate' | 'label'
-            check_type   TEXT NOT NULL, 
-                 
+            check_type   TEXT NOT NULL,
+
             -- feature name / state label / 'p_distressed'
-            name         TEXT NOT NULL,    
+            name         TEXT NOT NULL,
             psi          REAL,
-                 
+
             -- 'ok' | 'warning' | 'action_needed'
-            status       TEXT NOT NULL,    
+            status       TEXT NOT NULL,
             reference_n  INTEGER,
             current_n    INTEGER,
             model_version TEXT,
@@ -216,8 +216,8 @@ def psi_status(psi: float) -> str:
 # ---------------------------------------------------------------------------
 
 def build_reference(
-        conn: libsql.Connection, 
-        model_version: str, 
+        conn: libsql.Connection,
+        model_version: str,
         top25_features: list[str]) -> dict:
     """
     Build the frozen reference distribution from the training snapshot
@@ -255,17 +255,17 @@ def build_reference(
     df["l1_sentiment_score"] = df.pop("sc_l1_sentiment_score")
     df["l1_price_market_score"] = df.pop("sc_l1_price_market_score")
 
-    df["l1_state_encoded"] = df["l1_state"].map({"Healthy": 0, 
-                                                 "Watch": 1, 
+    df["l1_state_encoded"] = df["l1_state"].map({"Healthy": 0,
+                                                 "Watch": 1,
                                                  "At Risk": 2}).fillna(2).astype(int)
-    df["price_trend_encoded"] = df["price_trend"].map({"increased": 1.0, 
-                                                       "stable": 0.0, 
+    df["price_trend_encoded"] = df["price_trend"].map({"increased": 1.0,
+                                                       "stable": 0.0,
                                                        "decreased": -1.0}).astype(float)
     df["review_update_divergence"] = (
         df["review_score_at_T"] * (1 - df["update_frequency_trend"].clip(-1, 1))
     )
 
-    log.info("Reference population: %d snapshots (%d games)", 
+    log.info("Reference population: %d snapshots (%d games)",
              len(df), df["appid"].nunique())
 
     reference = {
@@ -304,7 +304,7 @@ def build_reference(
         try:
             with open(run_log_path) as f:
                 lines = [json.loads(line) for line in f if line.strip()]
-            matching = [line for line in lines 
+            matching = [line for line in lines
                         if line.get("model_version") == model_version]
             if matching:
                 reference["oof_pr_auc"] = matching[-1].get("oof_prauc")
@@ -335,7 +335,7 @@ def load_or_build_reference(conn: libsql.Connection, model_version: str,
 # ---------------------------------------------------------------------------
 
 def load_current_features(
-        conn: libsql.Connection, 
+        conn: libsql.Connection,
         top25_features: list[str]) -> pd.DataFrame:
     """
     Pull the latest shap_json per appid from live_scores and unpack into
@@ -375,12 +375,12 @@ def load_current_features(
 # raw feature values from live_snapshots.features_json when available.
 
 def load_current_raw_features(
-        conn: libsql.Connection, 
+        conn: libsql.Connection,
         top25_features: list[str]) -> pd.DataFrame:
     log.info("Loading current raw features from live_snapshots...")
     query = """
-        SELECT 
-            ls.*, 
+        SELECT
+            ls.*,
             sc.l1_state,
                 sc.l1_composite_score AS sc_l1_composite_score,
                 sc.update_health AS sc_l1_update_health_score,
@@ -389,7 +389,7 @@ def load_current_raw_features(
                 sc.sentiment AS sc_l1_sentiment_score,
                 sc.price_market AS sc_l1_price_market_score
         FROM live_snapshots ls
-        LEFT JOIN live_scores sc ON ls.appid = sc.appid 
+        LEFT JOIN live_scores sc ON ls.appid = sc.appid
             AND sc.snapshot_date = (SELECT MAX(snapshot_date) FROM live_scores)
     """
     try:
@@ -413,15 +413,15 @@ def load_current_raw_features(
     if "l1_state" in df.columns:
         df["l1_state_encoded"] = df["l1_state"].map(
             {"Healthy": 0, "Watch": 1, "At Risk": 2}).fillna(2).astype(int)
-        
+
     if "price_trend" in df.columns:
         df["price_trend_encoded"] = df["price_trend"].map(
             {"increased": 1.0, "stable": 0.0, "decreased": -1.0}
             ).astype(float)
-        
+
     if "review_score_at_T" in df.columns and "update_frequency_trend" in df.columns:
         df["review_update_divergence"] = (
-            pd.to_numeric(df["review_score_at_T"], errors="coerce") * 
+            pd.to_numeric(df["review_score_at_T"], errors="coerce") *
             (1 - pd.to_numeric(
                 df["update_frequency_trend"], errors="coerce"
                 ).clip(lower=-1, upper=1))
@@ -434,10 +434,10 @@ def load_current_raw_features(
 # Checks
 # ---------------------------------------------------------------------------
 
-def check_feature_drift(reference: dict, 
+def check_feature_drift(reference: dict,
                         df_current_raw: pd.DataFrame,
-                        top25_features: list[str], 
-                        run_date: str, 
+                        top25_features: list[str],
+                        run_date: str,
                         model_version: str) -> list[dict]:
     results = []
     if df_current_raw.empty:
@@ -452,7 +452,7 @@ def check_feature_drift(reference: dict,
         cur_arr = (
             pd.to_numeric(df_current_raw.get(feat), errors="coerce")
             .dropna()
-            .values 
+            .values
             if feat in df_current_raw.columns else np.array([]))
 
         if len(cur_arr) == 0:
@@ -476,7 +476,7 @@ def check_prediction_drift(reference: dict, df_current: pd.DataFrame,
     results = []
     cur_preds = (pd.to_numeric(df_current.get("p_distressed"), errors="coerce")
                 .dropna()
-                .values 
+                .values
                 if "p_distressed" in df_current.columns else np.array([]))
 
     # Without a stored OOF prediction array, fall back to comparing the
@@ -497,8 +497,8 @@ def check_prediction_drift(reference: dict, df_current: pd.DataFrame,
         results.append({
             "run_date": run_date, "check_type": "prediction", "name": "p_distressed",
             "psi": None if np.isnan(psi) else round(psi, 4),
-            "status": status, 
-            "reference_n": len(ref_preds), 
+            "status": status,
+            "reference_n": len(ref_preds),
             "current_n": len(cur_preds),
             "model_version": model_version,
         })
@@ -546,8 +546,8 @@ def check_null_rate_drift(reference: dict, df_current: pd.DataFrame,
         results.append({
             "run_date": run_date, "check_type": "null_rate", "name": state,
             "psi": round(float(rel_change), 4),  # repurposed field: relative change
-            "status": status, 
-            "reference_n": ref_info["n"], 
+            "status": status,
+            "reference_n": ref_info["n"],
             "current_n": int(mask.sum()),
             "model_version": model_version,
         })
@@ -560,9 +560,9 @@ def check_null_rate_drift(reference: dict, df_current: pd.DataFrame,
 
 
 def check_label_drift(
-        conn: libsql.Connection, 
-        run_date: str, 
-        model_version: str, 
+        conn: libsql.Connection,
+        run_date: str,
+        model_version: str,
         min_resolved: int = 50) -> list[dict]:
     """
     Best-effort: compare resolved outcomes for games that were STAYS_ACTIVE
@@ -589,19 +589,19 @@ def check_label_drift(
     total = sum(n for _, n in rows)
     if total < min_resolved:
         log.info("Only %d resolved games found (minimum %d required) — "
-                 "skipping label drift", 
+                 "skipping label drift",
                  total, min_resolved)
         return results
 
-    abandoned = sum(n for outcome, n in rows 
+    abandoned = sum(n for outcome, n in rows
                     if outcome in ("EXIT_ABANDONED", "EXIT_SILENT"))
     cur_rate = abandoned / total if total > 0 else 0.0
 
     # Training base rate ~0.20 from snapshots with outcomes
     ref_rate = 0.20
     rel_change = (cur_rate - ref_rate) / ref_rate if ref_rate > 0 else 0.0
-    status = ("action_needed" 
-            if abs(rel_change) >= 0.5 
+    status = ("action_needed"
+            if abs(rel_change) >= 0.5
             else ("warning" if abs(rel_change) >= 0.25 else "ok"))
 
     results.append({
@@ -611,7 +611,7 @@ def check_label_drift(
         "model_version": model_version,
     })
     if status != "ok":
-        log.warning("Label drift: cur_rate=%.3f ref_rate=%.3f -> %s", 
+        log.warning("Label drift: cur_rate=%.3f ref_rate=%.3f -> %s",
                     cur_rate, ref_rate, status)
 
     return results
@@ -652,10 +652,10 @@ def main() -> None:
     ensure_drift_table(conn)
 
     top25_features = load_shap_features(args.model)
-    log.info("Monitoring drift for %d top-SHAP features (model %s)", 
+    log.info("Monitoring drift for %d top-SHAP features (model %s)",
              len(top25_features), args.model)
 
-    reference = load_or_build_reference(conn, args.model, 
+    reference = load_or_build_reference(conn, args.model,
                                         top25_features, args.freeze_reference)
 
     if args.freeze_reference:
@@ -669,11 +669,11 @@ def main() -> None:
     log.info("Current scored population: %d games", len(df_current))
 
     all_results: list[dict] = []
-    all_results += check_feature_drift(reference, df_current_raw, 
+    all_results += check_feature_drift(reference, df_current_raw,
                                        top25_features, run_date, args.model)
-    all_results += check_prediction_drift(reference, df_current, 
+    all_results += check_prediction_drift(reference, df_current,
                                           run_date, args.model)
-    all_results += check_null_rate_drift(reference, df_current, 
+    all_results += check_null_rate_drift(reference, df_current,
                                          run_date, args.model)
     all_results += check_label_drift(conn, run_date, args.model)
 

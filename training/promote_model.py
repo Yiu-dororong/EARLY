@@ -2,7 +2,7 @@
 promote_model.py — EARLY pipeline: MLflow model registry promotion
 ====================================================================
 
-Transitions a registered model version between 
+Transitions a registered model version between
 Staging / Champion / Archived, with a metric comparison report
 against the current Production model before promoting.
 
@@ -92,10 +92,10 @@ TIER_METRIC_KEYS = [
 ]
 
 
-def get_client() -> "MlflowClient":
+def get_client() -> MlflowClient:
     if not _MLFLOW_AVAILABLE:
         raise RuntimeError("mlflow is not installed. pip install mlflow")
-    tracking_uri = ("databricks" if os.getenv("DATABRICKS_HOST") 
+    tracking_uri = ("databricks" if os.getenv("DATABRICKS_HOST")
                                 else os.getenv("MLFLOW_TRACKING_URI", "./mlruns"))
     mlflow.set_tracking_uri(tracking_uri)
     if tracking_uri == "databricks":
@@ -104,13 +104,13 @@ def get_client() -> "MlflowClient":
     return MlflowClient()
 
 
-def list_versions(client: "MlflowClient") -> None:
+def list_versions(client: MlflowClient) -> None:
     versions = client.search_model_versions(f"name='{REGISTERED_MODEL_NAME}'")
     if not versions:
         log.info("No versions registered for %s", REGISTERED_MODEL_NAME)
         return
 
-    log.info("%-8s %-15s %-10s %-10s %s", "version", "aliases", 
+    log.info("%-8s %-15s %-10s %-10s %s", "version", "aliases",
              "oof_prauc", "test_prauc", "run_id")
     for mv_search in sorted(versions, key=lambda v: int(v.version), reverse=True):
         mv = client.get_model_version(REGISTERED_MODEL_NAME, mv_search.version)
@@ -120,23 +120,23 @@ def list_versions(client: "MlflowClient") -> None:
         log.info(
             "%-8s %-15s %-10s %-10s %s",
             mv.version, aliases_str,
-            f"{metrics.get('oof_prauc', float('nan')):.4f}" 
+            f"{metrics.get('oof_prauc', float('nan')):.4f}"
             if "oof_prauc" in metrics else "—",
-            f"{metrics.get('test_prauc', float('nan')):.4f}" 
+            f"{metrics.get('test_prauc', float('nan')):.4f}"
             if "test_prauc" in metrics else "—",
             mv.run_id,
         )
 
 
-def get_production_version(client: "MlflowClient"):
+def get_production_version(client: MlflowClient):
     try:
-        return client.get_model_version_by_alias(name=REGISTERED_MODEL_NAME, 
+        return client.get_model_version_by_alias(name=REGISTERED_MODEL_NAME,
                                                  alias="champion")
     except Exception:
         return None
 
 
-def compare_to_production(client: "MlflowClient", candidate_version: str) -> dict:
+def compare_to_production(client: MlflowClient, candidate_version: str) -> dict:
     """
     Compare candidate metrics against current Production metrics.
 
@@ -144,9 +144,9 @@ def compare_to_production(client: "MlflowClient", candidate_version: str) -> dic
       {
         "passed": bool,
         "current_production_version": str | None,
-        "comparisons": {metric_name: {"candidate": x, 
-                                    "production": y, 
-                                    "delta": d, 
+        "comparisons": {metric_name: {"candidate": x,
+                                    "production": y,
+                                    "delta": d,
                                     "ok": bool}},
         "reasons": [list of failure reasons, empty if passed]
       }
@@ -196,9 +196,9 @@ def compare_to_production(client: "MlflowClient", candidate_version: str) -> dic
             continue
         delta = cand_v - prod_v
         ok = delta >= -TOLERANCE_TIER_PP
-        comparisons[key] = {"candidate": cand_v, 
-                            "production": prod_v, 
-                            "delta": delta, 
+        comparisons[key] = {"candidate": cand_v,
+                            "production": prod_v,
+                            "delta": delta,
                             "ok": ok}
         if not ok:
             reasons.append(
@@ -247,7 +247,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description="EARLY model registry promotion")
     p.add_argument("--list", action="store_true", help="List registered model versions")
     p.add_argument("--version", type=str, help="Model version to transition")
-    p.add_argument("--alias", type=str, 
+    p.add_argument("--alias", type=str,
                    choices=["staging", "champion", "challenger", "archived"],
                    help="Target alias")
     p.add_argument("--yes", action="store_true", help="Skip confirmation prompt")
@@ -286,11 +286,11 @@ def main() -> None:
         prod_mv = get_production_version(client)
         if prod_mv is not None and prod_mv.version != args.version:
             try:
-                client.delete_registered_model_alias(name=REGISTERED_MODEL_NAME, 
+                client.delete_registered_model_alias(name=REGISTERED_MODEL_NAME,
                                                      alias="champion")
             except Exception:
                 pass
-            log.info("Removed champion alias from previous Production v%s", 
+            log.info("Removed champion alias from previous Production v%s",
                      prod_mv.version)
 
     elif not args.yes:

@@ -80,8 +80,8 @@ def get_db():
 # Helpers
 # ---------------------------------------------------------------------------
 
-def load_model_and_features(model_version: str) -> tuple[xgb.Booster, 
-                                                         list[str], 
+def load_model_and_features(model_version: str) -> tuple[xgb.Booster,
+                                                         list[str],
                                                          list[str]]:
     """Load XGBoost booster, top-25 feature list, and genre columns."""
     model_path = MODEL_DIR / f"xgb_{model_version}.json"
@@ -147,8 +147,8 @@ def fetch_labeled_snapshots(db) -> list[dict]:
     """).fetchall()
 
     extended_cols = col_names + [
-        "sc_l1_state", "sc_l1_composite_score", "sc_l1_update_health_score", 
-        "sc_l1_player_retention_score", "sc_l1_dev_engagement_score", 
+        "sc_l1_state", "sc_l1_composite_score", "sc_l1_update_health_score",
+        "sc_l1_player_retention_score", "sc_l1_dev_engagement_score",
         "sc_l1_sentiment_score", "sc_l1_price_market_score", "gg_genre_scope"
     ]
 
@@ -172,7 +172,7 @@ def fetch_labeled_snapshots(db) -> list[dict]:
         d["l1_sentiment_score"] = d.pop("sc_l1_sentiment_score")
         d["l1_price_market_score"] = d.pop("sc_l1_price_market_score")
         d["genre_scope"] = d.pop("gg_genre_scope")
-        
+
         l1_val = L1_STATE_MAP.get(d["l1_state"])
         d["l1_state_encoded"] = l1_val if l1_val is not None else 2
 
@@ -225,7 +225,7 @@ def compute_shap_vectors(
     for s in snapshots:
         # Encode price trend
         features = encode_price_trend(s)
-        
+
         # Inject derived feature: review_update_divergence
         rev_score = features.get("review_score_at_T")
         upd_trend = features.get("update_frequency_trend")
@@ -239,7 +239,7 @@ def compute_shap_vectors(
                 features["review_update_divergence"] = None
         else:
             features["review_update_divergence"] = None
-            
+
         # Encode genres
         genre_encoded = encode_genre(features.get("primary_genre"), genre_cols)
         features.update(genre_encoded)
@@ -258,9 +258,9 @@ def compute_shap_vectors(
                 except (TypeError, ValueError):
                     null_count += 1
                     row.append(np.nan)
-                    
+
         X_data.append(row)
-        
+
         # Keep track of enriched dict and null_count
         enriched_snap = dict(s)
         enriched_snap["null_feature_count"] = null_count
@@ -351,7 +351,7 @@ def upsert_to_zilliz(snapshots: list[dict], dry_run: bool = False) -> tuple[int,
             )
         except Exception as e:
             error += len(rows)
-            log.error("Batch %d–%d failed: %s", 
+            log.error("Batch %d–%d failed: %s",
                       batch_start, batch_start + len(batch), e)
 
     return success, error
@@ -366,9 +366,9 @@ def main():
         description="Populate Zilliz with historical SHAP anchors"
     )
     parser.add_argument("--model-version", default=DEFAULT_MODEL_VERSION)
-    parser.add_argument("--dry-run",  action="store_true", 
+    parser.add_argument("--dry-run",  action="store_true",
                         help="Validate without writing to Zilliz")
-    parser.add_argument("--rebuild",  action="store_true", 
+    parser.add_argument("--rebuild",  action="store_true",
                         help="Drop and recreate collection first")
     args = parser.parse_args()
 
@@ -401,7 +401,7 @@ def main():
         return
 
     # Compute SHAP vectors
-    snapshots = compute_shap_vectors(snapshots, booster, 
+    snapshots = compute_shap_vectors(snapshots, booster,
                                      all_feature_cols, top25_features, genre_cols)
 
     # Upsert to Zilliz

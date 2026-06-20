@@ -2,8 +2,8 @@
 mlflow_client.py — EARLY pipeline: thin MLflow wrapper
 =======================================================
 
-Provides a small, consistent interface for logging training runs and resolving 
-the current Production model, with a no-op fallback so training/inference work 
+Provides a small, consistent interface for logging training runs and resolving
+the current Production model, with a no-op fallback so training/inference work
 standalone if MLflow isn't configured (mirrors the langfuse_client.py pattern).
 
 ─────────────────────────────────────────────────────────────────────────────
@@ -55,7 +55,6 @@ import logging
 import os
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -109,7 +108,7 @@ def start_run(model_version: str, experiment_name: str = "early_xgb_training"):
 
     if default_uri == "databricks" and not experiment_name.startswith("/"):
         user_email = os.getenv("DATABRICKS_USER_EMAIL")
-        
+
         if user_email:
             experiment_name = f"/Users/{user_email}/{experiment_name}"
         else:
@@ -136,7 +135,7 @@ def log_training_run(
     scorecard_config_version: str,
     training_cohort: dict,
     shap_top25_path: Path | None = None,
-    input_example: Optional[pd.DataFrame] = None,
+    input_example: pd.DataFrame | None = None,
 ) -> str | None:
     """
     Log params/metrics/artifacts for a completed training run, and register
@@ -148,8 +147,8 @@ def log_training_run(
     if not _MLFLOW_AVAILABLE:
         log.info(
             "[no-op] Would log training run: model_version=%s metrics=%s",
-            model_version, {k: round(v, 4) 
-                            if isinstance(v, float) 
+            model_version, {k: round(v, 4)
+                            if isinstance(v, float)
                             else v for k, v in metrics.items()},
         )
         return None
@@ -171,8 +170,8 @@ def log_training_run(
     if model_path.exists():
         import xgboost as xgb
         bst = xgb.Booster()
-        bst.load_model(str(model_path)) 
-        mlflow.xgboost.log_model(xgb_model=bst, name="model", 
+        bst.load_model(str(model_path))
+        mlflow.xgboost.log_model(xgb_model=bst, name="model",
                                  input_example=input_example)
     if features_path.exists():
         mlflow.log_artifact(str(features_path), artifact_path="features")
@@ -204,7 +203,7 @@ def log_training_run(
 
 def _setup_mlflow_uris():
     """Ensure tracking and registry URIs are set consistently."""
-    tracking_uri = ("databricks" if os.getenv("DATABRICKS_HOST") 
+    tracking_uri = ("databricks" if os.getenv("DATABRICKS_HOST")
                     else os.getenv("MLFLOW_TRACKING_URI", "./mlruns"))
     mlflow.set_tracking_uri(tracking_uri)
     if tracking_uri == "databricks":
@@ -224,13 +223,13 @@ def get_production_model_uri() -> str | None:
     client = MlflowClient()
 
     try:
-        mv = client.get_model_version_by_alias(name=REGISTERED_MODEL_NAME, 
+        mv = client.get_model_version_by_alias(name=REGISTERED_MODEL_NAME,
                                                alias="champion")
     except Exception as e:
         log.warning("Could not query registry: %s", e)
         return None
 
-    log.info("Production model: %s v%s (run_id=%s)", REGISTERED_MODEL_NAME, 
+    log.info("Production model: %s v%s (run_id=%s)", REGISTERED_MODEL_NAME,
              mv.version, mv.run_id)
     return f"models:/{REGISTERED_MODEL_NAME}@champion"
 
@@ -249,8 +248,8 @@ def get_run_metrics(run_id: str) -> dict:
         return {}
 
 
-def download_artifact(model_uri: str, 
-                      artifact_relpath: str, 
+def download_artifact(model_uri: str,
+                      artifact_relpath: str,
                       dst_dir: str | Path = "models") -> Path | None:
     """
     Download a single artifact (e.g. 'model/xgb_v1.3.json') from a model
@@ -266,6 +265,6 @@ def download_artifact(model_uri: str,
         )
         return Path(local_path)
     except Exception as e:
-        log.warning("Artifact download failed (%s / %s): %s", 
+        log.warning("Artifact download failed (%s / %s): %s",
                     model_uri, artifact_relpath, e)
         return None

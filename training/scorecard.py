@@ -131,38 +131,38 @@ def normalise(value: float | None, scale: dict) -> float | None:
         # Used for MOMENTUM: Simply caps extreme values but preserves the zero-center.
         # e.g., "min": -1.0, "max": 1.0
         lo, hi = scale["min"], scale["max"]
-        
+
         # No division! Just a strict ceiling and floor.
         return max(lo, min(hi, value))
 
     elif t == "centered_ratio":
-        # Used for MOMENTUM: Translates a raw ratio (e.g., 2.0x, 0.5x) 
+        # Used for MOMENTUM: Translates a raw ratio (e.g., 2.0x, 0.5x)
         # into a bounded [-1.0, 1.0] momentum score.
-        
+
         # Extract the half_range from the config, defaulting to 1.0 for safety
         half_range = scale.get("half_range", 1.0)
-        
+
         if half_range <= 0:
             raise ValueError("half_range for centered_ratio must be strictly positive.")
-            
+
         # Step 1: Shift the ratio so a steady state (1.0) becomes exactly 0.0
         shifted = value - 1.0
-        
+
         # Step 2: Apply the range divisor
         raw_momentum = shifted / half_range
-        
+
         # Step 3: Hard clamp to [-1.0, 1.0] to protect the scorecard
         return max(-1.0, min(1.0, raw_momentum))
-    
+
     elif t == "symlog_norm":
         cap = scale.get("cap", 1000)
         if value is None:
             return 0.5  # Neutral fallback for 0 slope / no data
-        
+
         # math.log1p is a fast, safe built-in for log(|x| + 1)
         symlog_val = math.copysign(math.log1p(abs(value)), value)
         symlog_cap = math.log1p(cap)
-        
+
         # Normalize to [-1.0, 1.0], then shift to [0.0, 1.0]
         v_norm = max(-1.0, min(1.0, symlog_val / symlog_cap))
         score = (v_norm + 1.0) / 2.0
@@ -500,7 +500,7 @@ def upsert_batch(conn: libsql.Connection, results: list[dict]) -> None:
         conn.commit()
 
         processed = i + len(chunk)
-        log.info("  Upserted %d/%d rows (%.1f%%)", 
+        log.info("  Upserted %d/%d rows (%.1f%%)",
                  processed, total, processed / total * 100)
 
 
@@ -519,7 +519,7 @@ def run(dry_run: bool, appid: int | None, limit: int | None) -> None:
     if CONFIG_VERSION in existing_versions:
         log.warning(
             "CONFIG_VERSION '%s' already exists in the database. "
-            "Records will be overwritten. Did you forget to bump the version?", 
+            "Records will be overwritten. Did you forget to bump the version?",
             CONFIG_VERSION
         )
 
@@ -552,7 +552,7 @@ def run(dry_run: bool, appid: int | None, limit: int | None) -> None:
     total = len(results)
     for state, count in sorted(state_dist.items(), key=lambda x: -x[1]):
         log.info("  %-20s %4d  (%.1f%%)", state, count, 100 * count / total)
-    log.info("Hard abandon overrides: %d snapshots (%d games)", 
+    log.info("Hard abandon overrides: %d snapshots (%d games)",
              hard_overrides, len(hard_override_appids))
     log.info("=" * 60)
 

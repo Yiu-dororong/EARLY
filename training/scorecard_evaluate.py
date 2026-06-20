@@ -168,7 +168,7 @@ def analyse_distribution(df: pd.DataFrame) -> None:
 
     # Hard abandon overrides
     hard_abandon_mask = (
-        (df["l1_state"] == "At Risk") 
+        (df["l1_state"] == "At Risk")
         & (df["l1_composite_score"] == 0.0)
         )
     n_hard_snaps = hard_abandon_mask.sum()
@@ -245,7 +245,7 @@ def analyse_outcome_agreement(df: pd.DataFrame) -> dict:
 
         n          = len(subset)
         n_success  = (subset["outcome"] == "EXIT_SUCCESS").sum()
-        n_abandoned = ((subset["outcome"] == "EXIT_ABANDONED") 
+        n_abandoned = ((subset["outcome"] == "EXIT_ABANDONED")
                        | (subset["outcome"] == "EXIT_SILENT")).sum()
         pct_success  = 100 * n_success  / n
         pct_abandoned = 100 * n_abandoned / n
@@ -268,17 +268,17 @@ def analyse_outcome_agreement(df: pd.DataFrame) -> dict:
                 f"  '{state}' has only {agreement:.1f}% agreement with expected "
                 f"outcome '{expected}' — threshold may need adjustment."
             )
-            
+
         if prev_state and pct_abandoned < prev_pct_abandoned:
             calibration_warnings.append(
                 f"  Monotonicity violation: '{state}' "
                 f"has a lower abandoned rate ({pct_abandoned:.1f}%) "
                 f"than '{prev_state}' ({prev_pct_abandoned:.1f}%)."
             )
-            
+
         prev_pct_abandoned = pct_abandoned
         prev_state = state
-        
+
         state_agreement[state] = {
             "n_games": int(n),
             "success_rate": float(pct_success / 100.0),
@@ -307,31 +307,31 @@ def analyse_outcome_agreement(df: pd.DataFrame) -> dict:
     try:
         import numpy as np
         import plotly.express as px
-        
+
         bins = np.linspace(0, 1.0, 11)
         labels = [f"{bins[i]:.1f}-{bins[i+1]:.1f}" for i in range(len(bins)-1)]
-        
+
         final_viz = final.copy()
-        final_viz["score_bin"] = pd.cut(final_viz["l1_composite_score"], 
-                                        bins=bins, 
-                                        labels=labels, 
+        final_viz["score_bin"] = pd.cut(final_viz["l1_composite_score"],
+                                        bins=bins,
+                                        labels=labels,
                                         include_lowest=True)
-        
+
         valid_outcomes = ["EXIT_SUCCESS", "EXIT_ABANDONED", "EXIT_SILENT"]
         final_viz = final_viz[final_viz["outcome"].isin(valid_outcomes)]
-        
-        bin_counts = final_viz.groupby(["score_bin", "outcome"], 
+
+        bin_counts = final_viz.groupby(["score_bin", "outcome"],
                                        observed=False).size().reset_index(name="count")
-        
-        total_per_bin = bin_counts.groupby("score_bin", 
+
+        total_per_bin = bin_counts.groupby("score_bin",
                                            observed=False)["count"].transform("sum")
         bin_counts["Percentage"] = (bin_counts["count"] / total_per_bin * 100).fillna(0)
         bin_counts = bin_counts[bin_counts["Percentage"] > 0]
-        
+
         bin_counts["Label"] = bin_counts.apply(lambda row: (
             f"{row['Percentage']:.1f}% ({row['count']})"
             ), axis=1)
-        
+
         fig = px.bar(
             bin_counts,
             x="score_bin",
@@ -341,22 +341,22 @@ def analyse_outcome_agreement(df: pd.DataFrame) -> dict:
             barmode="stack",
             text="Label",
             color_discrete_map={
-                "EXIT_SUCCESS": "#2ca02c", 
-                "EXIT_ABANDONED": "#d62728", 
+                "EXIT_SUCCESS": "#2ca02c",
+                "EXIT_ABANDONED": "#d62728",
                 "EXIT_SILENT": "#ff7f0e"
             },
             labels={"score_bin": "L1 Composite Score", "outcome": "Outcome"}
         )
         fig.update_traces(texttemplate='%{text}', textposition='inside')
-        
+
         os.makedirs("outputs", exist_ok=True)
-        out_path = os.path.join("outputs", 
+        out_path = os.path.join("outputs",
                                 f"outcome_distribution_deciles_{CONFIG_VERSION}.html")
         fig.write_html(out_path)
         log.info("")
         log.info("Saved Outcome Distribution visualization to %s", out_path)
     except ImportError:
-        log.warning("Plotly/numpy not installed. Skipping visualization." 
+        log.warning("Plotly/numpy not installed. Skipping visualization."
                     "(Run: pip install plotly numpy)")
 
     return state_agreement
