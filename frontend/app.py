@@ -12,17 +12,18 @@ Env:
 
 from __future__ import annotations
 
+import glob
+import json
+import os
+import sys
 import time
 from datetime import datetime, timedelta
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-import os
-import sys
-import glob
-import json
-import numpy as np
+
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -30,7 +31,8 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 
-from frontend.utils import api, ui
+from frontend.utils import api, ui # noqa: E402, I001
+
 
 # ---------------------------------------------------------------------------
 # Page config
@@ -90,7 +92,9 @@ def _map_dimension_score(dim_key: str, raw_value: float | None) -> float | None:
     if raw_value is None:
         return None
     stats = _get_scorecard_stats()
-    if not stats or "dimension_stats" not in stats or dim_key not in stats["dimension_stats"]:
+    if (not stats 
+        or "dimension_stats" not in stats 
+        or dim_key not in stats["dimension_stats"]):
         return raw_value  # fallback
     
     dim_data = stats["dimension_stats"][dim_key]
@@ -142,7 +146,8 @@ def _history_chart(snapshots: list[dict]) -> go.Figure:
     """Distress probability over time with threshold line."""
     dates = []
     for s in snapshots:
-        dt = _resolve_date_obj(s.get("snap_date") or s.get("snapshot_date"), s.get("scored_at"))
+        dt = _resolve_date_obj(s.get("snap_date") or s.get("snapshot_date"), 
+                               s.get("scored_at"))
         dates.append(dt.strftime("%Y-%m-%d") if dt else "—")
     values = [s.get("p_distressed") for s in snapshots]
 
@@ -199,7 +204,11 @@ def _get_cached_health():
 
 
 @st.cache_data(ttl=600)
-def _get_cached_games(state_filter: str, min_reviews: int, max_days_since_build: int, search_name: str, limit: int):
+def _get_cached_games(state_filter: str, 
+                      min_reviews: int, 
+                      max_days_since_build: int, 
+                      search_name: str, 
+                      limit: int):
     kwargs: dict = {}
     if state_filter != "All":
         kwargs["l1_state"] = state_filter
@@ -228,7 +237,9 @@ def _build_dataframe(items: list[dict]):
             "EA Age (d)":   g.get("ea_age_days") or 0,
             "Days Since Build": g.get("days_since_last_build_update"),
             "Reviews":      g.get("review_count_at_T") or 0,
-            "Scored":       _resolve_date_obj(g.get("snap_date") or g.get("snapshot_date"), g.get("scored_at")),
+            "Scored":       _resolve_date_obj(
+                            g.get("snap_date") or g.get("snapshot_date"), 
+                            g.get("scored_at")),
         })
     return pd.DataFrame(rows)
 
@@ -241,20 +252,30 @@ def render_browse():
     with st.sidebar:
         st.markdown("## 📡 EARLY")
         st.markdown(
-            '<span style="font-size:0.8em;color:#7d8590;">Early Access Health Monitor</span>',
+            '<span style="font-size:0.8em;color:#7d8590;">'
+            'Early Access Health Monitor</span>',
             unsafe_allow_html=True,
         )
         st.divider()
 
         st.markdown("**Filters**")
-        state_filter    = st.selectbox("State", ["All", "Healthy", "Watch", "At Risk"], on_change=_reset_limit)
-        min_reviews     = st.number_input("Min Reviews", min_value=0, value=0, step=10, on_change=_reset_limit)
-        max_days_since_build = st.number_input("Max Days Since Build", min_value=0, value=0, step=30, help="0 to ignore", on_change=_reset_limit)
-        search_name     = st.text_input("Search by name", placeholder="e.g. Nightingale", on_change=_reset_limit)
+        state_filter    = st.selectbox("State", ["All", "Healthy", "Watch", "At Risk"], 
+                                       on_change=_reset_limit)
+        min_reviews     = st.number_input("Min Reviews", 
+                                          min_value=0, value=0, step=10, 
+                                          on_change=_reset_limit)
+        max_days_since_build = st.number_input("Max Days Since Build", 
+                                               min_value=0, value=0, step=30, 
+                                               help="0 to ignore", 
+                                               on_change=_reset_limit)
+        search_name     = st.text_input("Search by name", 
+                                        placeholder="e.g. Nightingale", 
+                                        on_change=_reset_limit)
 
     # Fetch games
     data = _get_cached_games(
-        state_filter, min_reviews, max_days_since_build, search_name, st.session_state.browse_limit
+        state_filter, min_reviews, max_days_since_build, 
+        search_name, st.session_state.browse_limit
     )
 
     total = data.get("total", 0) if data else 0
@@ -283,42 +304,66 @@ def render_browse():
     st.markdown("""
     **Welcome to the EARLY Intelligence Dashboard.**
 
-    EARLY analyzes public Steam data (update cadence, player retention, community sentiment, 
-                developer behavior, and more) to estimate the probability that an 
-                Early Access game will **stop updating** before reaching full release (1.0).
+    EARLY analyzes public Steam data (update cadence, player retention, 
+                community sentiment, developer behavior, and more) 
+                to estimate the probability that an Early Access game 
+                will **stop updating** before reaching full release (1.0).
     """)
 
     with st.expander("📜 Why This Tool Exists", expanded=False):
-        st.markdown("""
-        Steam Early Access is a high-risk, high-reward environment. While many games succeed, many others go silent and never ship.
+        st.markdown(
+                    """
+                Steam Early Access is a high-risk, high-reward environment. While many
+                games succeed, many others go silent and never ship.
 
-        EARLY was built to audit a game's **operational momentum** — what developers are actually doing, not what they promise to do. The system breaks down its analysis into four straightforward steps:
-        - **Activity Scorecard:** Measures the game's current momentum. It tracks how often does developers update and flags if a developer's real-world update habits are slowing down.
-        - **Risk Classifier:** Evaluates the long-run probability of failure. It looks at the game's overall footprint to calculate the statistical risk ($p_{\text{distressed}}$) of the project stalling or being abandoned before launch.
-        - **AI Forensic Agents:** Deep-dives into the text. When requested, our specialized AI agents cross-reference recent developer announcements and player reviews, translating raw community text and patch notes into clear, actionable intelligence.
-        - **Similarity Search:** Looks for lookalike projects. It instantly scans our database of historical games to find past projects with the exact same data footprint, identifying how similar cases turned out.
-                    """)
+                EARLY was built to audit a game's **operational momentum** — what
+                developers are actually doing, not what they promise to do. The system
+                breaks down its analysis into four straightforward steps:
+                - **Activity Scorecard:** Measures the game's current momentum. It
+                tracks how often does developers update and flags if a developer's
+                real-world update habits are slowing down.
+                - **Risk Classifier:** Evaluates the long-run probability of failure.
+                It looks at the game's overall footprint to calculate the statistical
+                risk ($p_{\text{distressed}}$) of the project stalling or being
+                abandoned before launch.
+                - **AI Forensic Agents:** Deep-dives into the text. When requested, our
+                specialized AI agents cross-reference recent developer announcements
+                and player reviews, translating raw community text and patch notes
+                into clear, actionable intelligence.
+                - **Similarity Search:** Looks for lookalike projects. It instantly
+                scans our database of historical games to find past projects with the
+                exact same data footprint, identifying how similar cases turned out.
+                """
+                )
     # Prominent Disclaimer
-    st.error("""
-    **⚠️ Important Disclaimer**:
-             
-    EARLY is an independent analytical tool, **not affiliated with Valve, Steam, or any game developers**. 
-             
-    - All predictions are statistical estimates only. Past performance does not guarantee future results.
-    - Predictions can be wrong. The model may suffer from data limitations and concept drift over time. 
-    - A self-fulfilling prophecy effect is possible — public awareness of risk can influence outcomes.
-    - **Always verify information directly on Steam**,  use EARLY as one data point among many — always do your own research.
+    st.error(
+                """
+            **⚠️ Important Disclaimer**:
 
+            EARLY is an independent analytical tool, **not affiliated with Valve,
+            Steam, or any game developers**.
 
-    """)
+            - All predictions are statistical estimates only. Past performance does
+            not guarantee future results.
+            - Predictions can be wrong. The model may suffer from data limitations
+            and concept drift over time.
+            - A self-fulfilling prophecy effect is possible — public awareness of
+            risk can influence outcomes.
+            - **Always verify information directly on Steam**, use EARLY as one
+            data point among many — always do your own research.
+            """
+            )
 
     if health:
         status = health.get("status", "unknown")
         color  = "#238636" if status == "ok" else "#da3633"
-        last_scored_date = health.get("snapshot_date") or _ts_to_date(health.get("last_scored_at"))
+        last_scored_date = (health.get("snapshot_date") 
+                            or _ts_to_date(health.get("last_scored_at")))
         st.markdown(
-            f'<span style="color:{color};font-size:0.8em;">● Pipeline: {status}</span> &nbsp;&nbsp; '
-            f'<span style="font-size:0.8em;color:#7d8590;">Last scored: {last_scored_date}</span>',
+            f'<span style="color:{color};font-size:0.8em;">● '
+            f'Pipeline: {status}</span> &nbsp;&nbsp; '
+            f'<span style="font-size:0.8em;color:#7d8590;">'
+            f'Last scored: {last_scored_date}</span>',
             unsafe_allow_html=True,
         )
         st.markdown("")
@@ -345,9 +390,12 @@ def render_browse():
         on_select="rerun",
         selection_mode="single-row",
         column_config={
-            "Days Since Build": st.column_config.NumberColumn("Days Since Build", format="%d"),
-            "State": st.column_config.TextColumn("State", width="small"),
-            "Scored": st.column_config.DateColumn("Scored", format="YYYY-MM-DD"),
+            "Days Since Build": st.column_config.NumberColumn("Days Since Build", 
+                                                              format="%d"),
+            "State": st.column_config.TextColumn("State", 
+                                                 width="small"),
+            "Scored": st.column_config.DateColumn("Scored", 
+                                                  format="YYYY-MM-DD"),
         },
     )
 
@@ -373,7 +421,8 @@ def render_game_header(score: dict):
     name    = score.get("name") or f"appid {score['appid']}"
     state   = score.get("l1_state")
     ea_age  = score.get("ea_age_days") or 0
-    scored_dt = _resolve_date_obj(score.get("snap_date") or score.get("snapshot_date"), score.get("scored_at"))
+    scored_dt = _resolve_date_obj(score.get("snap_date") or score.get("snapshot_date"), 
+                                  score.get("scored_at"))
     scored  = scored_dt.strftime("%Y-%m-%d") if scored_dt else "—"
     quality = score.get("data_quality", "medium")
     appid   = score["appid"]
@@ -400,11 +449,14 @@ def render_game_header(score: dict):
 
     btn1, btn2, btn3, _ = st.columns([1.5, 1.5, 2.5, 4])
     with btn1:
-        st.link_button("Steam Storefront", f"https://store.steampowered.com/app/{appid}", use_container_width=True)
+        st.link_button("Steam Storefront", f"https://store.steampowered.com/app/{appid}", 
+                       use_container_width=True)
     with btn2:
-        st.link_button("Steam Community", f"https://steamcommunity.com/app/{appid}", use_container_width=True)
+        st.link_button("Steam Community", f"https://steamcommunity.com/app/{appid}", 
+                       use_container_width=True)
     with btn3:
-        st.link_button("SteamDB (Third-party)", f"https://steamdb.info/app/{appid}", use_container_width=True)
+        st.link_button("SteamDB (Third-party)", f"https://steamdb.info/app/{appid}", 
+                       use_container_width=True)
     st.markdown("")
     _render_how_to_read()
 
@@ -424,7 +476,9 @@ def render_player_tab(score: dict, history: dict | None):
     with c1:
         val = f"{p_dist:.1%}" if p_dist is not None else "N/A"
         st.metric("Distress Risk", val,
-                  help="Overall likelihood that the game will fail to reach a successful full release based on its current trajectory and historical patterns")
+                  help="Overall likelihood that the game will fail to "
+                  "reach a successful full release based on "
+                  "its current trajectory and historical patterns")
     with c2:
         st.metric("Reviews", f"{rev:,}",
                   help="Total review count at last scoring snapshot.")
@@ -435,7 +489,8 @@ def render_player_tab(score: dict, history: dict | None):
     st.markdown("")
 
     # Dimension signal meters
-    st.markdown("**Health Dimensions**", help="Percentages are relative to historical training data.")
+    st.markdown("**Health Dimensions**", 
+                help="Percentages are relative to historical training data.")
     bars_html = "".join(
         ui.signal_bar(label, _map_dimension_score(key, dims.get(key)))
         for key, label in DIMENSION_LABELS.items()
@@ -485,7 +540,8 @@ def render_developer_tab(score: dict):
         stats = _get_scorecard_stats()
         if stats and "state_agreement" in stats and state in stats["state_agreement"]:
             sa = stats["state_agreement"][state]
-            state_help = f"Historically, {sa['agreement_rate']:.1%} of games in this state ended up as {sa['expected_outcome']}."
+            state_help = f"Historically, {sa['agreement_rate']:.1%} of games "
+            f"in this state ended up as {sa['expected_outcome']}."
             
         st.metric("State", state or "—", help=state_help)
         st.metric("Model", score.get("model_version") or "—")
@@ -494,7 +550,7 @@ def render_developer_tab(score: dict):
         with st.expander(f"⚠ {len(nulls)} / {TOTAL_FEATURES} features null"):
             st.caption(
                 "ℹ️ *Null features typically occur when a data source is unavailable "
-                "or a metric cannot be mathematically derived (e.g., division by zero).*"
+                "or a metric cannot be mathematically derived (e.g. division by zero).*"
             )
             st.caption(", ".join(nulls))
 
@@ -535,7 +591,8 @@ def _render_analysis_section(score: dict, audience: str):
         else:
             st.session_state.analysis_polling = False
             st.session_state.poll_count = 0
-            st.warning("Analysis is taking longer than expected. Try refreshing the page.")
+            st.warning("Analysis is taking longer than expected. "
+                       "Try refreshing the page.")
             return
 
     # Load cached analysis
@@ -602,8 +659,10 @@ def _render_player_analysis(analysis: dict, appid: int):
             if flag:
                 st.markdown(
                     '<div style="text-align:center;margin-top:6px">'
-                    '<span style="background:#da363322;color:#da3633;border:1px solid #da363344;'
-                    'padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:600;">'
+                    '<span style="background:#da363322;'
+                    'color:#da3633;border:1px solid #da363344;'
+                    'padding:2px 8px;border-radius:4px;'
+                    'font-size:0.75em;font-weight:600;">'
                     '🚩 Fake Heartbeat</span></div>',
                     unsafe_allow_html=True,
                 )
@@ -658,7 +717,10 @@ def _render_developer_analysis(analysis: dict, appid: int):
                 trans = c.get("quote_translation")
                 if trans and str(trans).strip().lower() not in ("null", "none", ""):
                     orig = c.get("representative_quote") or ""
-                    c["representative_quote"] = f"{orig}<br><span style='font-size:0.9em; color:#8b949e;'><i>Translation:</i> {trans}</span>"
+                    c["representative_quote"] = (
+                        f"{orig}<br><span style='font-size:0.9em; "
+                        f"color:#8b949e;'><i>Translation:</i> {trans}</span>"
+                        )
             clusters_html = "".join(ui.cluster_row(c) for c in clusters)
             st.markdown(clusters_html, unsafe_allow_html=True)
 
@@ -683,7 +745,8 @@ def _render_developer_analysis(analysis: dict, appid: int):
             + (" 🚩" if flag else "")
         ):
             if flag:
-                st.warning("This update was flagged as a potential fake heartbeat — minimal content with no real development substance.")
+                st.warning("This update was flagged as a potential fake heartbeat "
+                           "— minimal content with no real development substance.")
             if reason:
                 st.write(reason)
     elif analysis.get("forensic_ran") is False:
@@ -713,7 +776,8 @@ def _render_similar_section(appid: int, audience: str):
                 st.session_state.similar_loaded  = True
                 st.rerun()
         else:
-            st.caption("Find games with a similar health profile that have already resolved.")
+            st.caption("Find games with a similar health profile "
+                       "that have already resolved.")
             return
 
     result = st.session_state.similar_results
@@ -735,7 +799,8 @@ def _render_similar_section(appid: int, audience: str):
         f"{len(games)} similar games found — "
         f"{abandoned} abandoned, {success} succeeded")
     st.caption(
-        "_Note: `dist` is cosine similarity where 1 = complete match, -1 = complete opposite_"
+        "_Note: `dist` is cosine similarity where 1 = complete match, "
+        "-1 = complete opposite_"
     )
 
     rows_html = "".join(ui.similar_game_row(g) for g in games)
@@ -750,71 +815,104 @@ def _render_how_to_read():
     st.markdown("📖 How to Read the Score")
 
     with st.expander("🔍 Understanding EARLY Scores", expanded=False):
-        st.markdown("""
+        st.markdown(
+            """
         ### Risk Tiers (Layer 1 Scorecard)
 
-        EARLY classifies games into three risk tiers based on a **weighted scorecard** across five health dimensions:
+        EARLY classifies games into three risk tiers based on a **weighted
+        scorecard** across five health dimensions:
 
         - **🟢 Healthy** Strong momentum across most dimensions.  
-          **Historical outcome**: High likelihood of a successful 1.0 full launch.  
+          **Historical outcome**: High likelihood of a successful 1.0 full
+          launch.  
 
-        - **🟡 Watch** Mixed or weakening signals. Worth monitoring. Acts as a transitional boundary.  
-          **Historical outcome**: Unstable middle tier—some games stabilize and launch, while others degrade further.  
+        - **🟡 Watch** Mixed or weakening signals. Worth monitoring. Acts as a
+          transitional boundary.  
+          **Historical outcome**: Unstable middle tier—some games stabilize
+          and launch, while others degrade further.  
 
         - **🔴 At Risk** Clear signs of stagnation or structural decline.  
-          **Historical outcome**: High probability of developer abandonment or permanent radio silence.  
-        """)
+          **Historical outcome**: High probability of developer abandonment
+          or permanent radio silence.  
+        """
+        )
 
         st.markdown("""
         ### Distress Probability (Layer 2 Machine Learning)
 
-        This is our **machine learning model's** estimated probability (0–100%) that a game is on a distressed or failing trajectory.
+        This is our **machine learning model's** estimated probability 
+        (0–100%) that a game is on a distressed or failing trajectory.
 
         - **&lt; 45%** → Generally healthy footprint
         - **45–60%** → Gray zone / Watch territory
         - **&gt; 60%** → Elevated risk / High operational distress
 
-        The ML model evaluates the whole ecosystem simultaneously, meaning it often catches subtle, compounding warning signs that simple checkboxes miss.
+        The ML model evaluates the whole ecosystem simultaneously, meaning it 
+        often catches subtle, compounding warning signs that simple checkboxes miss.
                     
-        Please note that the probability **does not refer to an instantaneous risk of abandonment**, but rather the overall likelihood that the game will fail to reach a successful full release based on its current trajectory and historical patterns.
+        Please note that the probability **does not refer to an instantaneous 
+        risk of abandonment**, but rather the overall likelihood that the game 
+        will fail to reach a successful full release based on 
+        its current trajectory and historical patterns.
         """)
 
-        st.markdown("""
-        ### Dimension Scores (0–100 Rating)
-
-        To ensure fairness, these 5 key indicators are **normalized against our entire historical training database**. A score of "50" means the game is performing exactly at the industry average for that metric, while a "75+" means it is outperforming 75% of early access history:
-
-        | Dimension | What it measures | Why it matters |
-        | :--- | :--- | :--- |
-        | **Update Health** | Cadence + substance of build updates | Core signal of developer coding momentum |
-        | **Player Retention** | Player count trends and engagement | Real consumer interest over time |
-        | **Dev Engagement** | Community posts & developer responsiveness | Verifies the studio is still actively involved |
-        | **Sentiment** | Review scores & recent review velocity | Player happiness & community momentum |
-        | **Price & Market** | Pricing trends, discounts, and genre context | Long-term commercial viability |
-
-        Each dimension factors in a **backbone** (long-term history) and a **momentum** (recent change) component.
-        """)
+        st.markdown(
+            (
+                "### Dimension Scores (0–100 Rating)\n\n"
+                "To ensure fairness, these 5 key indicators are **normalized "
+                "against our entire historical training database**. A score of "
+                '"50" means the game is performing exactly at the industry '
+                'average for that metric, while a "75+" means it is '
+                "outperforming 75% of early access history:\n\n"
+                "| Dimension | What it measures | Why it matters |\n"
+                "| :--- | :--- | :--- |\n"
+                "| **Update Health** | Cadence + substance of build updates | "
+                "Core signal of developer coding momentum |\n"
+                "| **Player Retention** | Player count trends and engagement | "
+                "Real consumer interest over time |\n"
+                "| **Dev Engagement** | Community posts & developer "
+                "responsiveness | Verifies the studio is still actively "
+                "involved |\n"
+                "| **Sentiment** | Review scores & recent review velocity | "
+                "Player happiness & community momentum |\n"
+                "| **Price & Market** | Pricing trends, discounts, and genre "
+                "context | Long-term commercial viability |\n\n"
+                "Each dimension factors in a **backbone** (long-term history) "
+                "and a **momentum** (recent change) component."
+            )
+        )
 
         st.markdown("""
         ### Data Quality & Missing Features
 
-        Stalled projects often stop generating clean signals, which can cause data gaps (null values) in our trackers. 
+        Stalled projects often stop generating clean signals, 
+        which can cause data gaps (null values) in our trackers. 
         
-        If a game has a high number of missing features, treat its predictive scores with extra caution. A sudden drop in data density is frequently an early indicator that a project's operational wheels have stopped turning.
+        If a game has a high number of missing features, 
+        treat its predictive scores with extra caution. 
+        A sudden drop in data density is frequently 
+        an early indicator that a project's operational wheels have stopped turning.
         """)
 
     with st.expander("🧠 AI Analysis & Similar Games"):
         st.markdown("""
-        **For complex or borderline games**, you can trigger an **on-demand AI Deep Analysis**:
+        **For complex or borderline games**, 
+        you can trigger an **on-demand AI Deep Analysis**:
 
-        - **Forensic Agent**: Evaluates the technical substance of recent patches against actual code deployment gaps.
-        - **Sentiment Auditor**: Reads between the lines of text reviews to surface core player complaints.
+        - **Forensic Agent**: Evaluates the technical substance of 
+        recent patches against actual code deployment gaps.
+        - **Sentiment Auditor**: Reads between the lines of text reviews 
+        to surface core player complaints.
         - **Critic Agent**: Synthesizes the data into a clear, unified verdict.
 
-        **Lookalike Projects (Similarity Search):** Instantly scans our historical database to find past games with the exact same data footprint. This allows you to see how previous projects with identical patterns ultimately turned out.
+        **Lookalike Projects (Similarity Search):** Instantly scans 
+        our historical database to find past games with the exact same data footprint. 
+        This allows you to see how previous projects 
+        with identical patterns ultimately turned out.
         """)
 
-    st.caption("All scores are data-driven estimates based on public Steam tracking metrics. No statistical model is perfect.")
+    st.caption("All scores are data-driven estimates based on "
+               "public Steam tracking metrics. No statistical model is perfect.")
 
 # ---------------------------------------------------------------------------
 # Game detail view — orchestrator
@@ -860,22 +958,33 @@ tab1, tab2, tab3 = st.tabs(["Overview", "Technical Details", "Performance"])
 
 with tab1:
     st.markdown("""
-    **EARLY** is a solo-built hybrid ML system designed to give consumers and developers early warning signals about Early Access game health.
+    **EARLY** is a solo-built hybrid ML system designed to give 
+    consumers and developers early warning signals about Early Access game health.
     
-    It combines rule-based scoring with machine learning and LLM agents to deliver transparent, explainable risk assessments.
+    It combines rule-based scoring with machine learning 
+    and LLM agents to deliver transparent, explainable risk assessments.
     """)
 
 with tab2:
-    st.markdown("""
-    ### Architecture
-    
-    - **Layer 1 — Scorecard**: Weighted deterministic evaluation across 5 dimensions (Update Health, Player Retention, Developer Engagement, Community Sentiment, Price & Market Signals)
-    - **Layer 2 — ML Model**: XGBoost binary classifier (`P(IS_DISTRESSED)`)
-    - **Layer 3 — AI Agents**: Forensic update substance scoring + Sentiment Auditor + Critic synthesis (triggered on-demand for Watch / At Risk games)
-    - **Similarity Search**: Finds historically similar games using SHAP vector embeddings (Zilliz)
-    
-    **Tech Stack**: Python, XGBoost, FastAPI, LangGraph, Groq, Streamlit, Turso (libSQL), Zilliz Cloud
-    """)
+    st.markdown(
+            """
+        ### Architecture
+
+        - **Layer 1 — Scorecard**: Weighted deterministic evaluation across
+          5 dimensions (Update Health, Player Retention, Developer Engagement,
+          Community Sentiment, Price & Market Signals)
+        - **Layer 2 — ML Model**: XGBoost binary classifier
+          (`P(IS_DISTRESSED)`)
+        - **Layer 3 — AI Agents**: Forensic update substance scoring +
+          Sentiment Auditor + Critic synthesis (triggered on-demand for Watch /
+          At Risk games)
+        - **Similarity Search**: Finds historically similar games using SHAP
+          vector embeddings (Zilliz)
+
+        **Tech Stack**: Python, XGBoost, FastAPI, LangGraph, Groq, Streamlit,
+        Turso (libSQL), Zilliz Cloud
+        """
+        )
     
     with st.expander("Key Design Principles"):
         st.markdown("""
@@ -902,4 +1011,5 @@ with tab3:
     - **At Risk** — ~48% success rate
     """)
     
-    st.caption("Metrics are for resolved games (2022+). Performance can vary on new titles.")
+    st.caption("Metrics are for resolved games (2022+). "
+               "Performance can vary on new titles.")

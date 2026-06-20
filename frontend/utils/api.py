@@ -8,10 +8,12 @@ All functions return parsed JSON or None on failure.
 from __future__ import annotations
 
 import os
+
 import requests
 import streamlit as st
 from dotenv import load_dotenv
 from streamlit.runtime.scriptrunner import get_script_run_ctx
+
 
 load_dotenv()
 
@@ -27,7 +29,8 @@ def _get_headers(include_session: bool = False) -> dict:
         if token:
             headers["api-key"] = token
         else:
-            st.error("Configuration Error: Production API Token missing from environment.")
+            st.error("Configuration Error: "
+                     "Production API Token missing from environment.")
             
     if include_session:
         try:
@@ -41,7 +44,10 @@ def _get_headers(include_session: bool = False) -> dict:
 
 def _get(path: str, params: dict | None = None) -> dict | None:
     try:
-        r = requests.get(f"{API_BASE}{path}", params=params, headers=_get_headers(), timeout=TIMEOUT)
+        r = requests.get(f"{API_BASE}{path}", 
+                         params=params, 
+                         headers=_get_headers(), 
+                         timeout=TIMEOUT)
         r.raise_for_status()
         return r.json()
     except Exception:
@@ -50,7 +56,10 @@ def _get(path: str, params: dict | None = None) -> dict | None:
 
 def _post(path: str, params: dict | None = None) -> dict | None:
     try:
-        r = requests.post(f"{API_BASE}{path}", params=params, headers=_get_headers(include_session=True), timeout=TIMEOUT)
+        r = requests.post(f"{API_BASE}{path}", 
+                          params=params, 
+                          headers=_get_headers(include_session=True), 
+                          timeout=TIMEOUT)
         r.raise_for_status()
         return r.json()
     except Exception:
@@ -74,10 +83,14 @@ def list_games(
     limit:  int = 100,
 ) -> dict | None:
     params: dict = {"offset": offset, "limit": limit}
-    if l1_state    is not None: params["l1_state"]    = l1_state
-    if ml_eligible is not None: params["ml_eligible"] = ml_eligible
-    if min_reviews is not None: params["min_reviews"] = min_reviews
-    if search_name is not None: params["search_name"] = search_name
+    if l1_state    is not None: 
+        params["l1_state"]    = l1_state
+    if ml_eligible is not None: 
+        params["ml_eligible"] = ml_eligible
+    if min_reviews is not None: 
+        params["min_reviews"] = min_reviews
+    if search_name is not None: 
+        params["search_name"] = search_name
     return _get("/games", params)
 
 

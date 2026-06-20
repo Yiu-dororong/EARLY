@@ -7,6 +7,7 @@ All render functions return HTML strings for st.markdown(..., unsafe_allow_html=
 
 from __future__ import annotations
 
+
 STYLESHEET = """
 <style>
 /* ── Base ─────────────────────────────────────────────────────────────── */
@@ -200,12 +201,16 @@ def state_badge(state: str | None) -> str:
 
 def data_quality_badge(quality: str | None) -> str:
     colors = {"high": "#238636", "medium": "#d29922", "low": "#da3633"}
-    labels = {"high": "High confidence", "medium": "Medium confidence", "low": "Low confidence"}
-    c = colors.get(quality or "", "#30363d")
-    l = labels.get(quality or "", "Unknown confidence")
+    labels = {"high": "High confidence", 
+              "medium": "Medium confidence", 
+              "low": "Low confidence"}
+    color = colors.get(quality or "", "#30363d")
+    label = labels.get(quality or "", "Unknown confidence")
     return (
-        f'<span style="background:{c}18;color:{c};border:1px solid {c}44;'
-        f'padding:2px 10px;border-radius:20px;font-size:0.75em;font-weight:600;">{l}</span>'
+        f'<span style="background:{color}18;color:'
+        f'{color};border:1px solid {color}44;'
+        f'padding:2px 10px;border-radius:20px;'
+        f'font-size:0.75em;font-weight:600;">{label}</span>'
     )
 
 
@@ -250,11 +255,13 @@ def cluster_row(cluster: dict) -> str:
     )
     quote_html = ""
     if cluster.get("representative_quote"):
-        quote_html = f'<div class="cluster-quote">"{cluster["representative_quote"]}"</div>'
+        quote_html = (f'<div class="cluster-quote">"'
+                        f'{cluster["representative_quote"]}"</div>')
 
     return (
         f'<div class="cluster-row">'
-        f'<span class="{valence_cls}" style="font-size:0.9em;flex-shrink:0;">{valence_sym}</span>'
+        f'<span class="{valence_cls}" style="font-size:0.9em;flex-shrink:0;">'
+        f'{valence_sym}</span>'
         f'<div>'
         f'<div class="cluster-label">{cluster.get("theme","")}</div>'
         f'<div class="cluster-freq">{cluster.get("frequency","")}</div>'
