@@ -26,7 +26,8 @@ def get_compound_key(request: Request) -> str:
     Ensures fair usage and prevents simple bypasses.
     """
     api_token = request.headers.get("api-key")
-    session_id = request.headers.get("session-id") or request.cookies.get("session_id", "anon_session")
+    session_id = (request.headers.get("session-id") 
+                  or request.cookies.get("session_id", "anon_session"))
     user_ip = get_real_ip(request)
 
     if api_token and session_id != "anon_session":

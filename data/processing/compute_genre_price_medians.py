@@ -28,12 +28,14 @@ import argparse
 import logging
 import os
 from datetime import datetime, timezone
-from dotenv import load_dotenv
-
-load_dotenv()
 
 import libsql
 import pandas as pd
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
 
 # ---------------------------------------------------------------------------
 # DB
@@ -198,7 +200,8 @@ def compute_medians(
         return corpus_median, "corpus_fallback"
 
     resolved = result.apply(
-        lambda row: pd.Series(resolve_median(row), index=["median_price_usd", "genre_median_source"]),
+        lambda row: pd.Series(resolve_median(row), 
+                              index=["median_price_usd", "genre_median_source"]),
         axis=1,
     )
     result["median_price_usd"]    = resolved["median_price_usd"]
@@ -303,7 +306,8 @@ def write_ratios(
     ratios_clean = ratios.where(pd.notnull(ratios), None)
     updates = [
         (
-            float(row["price_vs_genre_median"]) if row["price_vs_genre_median"] is not None else None,
+            float(row["price_vs_genre_median"]) 
+            if row["price_vs_genre_median"] is not None else None,
             row["primary_genre"],
             row["appid"],
             row["snapshot_date"]
@@ -324,7 +328,8 @@ def write_ratios(
             chunk,
         )
         processed = i + len(chunk)
-        log.info("  Updated %d/%d snapshots (%.1f%%)", processed, total, processed / total * 100)
+        log.info("  Updated %d/%d snapshots (%.1f%%)", 
+                 processed, total, processed / total * 100)
 
     conn.commit()
     null_ratios = ratios["price_vs_genre_median"].isna().sum()
@@ -360,7 +365,8 @@ def run(dry_run: bool, thin_threshold: int, delta: bool) -> None:
     computed_at = datetime.now(timezone.utc).isoformat()
 
     if delta:
-        log.info("Delta run: writing to live_genre_price_medians and skipping snapshot updates.")
+        log.info("Delta run: "
+                 "writing to live_genre_price_medians and skipping snapshot updates.")
         write_medians(conn, medians, computed_at, table_name="live_genre_price_medians")
     else:
         write_medians(conn, medians, computed_at, table_name="genre_price_medians")
@@ -385,10 +391,12 @@ if __name__ == "__main__":
                         help="Compute but do not write to DB")
     parser.add_argument(
         "--thin-threshold", type=int, default=THIN_BUCKET_DEFAULT,
-        help=f"Min games for a genre median to be used directly (default: {THIN_BUCKET_DEFAULT})",
+        help=f"Min games for a genre median to be used directly "
+        f"(default: {THIN_BUCKET_DEFAULT})",
     )
     parser.add_argument("--delta", action="store_true",
-                        help="Delta run: only recompute and write to the genre_price_medians table")
+                        help="Delta run: "
+                        "only recompute and write to the genre_price_medians table")
     args = parser.parse_args()
 
     run(args.dry_run, args.thin_threshold, args.delta)

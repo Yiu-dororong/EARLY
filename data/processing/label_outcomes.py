@@ -14,19 +14,28 @@ Logic (in priority order):
   falls back to flat FLOOR_GAP_DAYS (365) for games with insufficient history.
 
   NOTE: EXIT_SILENT requires event_history with type 28 (dev posts).
-  If event_history is absent, EXIT_SILENT collapses into STAYS_ACTIVE — logged as warning.
+  If event_history is absent, 
+  EXIT_SILENT collapses into STAYS_ACTIVE — logged as warning.
 
 Writes to:
-  games_v2.outcome         — 'EXIT_SUCCESS' | 'EXIT_ABANDONED' | 'EXIT_SILENT' | 'STAYS_ACTIVE'
-  games_v2.outcome_date    — ISO date string (graduation_date or last_build_update_date)
-  games_v2.outcome_source  — 'appdetails_graduation' | 'abandonment_rule' | 'open_label'
-  games_v2.abandoned_date  — ISO date string of the day the abandonment clock expired
+- games_v2.outcome:
+    'EXIT_SUCCESS' | 'EXIT_ABANDONED' | 'EXIT_SILENT' | 'STAYS_ACTIVE'
+- games_v2.outcome_date:
+    ISO date string (graduation_date or last_build_update_date)
+- games_v2.outcome_source:
+    'appdetails_graduation' | 'abandonment_rule' | 'open_label'
+- games_v2.abandoned_date:
+    ISO date string of the day the abandonment clock expired
 
 Run modes:
-  python label_outcomes.py                        — labels games_v2 only
-  python label_outcomes.py --dry-run              — prints decisions, writes nothing
-  python label_outcomes.py --appid 123            — single game debug mode
-  python label_outcomes.py --delta                — only process active and recently graduated games
+- python label_outcomes.py
+    Labels games_v2 only.
+- python label_outcomes.py --dry-run
+    Prints decisions, writes nothing.
+- python label_outcomes.py --appid 123
+    Single game debug mode.
+- python label_outcomes.py --delta
+    Only process active and recently graduated games.
 """
 
 import argparse
@@ -36,11 +45,13 @@ import sys
 import time
 from datetime import datetime, timedelta, timezone
 from itertools import groupby
+
+import libsql
 from dotenv import load_dotenv
+
 
 load_dotenv()
 
-import libsql
 
 # ---------------------------------------------------------------------------
 # Config
@@ -54,7 +65,7 @@ FLOOR_GAP_DAYS = 365                   # minimum allowable build gap (Steam's ow
 TOLERANCE_MULTIPLIER = 1.5             # allow 50% longer than personal norm
 MIN_EVENTS_FOR_PERSONAL_THRESHOLD = 5  # below this, use FLOOR_GAP_DAYS
 POST_GAP_DAYS = 365                    # dev post clock — independent of build clock
-MIN_EA_AGE_DAYS = 90                   # clock doesn't start until game has been in EA 90+ days
+MIN_EA_AGE_DAYS = 90                   # clock doesn't start until EA aged 90+ days
 DELTA_GRADUATION_DAYS = 90             # delta run look-back window
 DB_MAX_RETRIES = 3                     # max DB connection retries
 DB_RETRY_DELAY = 5.0                   # delay between DB retries
@@ -87,7 +98,8 @@ def compute_allowable_build_gap(historical_build_gaps: list[int]) -> int:
     if len(historical_build_gaps) < MIN_EVENTS_FOR_PERSONAL_THRESHOLD:
         return FLOOR_GAP_DAYS
     from statistics import median
-    return max(FLOOR_GAP_DAYS, int(median(historical_build_gaps) * TOLERANCE_MULTIPLIER))
+    return max(FLOOR_GAP_DAYS, 
+               int(median(historical_build_gaps) * TOLERANCE_MULTIPLIER))
 
 
 def compute_outcome(
@@ -125,10 +137,13 @@ def compute_outcome(
     ea_age_days: float | None = None
     if ea_start_date and ea_start_date.strip():
         try:
-            ea_start    = datetime.fromisoformat(ea_start_date.strip()).replace(tzinfo=timezone.utc)
+            ea_start    = datetime.fromisoformat(
+                                    ea_start_date.strip()
+                                    ).replace(tzinfo=timezone.utc)
             ea_age_days = (now - ea_start).days
         except ValueError:
-            log.warning("appid=%s — unparseable ea_start_date: %r", appid, ea_start_date)
+            log.warning("appid=%s — unparseable ea_start_date: %r", 
+                        appid, ea_start_date)
 
     # ── Build gap ─────────────────────────────────────────────────────────
     allowable_build_gap = compute_allowable_build_gap(historical_build_gaps)
@@ -213,8 +228,10 @@ def compute_outcome(
                 "outcome_source": "abandonment_rule",
                 "abandoned_date": _abandoned_date(),
                 "reason": (
-                    f"days_since_build={days_since_build} (>allowable={allowable_build_gap}), "
-                    f"days_since_post={days_since_post} (>{POST_GAP_DAYS} or never), "
+                    f"days_since_build={days_since_build} "
+                    f"(>allowable={allowable_build_gap}), "
+                    f"days_since_post={days_since_post} "
+                    f"(>{POST_GAP_DAYS} or never), "
                     f"ea_age={ea_age_days}d"
                 ),
             }
@@ -230,8 +247,10 @@ def compute_outcome(
                 "outcome_source": "silent_rule",
                 "abandoned_date": _abandoned_date(),
                 "reason": (
-                    f"days_since_build={days_since_build} (>allowable={allowable_build_gap}), "
-                    f"days_since_post={days_since_post} (<={POST_GAP_DAYS}, still posting), "
+                    f"days_since_build={days_since_build} "
+                    f"(>allowable={allowable_build_gap}), "
+                    f"days_since_post={days_since_post} "
+                    f"(<={POST_GAP_DAYS}, still posting), "
                     f"ea_age={ea_age_days}d"
                 ),
             }
@@ -254,7 +273,10 @@ def compute_outcome(
 # Data fetching helpers
 # ---------------------------------------------------------------------------
 
-def fetch_last_build_update_dates(conn, appids: list[int]) -> tuple[dict[int, str | None], libsql.Connection]:
+def fetch_last_build_update_dates(
+        conn, 
+        appids: list[int]
+        ) -> tuple[dict[int, str | None], libsql.Connection]:
     cursor = conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='event_history'"
     )
@@ -275,7 +297,8 @@ def fetch_last_build_update_dates(conn, appids: list[int]) -> tuple[dict[int, st
             try:
                 rows = conn.execute(
                     f"""
-                    SELECT appid, datetime(MAX(event_ts), 'unixepoch') AS last_build_update_date
+                    SELECT appid, 
+                        datetime(MAX(event_ts), 'unixepoch') AS last_build_update_date
                     FROM event_history
                     WHERE appid IN ({placeholders})
                       AND event_type IN (12, 13, 14)
@@ -289,17 +312,23 @@ def fetch_last_build_update_dates(conn, appids: list[int]) -> tuple[dict[int, st
             except Exception as e:
                 if attempt == DB_MAX_RETRIES:
                     raise
-                log.warning("DB read error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
+                log.warning("DB read error attempt %d: %s - retrying in %ds", 
+                            attempt, e, DB_RETRY_DELAY)
                 time.sleep(DB_RETRY_DELAY)
-                try: conn.close()
-                except Exception: pass
+                try: 
+                    conn.close()
+                except Exception as e: 
+                    log.warning("Error closing database connection: %s", e)
                 conn = get_conn()
     for appid in appids:
         result.setdefault(appid, None)
     return result, conn
 
 
-def fetch_last_dev_post_dates(conn, appids: list[int]) -> tuple[dict[int, str | None], libsql.Connection]:
+def fetch_last_dev_post_dates(
+        conn, 
+        appids: list[int]
+        ) -> tuple[dict[int, str | None], libsql.Connection]:
     cursor = conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='event_history'"
     )
@@ -320,7 +349,8 @@ def fetch_last_dev_post_dates(conn, appids: list[int]) -> tuple[dict[int, str | 
             try:
                 rows = conn.execute(
                     f"""
-                    SELECT appid, datetime(MAX(event_ts), 'unixepoch') AS last_dev_post_date
+                    SELECT appid, 
+                            datetime(MAX(event_ts), 'unixepoch') AS last_dev_post_date
                     FROM event_history
                     WHERE appid IN ({placeholders})
                       AND event_type = 28
@@ -334,17 +364,23 @@ def fetch_last_dev_post_dates(conn, appids: list[int]) -> tuple[dict[int, str | 
             except Exception as e:
                 if attempt == DB_MAX_RETRIES:
                     raise
-                log.warning("DB read error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
+                log.warning("DB read error attempt %d: %s - retrying in %ds", 
+                            attempt, e, DB_RETRY_DELAY)
                 time.sleep(DB_RETRY_DELAY)
-                try: conn.close()
-                except Exception: pass
+                try: 
+                    conn.close()
+                except Exception as e: 
+                    log.warning("Error closing database connection: %s", e)
                 conn = get_conn()
     for appid in appids:
         result.setdefault(appid, None)
     return result, conn
 
 
-def fetch_historical_build_gaps(conn, appids: list[int]) -> tuple[dict[int, list[int]], libsql.Connection]:
+def fetch_historical_build_gaps(
+        conn, 
+        appids: list[int]
+        ) -> tuple[dict[int, list[int]], libsql.Connection]:
     cursor = conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='event_history'"
     )
@@ -389,19 +425,30 @@ def fetch_historical_build_gaps(conn, appids: list[int]) -> tuple[dict[int, list
             except Exception as e:
                 if attempt == DB_MAX_RETRIES:
                     raise
-                log.warning("DB read error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
+                log.warning("DB read error attempt %d: %s - retrying in %ds", 
+                            attempt, e, DB_RETRY_DELAY)
                 time.sleep(DB_RETRY_DELAY)
-                try: conn.close()
-                except Exception: pass
+                try: 
+                    conn.close()
+                except Exception as e: 
+                    log.warning("Error closing database connection: %s", e)
                 conn = get_conn()
 
     return result, conn
 
 
-def fetch_games_v2(conn, appid_filter: int | None = None, delta: bool = False) -> tuple[list[dict], libsql.Connection]:
+def fetch_games_v2(
+        conn, 
+        appid_filter: int | None = None, 
+        delta: bool = False
+        ) -> tuple[list[dict], libsql.Connection]:
     delta_filter = ""
     if delta:
-        delta_filter = f"AND (currently_in_ea = 1 OR (currently_in_ea = 0 AND graduation_date IS NOT NULL AND graduation_date >= date('now', '-{DELTA_GRADUATION_DAYS} days')))"
+        delta_filter = f"""AND (currently_in_ea = 1 
+                            OR (currently_in_ea = 0 
+                            AND graduation_date IS NOT NULL 
+                            AND graduation_date >= 
+                            date('now', '-{DELTA_GRADUATION_DAYS} days')))"""
 
     where = f"""
         WHERE eligibility_status = 'ELIGIBLE'
@@ -437,10 +484,13 @@ def fetch_games_v2(conn, appid_filter: int | None = None, delta: bool = False) -
         except Exception as e:
             if attempt == DB_MAX_RETRIES:
                 raise
-            log.warning("DB fetch_games_v2 error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
+            log.warning("DB fetch_games_v2 error attempt %d: %s - retrying in %ds", 
+                        attempt, e, DB_RETRY_DELAY)
             time.sleep(DB_RETRY_DELAY)
-            try: conn.close()
-            except Exception: pass
+            try: 
+                conn.close()
+            except Exception as e: 
+                log.warning("Error closing database connection: %s", e)
             conn = get_conn()
 
     return [
@@ -453,19 +503,27 @@ def fetch_games_v2(conn, appid_filter: int | None = None, delta: bool = False) -
 # Write helpers
 # ---------------------------------------------------------------------------
 
-def write_outcomes_v2(conn, decisions: list[dict], dry_run: bool = False) -> libsql.Connection:
+def write_outcomes_v2(
+        conn, 
+        decisions: list[dict], 
+        dry_run: bool = False) -> libsql.Connection:
     existing_cols = set()
     for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
-            existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(games_v2)").fetchall()}
+            existing_cols = {row[1] for row in conn.execute(
+                "PRAGMA table_info(games_v2)"
+                ).fetchall()}
             break
         except Exception as e:
             if attempt == DB_MAX_RETRIES:
                 raise
-            log.warning("DB PRAGMA read error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
+            log.warning("DB PRAGMA read error attempt %d: %s - retrying in %ds", 
+                        attempt, e, DB_RETRY_DELAY)
             time.sleep(DB_RETRY_DELAY)
-            try: conn.close()
-            except Exception: pass
+            try: 
+                conn.close()
+            except Exception as e: 
+                log.warning("Error closing database connection: %s", e)
             conn = get_conn()
             
     if "abandoned_date" not in existing_cols:
@@ -478,10 +536,13 @@ def write_outcomes_v2(conn, decisions: list[dict], dry_run: bool = False) -> lib
                 except Exception as e:
                     if attempt == DB_MAX_RETRIES:
                         raise
-                    log.warning("DB ALTER TABLE error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
+                    log.warning("DB ALTER TABLE error attempt %d: %s - retrying in %ds",
+                                attempt, e, DB_RETRY_DELAY)
                     time.sleep(DB_RETRY_DELAY)
-                    try: conn.close()
-                    except Exception: pass
+                    try: 
+                        conn.close()
+                    except Exception as e: 
+                        log.warning("Error closing database connection: %s", e)
                     conn = get_conn()
             log.info("Added column games_v2.abandoned_date")
         else:
@@ -493,7 +554,8 @@ def write_outcomes_v2(conn, decisions: list[dict], dry_run: bool = False) -> lib
         for i in range(0, len(decisions), chunk_size):
             chunk = decisions[i : i + chunk_size]
             update_tuples = [
-                (d["outcome"], d["outcome_date"], d["outcome_source"], d["abandoned_date"], d["appid"])
+                (d["outcome"], d["outcome_date"], 
+                 d["outcome_source"], d["abandoned_date"], d["appid"])
                 for d in chunk
             ]
             for attempt in range(1, DB_MAX_RETRIES + 1):
@@ -514,10 +576,13 @@ def write_outcomes_v2(conn, decisions: list[dict], dry_run: bool = False) -> lib
                 except Exception as e:
                     if attempt == DB_MAX_RETRIES:
                         raise
-                    log.warning("DB write batch error attempt %d: %s - retrying in %ds", attempt, e, DB_RETRY_DELAY)
+                    log.warning("DB write batch error attempt %d: %s - retrying in %ds",
+                                attempt, e, DB_RETRY_DELAY)
                     time.sleep(DB_RETRY_DELAY)
-                    try: conn.close()
-                    except Exception: pass
+                    try: 
+                        conn.close()
+                    except Exception as e: 
+                        log.warning("Error closing database connection: %s", e)
                     conn = get_conn()
             updated += len(chunk)
         log.info("games_v2: wrote %d outcome labels", updated)
@@ -559,7 +624,8 @@ def main():
     parser.add_argument("--appid",    type=int, default=None,
                         help="Debug a single appid")
     parser.add_argument("--delta",    action="store_true",
-                        help="Delta run: only process active and recently graduated games")
+                        help="Delta run: "
+                        "only process active and recently graduated games")
     args = parser.parse_args()
 
     conn = get_conn()

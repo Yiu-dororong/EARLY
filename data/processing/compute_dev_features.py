@@ -51,12 +51,13 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 from collections import defaultdict
 from datetime import date, datetime, timezone
-import os
 
 import libsql
 from dotenv import load_dotenv
+
 
 load_dotenv()
 
@@ -126,7 +127,8 @@ def parse_developers(raw: str | None) -> list[str]:
         try:
             devs = json.loads(raw)
             if isinstance(devs, list):
-                return [normalise_dev(d) for d in devs if isinstance(d, str) and d.strip()]
+                return [normalise_dev(d) for d in devs 
+                        if isinstance(d, str) and d.strip()]
         except json.JSONDecodeError:
             pass
     return [normalise_dev(raw)] if raw else []
@@ -173,14 +175,17 @@ def build_game_index(conn: libsql.Connection, publisher_cap: int) -> dict[int, d
     snapshotted = {
         r[0] for r in conn.execute("SELECT DISTINCT appid FROM snapshots").fetchall()
     }
-    log.info("Active corpus: %d snapshotted games out of %d total", len(snapshotted), len(all_rows))
+    log.info("Active corpus: %d snapshotted games out of %d total", 
+             len(snapshotted), len(all_rows))
 
     # Step 3: dev frequency count (across full corpus for publisher detection)
     dev_freq: dict[str, int] = defaultdict(int)
     raw_games = []
-    for appid, developers, ea_start_date, graduation_date, outcome, abandoned_date, is_free in all_rows:
+    for (appid, developers, ea_start_date, graduation_date, 
+         outcome, abandoned_date, is_free) in all_rows:
         devs = parse_developers(developers)
-        raw_games.append((appid, devs, ea_start_date, graduation_date, outcome, abandoned_date, is_free))
+        raw_games.append((appid, devs, ea_start_date, graduation_date, 
+                          outcome, abandoned_date, is_free))
         for d in devs:
             dev_freq[d] += 1
 
@@ -198,7 +203,8 @@ def build_game_index(conn: libsql.Connection, publisher_cap: int) -> dict[int, d
             for d in devs:
                 if d not in publishers:
                     active_devs.add(d)
-    log.info("Active corpus dev strings: %d unique (post publisher filter)", len(active_devs))
+    log.info("Active corpus dev strings: %d unique (post publisher filter)", 
+             len(active_devs))
 
     # Step 5: snapshot data for review counts — ASC so last element = most recent
     snap_rows = conn.execute("""
@@ -218,7 +224,8 @@ def build_game_index(conn: libsql.Connection, publisher_cap: int) -> dict[int, d
     #         (needed so pre-2022 games appear as valid siblings)
     game_index: dict[int, dict] = {}
 
-    for appid, devs, ea_start_date, graduation_date, outcome, abandoned_date, is_free in raw_games:
+    for (appid, devs, ea_start_date, graduation_date, 
+         outcome, abandoned_date, is_free) in raw_games:
         clean_devs = [d for d in devs if d not in publishers]
 
         # Only index games that are either in the active corpus OR share a dev
@@ -316,29 +323,38 @@ def merge_pre2022_table(conn: libsql.Connection, game_index: dict[int, dict]) ->
     """).fetchall()
 
     patched = 0
-    for appid, dev_norm, ea_start_date, graduation_date, outcome, crossed_50, ea_age_days, is_free in rows:
+    for (appid, dev_norm, ea_start_date, graduation_date, 
+         outcome, crossed_50, ea_age_days, is_free) in rows:
         if appid not in game_index:
             # Add new entry for pre-2022 game not in games_v2 corpus at all
             ea_start      = parse_date(ea_start_date)
-            graduation_dt = parse_date(graduation_date) if outcome != "STAYS_ACTIVE" else None
+            graduation_dt = (parse_date(graduation_date) if outcome != "STAYS_ACTIVE" 
+                             else None)
             game_index[appid] = {
                 "devs":                  [dev_norm] if dev_norm else [],
                 "ea_start":              ea_start,
                 "graduation_date":       graduation_dt,
                 "outcome":               outcome or "UNKNOWN",
                 "ea_end":                graduation_dt,
-                "ea_age_days":           ea_age_days if outcome != "STAYS_ACTIVE" else EA_AGE_MIN_DAYS, # Checked: latest pre-2022 ea release date - oldest snapshot date > 90
+                # Checked: latest pre-2022 ea release date - oldest snapshot date > 90
+                "ea_age_days":           ea_age_days if outcome != "STAYS_ACTIVE" 
+                                                    else EA_AGE_MIN_DAYS, 
                 "is_ea":                 True,
                 "is_free":               bool(is_free),
-                "release_date":          graduation_dt if graduation_dt else ea_start, # release here means 1.0 release, avoid active EA return None by replacing EA start date
-                "ea_peak_review_count":  EA_REVIEW_THRESHOLD if crossed_50 else 0, # all pre-2022 EA games have graduated before 2022, so there is no need for real time calculation
+                # release here means 1.0 release, 
+                # avoid active EA return None by replacing EA start date
+                "release_date":          graduation_dt if graduation_dt else ea_start, 
+                # all pre-2022 EA games have graduated before 2022, 
+                # so there is no need for real time calculation
+                "ea_peak_review_count":  EA_REVIEW_THRESHOLD if crossed_50 else 0, 
             }
             patched += 1
         else:
             # Patch existing entry only if snapshot data is missing
             existing = game_index[appid]
             if existing["ea_peak_review_count"] is None and crossed_50 is not None:
-                existing["ea_peak_review_count"] = EA_REVIEW_THRESHOLD if crossed_50 else 0
+                existing["ea_peak_review_count"] = (EA_REVIEW_THRESHOLD if crossed_50 
+                                                    else 0)
                 if existing["ea_age_days"] is None and ea_age_days is not None:
                     existing["ea_age_days"] = ea_age_days
                 patched += 1
@@ -504,14 +520,19 @@ def run(dry_run: bool, publisher_cap: int, delta: bool) -> None:
               AND appid IN (
                   SELECT appid FROM games_v2 
                   WHERE currently_in_ea = 1 
-                     OR (currently_in_ea = 0 AND graduation_date IS NOT NULL AND graduation_date >= date('now', '-{DELTA_GRADUATION_DAYS} days'))
+                     OR (currently_in_ea = 0 
+                     AND graduation_date IS NOT NULL 
+                     AND graduation_date >= 
+                     date('now', '-{DELTA_GRADUATION_DAYS} days'))
               )
         """
         rows = conn.execute(query).fetchall()
         unique_appids = {r[0] for r in rows}
     else:
         log.info("Loading snapshots to process...")
-        query = "SELECT appid, snapshot_date FROM snapshots ORDER BY appid, snapshot_date"
+        query = """SELECT appid, snapshot_date 
+                    FROM snapshots 
+                    ORDER BY appid, snapshot_date"""
         snapshots = conn.execute(query).fetchall()
         log.info("Processing %d snapshots...", len(snapshots))
 
@@ -519,14 +540,16 @@ def run(dry_run: bool, publisher_cap: int, delta: bool) -> None:
             unique_appids.add(appid)
             snapshot_t = parse_date(snapshot_date_str)
             if snapshot_t is None:
-                log.warning("Unparseable snapshot_date appid=%d: %s", appid, snapshot_date_str)
+                log.warning("Unparseable snapshot_date appid=%d: %s", 
+                            appid, snapshot_date_str)
                 skipped += 1
                 continue
 
             prev_ea, prior_success, total_shipped = compute_dev_features(
                 appid, snapshot_t, game_index, dev_to_games,
             )
-            updates.append((prev_ea, prior_success, total_shipped, appid, snapshot_date_str))
+            updates.append((prev_ea, prior_success, total_shipped, 
+                            appid, snapshot_date_str))
 
         log.info("Computed %d snapshots (%d skipped).", len(updates), skipped)
 
@@ -537,20 +560,23 @@ def run(dry_run: bool, publisher_cap: int, delta: bool) -> None:
             appid, today, game_index, dev_to_games
         )
         current_updates.append((
-            appid, prev_ea, prior_success, total_shipped, datetime.now(timezone.utc).isoformat()
+            appid, prev_ea, prior_success, 
+            total_shipped, datetime.now(timezone.utc).isoformat()
         ))
     log.info("Computed current state for %d games.", len(current_updates))
 
     if dry_run:
         if not delta:
             log.info("Dry run — sample (first 10 historical updates):")
-            for prev_ea, prior_success, total_shipped, appid, snap_date in updates[:10]:
+            for (prev_ea, prior_success, 
+                 total_shipped, appid, snap_date) in updates[:10]:
                 log.info(
                     "  appid=%-8d  T=%s  prev_ea=%-3d  prior_success=%d  shipped=%d",
                     appid, snap_date, prev_ea, prior_success, total_shipped,
                 )
         log.info("Dry run — sample (first 10 current states):")
-        for appid, prev_ea, prior_success, total_shipped, updated_at in current_updates[:10]:
+        for (appid, prev_ea, prior_success, 
+             total_shipped, updated_at) in current_updates[:10]:
             log.info(
                 "  appid=%-8d  prev_ea=%-3d  prior_success=%d  shipped=%d",
                 appid, prev_ea, prior_success, total_shipped,
@@ -576,7 +602,8 @@ def run(dry_run: bool, publisher_cap: int, delta: bool) -> None:
                 chunk,
             )
             processed = i + len(chunk)
-            log.info("  Updated %d/%d snapshots (%.1f%%)", processed, total_updates, processed / total_updates * 100)
+            log.info("  Updated %d/%d snapshots (%.1f%%)", 
+                     processed, total_updates, processed / total_updates * 100)
         log.info("Done. %d snapshots updated.", total_updates)
 
     if current_updates:
@@ -594,7 +621,8 @@ def run(dry_run: bool, publisher_cap: int, delta: bool) -> None:
                 chunk,
             )
             processed = i + len(chunk)
-            log.info("  Updated %d/%d current states (%.1f%%)", processed, total_current, processed / total_current * 100)
+            log.info("  Updated %d/%d current states (%.1f%%)", 
+                     processed, total_current, processed / total_current * 100)
         log.info("Done. %d current states updated.", total_current)
 
     conn.commit()
@@ -610,7 +638,8 @@ if __name__ == "__main__":
     parser.add_argument("--publisher-cap", type=int, default=PUBLISHER_FREQ_CAP,
                         help="Exclude dev strings on > N games (default: %(default)s)")
     parser.add_argument("--delta", action="store_true",
-                        help="Delta run: only process active and recently graduated games")
+                        help="Delta run: "
+                        "only process active and recently graduated games")
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 

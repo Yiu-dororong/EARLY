@@ -21,16 +21,16 @@ Run modes:
   python pipeline_discovery.py --retry-errors       # rerun games with ERROR status
 """
 
-import time
-import logging
 import argparse
-from datetime import datetime, timezone
 import json
-
-import requests
-import libsql
-from dotenv import load_dotenv
+import logging
 import os
+import time
+from datetime import datetime, timezone
+
+import libsql
+import requests
+from dotenv import load_dotenv
 
 
 load_dotenv()
@@ -129,15 +129,20 @@ def init_schema(conn):
 def load_existing_games(conn) -> tuple[dict, libsql.Connection]:
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            rows = conn.execute("SELECT appid, currently_in_ea FROM games_v2").fetchall()
+            rows = conn.execute(
+                "SELECT appid, currently_in_ea FROM games_v2"
+                ).fetchall()
             return {r[0]: r[1] for r in rows}, conn
         except Exception as e:
             if attempt == MAX_RETRIES:
                 raise
-            log.warning(f"DB load_existing_games error attempt {attempt}: {e} — retrying in {RETRY_DELAY}s")
+            log.warning(f"DB load_existing_games error attempt {attempt}: {e} — "
+                        f"retrying in {RETRY_DELAY}s")
             time.sleep(RETRY_DELAY)
-            try: conn.close()
-            except Exception: pass
+            try: 
+                conn.close()
+            except Exception as e: 
+                log.warning("Error closing database connection: %s", e)
             conn = get_conn()
     return {}, conn
 
@@ -152,10 +157,13 @@ def get_last_run_ts(conn) -> tuple[int, libsql.Connection]:
         except Exception as e:
             if attempt == MAX_RETRIES:
                 raise
-            log.warning(f"DB get_last_run_ts error attempt {attempt}: {e} — retrying in {RETRY_DELAY}s")
+            log.warning(f"DB get_last_run_ts error attempt {attempt}: {e} — "
+                        f"retrying in {RETRY_DELAY}s")
             time.sleep(RETRY_DELAY)
-            try: conn.close()
-            except Exception: pass
+            try: 
+                conn.close()
+            except Exception as e: 
+                log.warning("Error closing database connection: %s", e)
             conn = get_conn()
     return 0, conn
 
@@ -173,10 +181,13 @@ def save_run_ts(conn, ts: int):
         except Exception as e:
             if attempt == MAX_RETRIES:
                 raise
-            log.warning(f"DB save_run_ts error attempt {attempt}: {e} — retrying in {RETRY_DELAY}s")
+            log.warning(f"DB save_run_ts error attempt {attempt}: {e} "
+                        f"— retrying in {RETRY_DELAY}s")
             time.sleep(RETRY_DELAY)
-            try: conn.close()
-            except Exception: pass
+            try: 
+                conn.close()
+            except Exception as e: 
+                log.warning("Error closing database connection: %s", e)
             conn = get_conn()
     return conn
 
@@ -194,10 +205,13 @@ def log_step(conn, appid, step, status, message=""):
         except Exception as e:
             if attempt == MAX_RETRIES:
                 raise
-            log.warning(f"DB log_step error attempt {attempt} for appid {appid}: {e} — retrying in {RETRY_DELAY}s")
+            log.warning(f"DB log_step error attempt {attempt} for appid {appid}: {e} "
+                        f"— retrying in {RETRY_DELAY}s")
             time.sleep(RETRY_DELAY)
-            try: conn.close()
-            except Exception: pass
+            try: 
+                conn.close()
+            except Exception as e: 
+                log.warning("Error closing database connection: %s", e)
             conn = get_conn()
     return conn
 
@@ -220,10 +234,14 @@ def upsert_game(conn, row: dict):
         except Exception as e:
             if attempt == MAX_RETRIES:
                 raise
-            log.warning(f"DB upsert error attempt {attempt} for appid {row.get('appid')}: {e} — retrying in {RETRY_DELAY}s")
+            log.warning(
+                f"DB upsert error attempt {attempt} for appid {row.get('appid')}: {e} "
+                f"— retrying in {RETRY_DELAY}s")
             time.sleep(RETRY_DELAY)
-            try: conn.close()
-            except Exception: pass
+            try: 
+                conn.close()
+            except Exception as e: 
+                log.warning("Error closing database connection: %s", e)
             conn = get_conn()
     return conn
 
@@ -285,7 +303,10 @@ def fetch_app_list(if_modified_since: int = 0) -> list[dict]:
             "bootstrap"
             if if_modified_since == 0
             else f"delta since "
-                 f"{datetime.fromtimestamp(if_modified_since, tz=timezone.utc).isoformat()}"
+                 f"""{datetime.fromtimestamp(
+                     if_modified_since, 
+                     tz=timezone.utc
+                     ).isoformat()}"""
         )
     )
 
@@ -372,7 +393,8 @@ def check_eligibility(appid: int) -> tuple[str, dict]:
     developers = info.get("developers", [])
     publishers = info.get("publishers", [])
     categories_raw = info.get("categories", [])
-    categories = [c.get("description", "") for c in categories_raw if isinstance(c, dict)]
+    categories = [c.get("description", "") for c in categories_raw 
+                  if isinstance(c, dict)]
 
     meta = {
         "name":              info.get("name", ""),
@@ -416,7 +438,10 @@ def fetch_ea_start(appid: int) -> int | None:
     return data.get("results", {}).get("start_date")
 
 
-def check_and_update_graduation(conn, appid: int, name: str) -> tuple[str, libsql.Connection]:
+def check_and_update_graduation(
+        conn, 
+        appid: int, 
+        name: str) -> tuple[str, libsql.Connection]:
     """
     Checks appdetails for graduation.
     Returns status: "GRADUATED", "STILL_EA", "ERROR", "DELISTED"
@@ -430,7 +455,8 @@ def check_and_update_graduation(conn, appid: int, name: str) -> tuple[str, libsq
 
     app_data = data[str(appid)]
     if not app_data.get("success"):
-        log.warning(f"  WARNING — appdetails success=false for {appid} (possibly delisted)")
+        log.warning(f"  WARNING — appdetails success=false "
+                    f"for {appid} (possibly delisted)")
         return "DELISTED", conn
 
     info = app_data.get("data", {})
@@ -445,7 +471,8 @@ def check_and_update_graduation(conn, appid: int, name: str) -> tuple[str, libsq
 
         graduation_date = None
         if release_ts:
-            graduation_date = datetime.fromtimestamp(release_ts, tz=timezone.utc).date().isoformat()
+            graduation_date = datetime.fromtimestamp(release_ts, 
+                                                     tz=timezone.utc).date().isoformat()
 
         log.info(f"  ✓ GRADUATED — {name} | graduation_date={graduation_date}")
 
@@ -453,7 +480,9 @@ def check_and_update_graduation(conn, appid: int, name: str) -> tuple[str, libsq
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 conn.execute(
-                    "UPDATE games_v2 SET currently_in_ea = 0, graduation_date = ?, fetched_at = ? WHERE appid = ?",
+                    """UPDATE games_v2 
+                    SET currently_in_ea = 0, graduation_date = ?, fetched_at = ? 
+                    WHERE appid = ?""",
                     (graduation_date, now_iso, appid)
                 )
                 conn.commit()
@@ -461,13 +490,19 @@ def check_and_update_graduation(conn, appid: int, name: str) -> tuple[str, libsq
             except Exception as e:
                 if attempt == MAX_RETRIES:
                     raise
-                log.warning(f"DB update error attempt {attempt} for appid {appid}: {e} — retrying in {RETRY_DELAY}s")
+                log.warning(f"DB update error attempt {attempt} for appid {appid}: "
+                            f"{e} — retrying in {RETRY_DELAY}s")
                 time.sleep(RETRY_DELAY)
-                try: conn.close()
-                except Exception: pass
+                try: 
+                    conn.close()
+                except Exception as e: 
+                    log.warning("Error closing database connection: %s", e)
                 conn = get_conn()
 
-        conn = log_step(conn, appid, "check_graduated", "GRADUATED", f"graduation_date={graduation_date}")
+        conn = log_step(conn, appid, 
+                        "check_graduated", 
+                        "GRADUATED", 
+                        f"graduation_date={graduation_date}")
         return "GRADUATED", conn
     
     return "STILL_EA", conn
@@ -481,15 +516,20 @@ def run_check_graduated(dry_run: bool = False):
     # Select all current EA appids from the database
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            rows = conn.execute("SELECT appid, name, ea_start_ts FROM games_v2 WHERE currently_in_ea = 1").fetchall()
+            rows = conn.execute("""SELECT appid, name, ea_start_ts 
+                                FROM games_v2 
+                                WHERE currently_in_ea = 1""").fetchall()
             break
         except Exception as e:
             if attempt == MAX_RETRIES:
                 raise
-            log.warning(f"DB load check_graduated error attempt {attempt}: {e} — retrying in {RETRY_DELAY}s")
+            log.warning(f"DB load check_graduated error attempt {attempt}: "
+                        f"{e} — retrying in {RETRY_DELAY}s")
             time.sleep(RETRY_DELAY)
-            try: conn.close()
-            except Exception: pass
+            try: 
+                conn.close()
+            except Exception as e: 
+                log.warning("Error closing database connection: %s", e)
             conn = get_conn()
 
     log.info(f"Found {len(rows)} active EA games to check for graduation.")
@@ -502,7 +542,8 @@ def run_check_graduated(dry_run: bool = False):
     error_count = 0
 
     for i, (appid, name, ea_start_ts) in enumerate(rows, 1):
-        log.info(f"[{i}/{len(rows)}] Checking graduation status for appid={appid} name={name!r}")
+        log.info(f"[{i}/{len(rows)}] Checking graduation status "
+                 f"for appid={appid} name={name!r}")
         res, conn = check_and_update_graduation(conn, appid, name)
         if res == "GRADUATED":
             graduated_count += 1
@@ -517,7 +558,9 @@ def run_check_graduated(dry_run: bool = False):
     )
 
 # ── Main pipeline ─────────────────────────────────────────────────────────────
-def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_errors: bool = False):
+def run_pipeline(force_bootstrap: bool = False, 
+                 dry_run: bool = False, 
+                 retry_errors: bool = False):
 
     run_start_ts = int(datetime.now(timezone.utc).timestamp())
 
@@ -531,19 +574,27 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 rows = conn.execute(
-                    "SELECT appid, name, last_modified_steam FROM games_v2 WHERE eligibility_status = 'ERROR'"
+                    """SELECT appid, name, last_modified_steam 
+                    FROM games_v2 
+                    WHERE eligibility_status = 'ERROR'"""
                 ).fetchall()
                 break
             except Exception as e:
                 if attempt == MAX_RETRIES:
                     raise
-                log.warning(f"DB load errors attempt {attempt}: {e} — retrying in {RETRY_DELAY}s")
+                log.warning(f"DB load errors attempt {attempt}: "
+                            f"{e} — retrying in {RETRY_DELAY}s")
                 time.sleep(RETRY_DELAY)
-                try: conn.close()
-                except Exception: pass
+                try: 
+                    conn.close()
+                except Exception as e: 
+                    log.warning("Error closing database connection: %s", e)
                 conn = get_conn()
-        to_process = [{"appid": r[0], "name": r[1], "last_modified": r[2]} for r in rows]
-        log.info(f"Retry errors run — Found {len(to_process)} games with ERROR status to retry.")
+        to_process = [{"appid": r[0], 
+                       "name": r[1], 
+                       "last_modified": r[2]} for r in rows]
+        log.info(f"Retry errors run — "
+                 f"Found {len(to_process)} games with ERROR status to retry.")
     else:
         existing_games, conn = load_existing_games(conn)
         last_run_ts, conn = (0, conn) if force_bootstrap else get_last_run_ts(conn)
@@ -627,7 +678,8 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
 
         if status == "SKIP_NOT_GAME":
             stats["skip_not_game"] += 1
-            log.info(f"  SKIP_NOT_GAME ({meta.get('type')}) — {meta.get('name', app_name)}")
+            log.info(f"  SKIP_NOT_GAME ({meta.get('type')}) — "
+                     f"{meta.get('name', app_name)}")
             conn = log_step(conn, appid, "eligibility", status, meta.get("type", ""))
             conn = upsert_game(conn, {**base_row, "eligibility_status": status})
             continue
@@ -680,7 +732,8 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
                 # Keep as ELIGIBLE — will be picked up on next delta run once
                 # it accumulates reviews and histogram becomes available
                 stats["skip_no_histogram"] += 1
-                log.info(f"  SKIP_NO_HISTOGRAM (active EA, no reviews yet) — {meta['name']}")
+                log.info(f"  SKIP_NO_HISTOGRAM (active EA, no reviews yet) — "
+                         f"{meta['name']}")
                 conn = log_step(conn, appid, "histogram", "SKIP_NO_HISTOGRAM",
                          "active EA but no histogram yet")
                 conn = upsert_game(conn, {
@@ -691,7 +744,7 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
             continue
 
         # Temporal filter — applies to both ELIGIBLE_GRADUATED and ELIGIBLE_ACTIVE
-        # (catches ELIGIBLE_ACTIVE with unparseable release_date that turns out pre-2022)
+        # catches ELIGIBLE_ACTIVE with unparseable release_date that turns out pre-2022
         if ea_start_ts < EA_CUTOFF_TS:
             stats["skip_pre_2022"] += 1
             ea_date_str = datetime.fromtimestamp(
@@ -701,7 +754,9 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
                 f"  SKIP_PRE_2022 via histogram (ea_start={ea_date_str}) "
                 f"— {meta['name']}"
             )
-            conn = log_step(conn, appid, "temporal_filter", "SKIP_PRE_2022", ea_date_str)
+            conn = log_step(conn, appid, 
+                            "temporal_filter", "SKIP_PRE_2022", 
+                            ea_date_str)
             conn = upsert_game(conn, {
                 **base_row,
                 "ea_start_date":      ea_date_str,
@@ -745,11 +800,13 @@ def run_pipeline(force_bootstrap: bool = False, dry_run: bool = False, retry_err
 
     # ── Check updated EA games for graduation ──
     if to_check_graduation and not retry_errors:
-        log.info(f"\n── Checking {len(to_check_graduation)} updated EA games for graduation ──")
+        log.info(f"\n── Checking {len(to_check_graduation)} "
+                 f"updated EA games for graduation ──")
         for i, app in enumerate(to_check_graduation, 1):
             appid = app["appid"]
             name = app.get("name", "")
-            log.info(f"[{i}/{len(to_check_graduation)}] Checking graduation status for appid={appid} name={name!r}")
+            log.info(f"[{i}/{len(to_check_graduation)}] "
+                     f"Checking graduation status for appid={appid} name={name!r}")
             res, conn = check_and_update_graduation(conn, appid, name)
             if res == "GRADUATED":
                 stats["graduated_in_delta"] += 1
@@ -799,4 +856,5 @@ if __name__ == "__main__":
     if args.check_graduated:
         run_check_graduated(dry_run=args.dry_run)
     else:
-        run_pipeline(force_bootstrap=args.bootstrap, dry_run=args.dry_run, retry_errors=args.retry_errors)
+        run_pipeline(force_bootstrap=args.bootstrap, 
+                     dry_run=args.dry_run, retry_errors=args.retry_errors)

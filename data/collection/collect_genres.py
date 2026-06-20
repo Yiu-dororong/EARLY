@@ -46,13 +46,18 @@ import os
 import re
 import time
 from datetime import datetime, timezone
-from dotenv import load_dotenv
-from bs4 import BeautifulSoup
-
-load_dotenv()
+from typing import TYPE_CHECKING
 
 import libsql
 import requests
+from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 # ---------------------------------------------------------------------------
 # DB
@@ -143,7 +148,7 @@ def derive_from_labels(labels: list[str]) -> tuple[str | None, int]:
     Given a list of genre/tag label strings, returns (primary_genre, scope)
     using GENRE_PRIORITY order. Returns (None, DEFAULT_SCOPE) if no match.
     """
-    normalised = [l.lower().strip() for l in labels]
+    normalised = [label.lower().strip() for label in labels]
     # Check synonym map first (more specific → less specific)
     for tag in normalised:
         if tag in TAG_SYNONYM_MAP:
@@ -191,7 +196,8 @@ def fetch_official_genres(appid: int, session: requests.Session) -> list[str] | 
         if not isinstance(genres, list):
             return []
 
-        return [g["description"] for g in genres if isinstance(g, dict) and "description" in g]
+        return [g["description"] for g in genres 
+                if isinstance(g, dict) and "description" in g]
 
     except requests.exceptions.Timeout:
         log.warning("appid=%d — appdetails timed out", appid)
@@ -206,7 +212,8 @@ def fetch_official_genres(appid: int, session: requests.Session) -> list[str] | 
 
 def fetch_community_tags(appid: int, session: requests.Session) -> list[dict] | None:
     """
-    Scrapes Steam community tags and their vote counts directly from the official store page HTML.
+    Scrapes Steam community tags and their vote counts 
+    directly from the official store page HTML.
     Returns list of {name, count} dicts.
     Returns [] if no tags. Returns None on failure.
     """
@@ -222,18 +229,24 @@ def fetch_community_tags(appid: int, session: requests.Session) -> list[dict] | 
         resp.raise_for_status()
 
         # The exact tag counts are embedded in a JavaScript call on the page
-        match = re.search(r'InitAppTagModal\s*\(\s*\d+\s*,\s*(\[\{.*?\}\])', resp.text, re.DOTALL)
+        match = re.search(r'InitAppTagModal\s*\(\s*\d+\s*,\s*(\[\{.*?\}\])', 
+                          resp.text, 
+                          re.DOTALL)
         
         if match:
             try:
                 tag_data = json.loads(match.group(1))
-                return [{"name": t["name"], "count": int(t.get("count", 0))} for t in tag_data if "name" in t]
+                return [{"name": t["name"], 
+                         "count": int(t.get("count", 0))} 
+                         for t in tag_data if "name" in t]
             except json.JSONDecodeError:
                 pass
 
-        # Fallback to BeautifulSoup scraping if the JS array isn't found (count defaults to 0)
+        # Fallback to BeautifulSoup scraping if the JS array isn't found 
+        # (count defaults to 0)
         soup = BeautifulSoup(resp.text, 'html.parser')
-        tags = [tag.text.strip() for tag in soup.find_all('a', class_='app_tag') if tag.text.strip() != '+']
+        tags = [tag.text.strip() for tag in soup.find_all('a', class_='app_tag') 
+                if tag.text.strip() != '+']
         
         return [{"name": tag, "count": 0} for tag in tags]
 
@@ -328,14 +341,18 @@ def resolve_genre(
 # DB helpers
 # ---------------------------------------------------------------------------
 
-def get_target_appids(conn: libsql.Connection, refetch: bool, delta: bool = False) -> list[int]:
+def get_target_appids(conn: libsql.Connection, 
+                      refetch: bool, 
+                      delta: bool = False) -> list[int]:
     delta_filter = ""
     if delta:
         delta_filter = f"""
         AND appid IN (
             SELECT appid FROM games_v2 
             WHERE currently_in_ea = 1 
-               OR (currently_in_ea = 0 AND graduation_date IS NOT NULL AND graduation_date >= date('now', '-{DELTA_GRADUATION_DAYS} days'))
+               OR (currently_in_ea = 0 
+               AND graduation_date IS NOT NULL 
+               AND graduation_date >= date('now', '-{DELTA_GRADUATION_DAYS} days'))
         )
         """
 
@@ -381,7 +398,8 @@ def upsert(conn: libsql.Connection, appid: int, res: dict) -> None:
             res["genre_scope"],
             res["genre_source"],
             json.dumps(res["raw_genres"]),
-            json.dumps(res["community_tags"]) if res["community_tags"] is not None else None,
+            json.dumps(res["community_tags"]) 
+                if res["community_tags"] is not None else None,
             datetime.now(timezone.utc).isoformat(),
         ],
     )
@@ -459,7 +477,10 @@ def run(delay: float, refetch: bool, dry_run: bool, delta: bool) -> None:
     log.info("=" * 60)
     log.info("Done. source breakdown: %s", source_counts)
     if source_counts["default"] > 0:
-        log.warning("Found %d games with unclassified/unknown primary genre (defaulted).", source_counts["default"])
+        log.warning(
+            "Found %d games with unclassified/unknown primary genre (defaulted).", 
+            source_counts["default"]
+            )
 
     if failed:
         log.warning("Failed appids (re-run to retry): %s", failed[:20])
@@ -482,9 +503,17 @@ def build_genre_onehot(conn: libsql.Connection) -> "pd.DataFrame":
 
         genre_df = build_genre_onehot(conn)
         # Fit on train only:
-        dummies = pd.get_dummies(train_df.merge(genre_df, on='appid')['primary_genre'], prefix='genre')
+        dummies = pd.get_dummies(
+        train_df.merge(genre_df, on='appid'
+        )['primary_genre'], prefix='genre'
+        )
+
         # Apply same columns to test:
-        test_dummies = pd.get_dummies(test_df.merge(genre_df, on='appid')['primary_genre'], prefix='genre')
+        test_dummies = pd.get_dummies(
+        test_df.merge(genre_df, on='appid'
+        )['primary_genre'], prefix='genre'
+        )
+
         test_dummies = test_dummies.reindex(columns=dummies.columns, fill_value=0)
     """
     import pandas as pd
@@ -507,7 +536,8 @@ if __name__ == "__main__":
     parser.add_argument("--dry-run", action="store_true",
                         help="Fetch and compute but do not write to DB")
     parser.add_argument("--delta", action="store_true",
-                        help="Delta run: only fetch for active and recently graduated games")
+                        help="Delta run: only fetch for "
+                        "active and recently graduated games")
     args = parser.parse_args()
 
     run(args.delay, args.refetch, args.dry_run, args.delta)

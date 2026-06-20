@@ -43,15 +43,15 @@ DB table created if not exists:
 import argparse
 import logging
 import os
-import json
 import re
 import time
-from typing import Union
 from datetime import datetime, timezone
+from typing import Union
 
 import libsql
 import requests
 from dotenv import load_dotenv
+
 
 load_dotenv()
 
@@ -152,14 +152,17 @@ def ensure_table(conn: libsql.Connection) -> None:
     log.info("event_history table ready")
 
 
-def get_eligible_appids(conn: libsql.Connection, delta: bool = False) -> tuple[list[int], libsql.Connection]:
+def get_eligible_appids(conn: libsql.Connection, 
+                        delta: bool = False) -> tuple[list[int], libsql.Connection]:
     delta_filter = ""
     if delta:
         delta_filter = f"""
         AND appid IN (
             SELECT appid FROM games_v2 
             WHERE currently_in_ea = 1 
-               OR (currently_in_ea = 0 AND graduation_date IS NOT NULL AND graduation_date >= date('now', '-{DELTA_GRADUATION_DAYS} days'))
+               OR (currently_in_ea = 0 
+               AND graduation_date IS NOT NULL 
+               AND graduation_date >= date('now', '-{DELTA_GRADUATION_DAYS} days'))
         )
         """
     query = f"""
@@ -177,12 +180,15 @@ def get_eligible_appids(conn: libsql.Connection, delta: bool = False) -> tuple[l
                 raise
             log.warning("DB read error attempt %d: %s - reconnecting", attempt, e)
             time.sleep(DB_RETRY_DELAY)
-            try: conn.close()
-            except: pass
+            try: 
+                conn.close()
+            except Exception as e:
+                log.warning("Error closing connection: %s", e)
             conn = get_conn()
 
 
-def get_already_collected(conn: libsql.Connection) -> tuple[set[int], libsql.Connection]:
+def get_already_collected(conn: libsql.Connection) -> tuple[set[int], 
+                                                            libsql.Connection]:
     """Return appids that have at least one row in event_history."""
     for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
@@ -190,15 +196,18 @@ def get_already_collected(conn: libsql.Connection) -> tuple[set[int], libsql.Con
             return {r[0] for r in rows}, conn
         except Exception as e:
             if attempt == DB_MAX_RETRIES:
-                raise
-            log.warning("DB read error attempt %d: %s - reconnecting", attempt, e)
-            time.sleep(DB_RETRY_DELAY)
-            try: conn.close()
-            except: pass
+                log.warning("DB read error attempt %d: %s - reconnecting", attempt, e)
+                time.sleep(DB_RETRY_DELAY)
+                raise e
+            try: 
+                conn.close()
+            except Exception as e:
+                log.warning("Error closing connection: %s", e)
             conn = get_conn()
 
 
-def upsert_events(conn: libsql.Connection, events: list[dict]) -> tuple[int, libsql.Connection]:
+def upsert_events(conn: libsql.Connection, 
+                  events: list[dict]) -> tuple[int, libsql.Connection]:
     """Insert events, ignoring duplicates. Returns count inserted."""
     if not events:
         return 0, conn
@@ -225,10 +234,13 @@ def upsert_events(conn: libsql.Connection, events: list[dict]) -> tuple[int, lib
             if attempt == DB_MAX_RETRIES:
                 log.warning("upsert failed: %s", e)
                 return 0, conn
-            log.warning("DB upsert_events error attempt %d: %s - reconnecting", attempt, e)
+            log.warning("DB upsert_events error attempt %d: %s - reconnecting", 
+                        attempt, e)
             time.sleep(DB_RETRY_DELAY)
-            try: conn.close()
-            except: pass
+            try: 
+                conn.close()
+            except Exception as e:
+                log.warning("Error closing connection: %s", e)
             conn = get_conn()
 
 
@@ -245,15 +257,21 @@ def mark_no_events(conn: libsql.Connection, appid: int) -> libsql.Connection:
                     (appid, event_gid, event_type, event_name,
                      event_ts, announcement_body, word_count,
                      is_automated, build_id, build_branch, collected_at)
-                VALUES (?, 'NONE', 0, 'NO_EVENTS_SENTINEL', 0, NULL, 0, 0, NULL, NULL, ?)
+                VALUES (?, 'NONE', 0, 'NO_EVENTS_SENTINEL', 
+                         0, NULL, 0, 
+                         0, NULL, NULL, ?)
             """, (appid, int(datetime.now(timezone.utc).timestamp())))
             conn.commit()
             return conn
         except Exception as e:
-            if attempt == DB_MAX_RETRIES: raise
-            time.sleep(DB_RETRY_DELAY)
-            try: conn.close()
-            except: pass
+            if attempt == DB_MAX_RETRIES:
+                log.warning("mark_no_events failed for appid %d: %s", appid, e) 
+                time.sleep(DB_RETRY_DELAY)
+                raise e
+            try: 
+                conn.close()
+            except Exception as e:
+                log.warning("Error closing connection: %s", e)
             conn = get_conn()
 
 
@@ -299,7 +317,8 @@ def count_words(text: Union[str, None]) -> int:
     english_words = re.findall(r'\w+', text_without_cjk)
 
     # 4. Machine Learning Normalization
-    # Translate CJK characters into English "word effort" equivalents (~2.5 chars per word)
+    # Translate CJK characters into English 
+    # "word effort" equivalents (~2.5 chars per word)
     normalized_cjk_effort = int(len(cjk_chars) / 2.5)
 
     # 5. Return combined effort
@@ -356,7 +375,8 @@ def parse_event(raw: dict, appid: int) -> dict:
         "appid": appid,
         "event_gid": str(raw.get("gid", "")),
         "event_type": event_type,
-        "event_name": raw.get("event_name", "")[:500] if raw.get("event_name") else None,
+        "event_name": raw.get("event_name", "")[:500] 
+                    if raw.get("event_name") else None,
         "event_ts": raw.get("rtime32_start_time", 0),
         "announcement_body": body_text if body_text else None,
         "word_count": count_words(body_text),
@@ -453,13 +473,20 @@ def fetch_events_for_appid(
 # ---------------------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Collect Steam event history for EARLY pipeline")
-    p.add_argument("--appid", type=int, help="Fetch a single appid (debug)")
-    p.add_argument("--force", action="store_true", help="Re-fetch already-collected appids")
-    p.add_argument("--delta", action="store_true", help="Delta run: only fetch for active and recently graduated games")
-    p.add_argument("--limit", type=int, help="Max number of appids to process in this run")
-    p.add_argument("--dry-run", action="store_true", help="Print plan without fetching or writing")
-    p.add_argument("--delay", type=float, default=REQUEST_DELAY, help=f"Seconds between requests (default {REQUEST_DELAY})")
+    p = argparse.ArgumentParser(
+        description="Collect Steam event history for EARLY pipeline")
+    p.add_argument("--appid", type=int, 
+                   help="Fetch a single appid (debug)")
+    p.add_argument("--force", action="store_true", 
+                   help="Re-fetch already-collected appids")
+    p.add_argument("--delta", action="store_true", 
+                   help="Delta run: only fetch for active and recently graduated games")
+    p.add_argument("--limit", type=int, 
+                   help="Max number of appids to process in this run")
+    p.add_argument("--dry-run", action="store_true", 
+                   help="Print plan without fetching or writing")
+    p.add_argument("--delay", type=float, default=REQUEST_DELAY, 
+                   help=f"Seconds between requests (default {REQUEST_DELAY})")
     p.add_argument("--verbose", action="store_true", help="Debug logging")
     return p.parse_args()
 
@@ -526,7 +553,10 @@ def main() -> None:
         try:
             existing_gids = set()
             if args.delta:
-                rows = conn.execute("SELECT event_gid FROM event_history WHERE appid = ?", (appid,)).fetchall()
+                rows = conn.execute(
+                    "SELECT event_gid FROM event_history WHERE appid = ?", 
+                    (appid,)
+                    ).fetchall()
                 existing_gids = {r[0] for r in rows}
 
             events = fetch_events_for_appid(
@@ -542,7 +572,8 @@ def main() -> None:
             else:
                 inserted, conn = upsert_events(conn, events)
                 n_build = sum(1 for e in events if e["event_type"] in BUILD_EVENT_TYPES)
-                n_post = sum(1 for e in events if e["event_type"] in POST_EVENT_TYPES and not e["is_automated"])
+                n_post = sum(1 for e in events if e["event_type"] in POST_EVENT_TYPES 
+                             and not e["is_automated"])
                 n_auto = sum(1 for e in events if e["is_automated"])
 
                 total_events += inserted
@@ -551,8 +582,10 @@ def main() -> None:
                 total_automated_filtered += n_auto
 
                 log.info(
-                    "[%d/%d] appid %d: %d build events, %d dev posts, %d automated filtered",
-                    i, len(appids), appid, n_build, n_post, n_auto,
+                    "[%d/%d] appid %d: %d build events, "
+                    "%d dev posts, %d automated filtered",
+                    i, len(appids), appid, n_build, 
+                    n_post, n_auto,
                 )
 
         except Exception as e:

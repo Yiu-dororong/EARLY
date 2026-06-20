@@ -53,12 +53,12 @@ import json
 import logging
 import os
 import time
-from collections import defaultdict
 from datetime import date, datetime, timezone
 
-import requests
 import libsql
+import requests
 from dotenv import load_dotenv
+
 
 load_dotenv()
 
@@ -138,15 +138,19 @@ def ensure_table(conn: libsql.Connection) -> None:
     log.info("pre2022_review_history table ready")
 
 
-def load_already_collected(conn: libsql.Connection) -> tuple[set[int], libsql.Connection]:
+def load_already_collected(conn: libsql.Connection) -> tuple[set[int], 
+                                                             libsql.Connection]:
     for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
-            res = {r[0] for r in conn.execute("SELECT appid FROM pre2022_ea_games").fetchall()}
+            res = {r[0] for r in conn.execute(
+                "SELECT appid FROM pre2022_ea_games"
+                ).fetchall()}
             return res, conn
         except Exception as e:
             if attempt == DB_MAX_RETRIES:
                 raise
-            log.warning("DB read error attempt %d: %s - reconnecting in %ds", attempt, e, DB_RETRY_DELAY)
+            log.warning("DB read error attempt %d: %s - reconnecting in %ds", 
+                        attempt, e, DB_RETRY_DELAY)
             time.sleep(DB_RETRY_DELAY)
             try:
                 conn.close()
@@ -178,7 +182,8 @@ def parse_developers(raw: str | None) -> list[str]:
         try:
             parsed = json.loads(raw)
             if isinstance(parsed, list):
-                return [d.lower().strip() for d in parsed if isinstance(d, str) and d.strip()]
+                return [d.lower().strip() for d in parsed 
+                        if isinstance(d, str) and d.strip()]
         except json.JSONDecodeError:
             pass
     return [raw.lower().strip()] if raw else []
@@ -188,7 +193,13 @@ def parse_developers(raw: str | None) -> list[str]:
 # Candidate discovery from games_v2
 # ---------------------------------------------------------------------------
 
-def discover_candidates(conn: libsql.Connection, delta: bool = False) -> tuple[list[tuple[int, str, date, bool]], libsql.Connection]:
+def discover_candidates(
+        conn: libsql.Connection, 
+        delta: bool = False
+        ) -> tuple[
+            list[tuple[int, str, date, bool]], 
+            libsql.Connection
+            ]:
     """
     Return (appid, developer_norm, ea_start_date, is_free) for all pre-2022
     EA games in games_v2 that share a dev with the active snapshot corpus,
@@ -200,7 +211,9 @@ def discover_candidates(conn: libsql.Connection, delta: bool = False) -> tuple[l
         try:
             # Active corpus: appids that have snapshots
             snapshotted = {
-                r[0] for r in conn.execute("SELECT DISTINCT appid FROM snapshots").fetchall()
+                r[0] for r in conn.execute(
+                    "SELECT DISTINCT appid FROM snapshots"
+                    ).fetchall()
             }
 
             delta_filter = ""
@@ -209,7 +222,10 @@ def discover_candidates(conn: libsql.Connection, delta: bool = False) -> tuple[l
                   AND g.appid IN (
                       SELECT appid FROM games_v2 
                       WHERE currently_in_ea = 1 
-                         OR (currently_in_ea = 0 AND graduation_date IS NOT NULL AND graduation_date >= date('now', '-{DELTA_GRADUATION_DAYS} days'))
+                         OR (currently_in_ea = 0 
+                         AND graduation_date IS NOT NULL 
+                         AND graduation_date >= 
+                         date('now', '-{DELTA_GRADUATION_DAYS} days'))
                   )
                 """
 
@@ -218,7 +234,9 @@ def discover_candidates(conn: libsql.Connection, delta: bool = False) -> tuple[l
             query = f"""
                 SELECT DISTINCT g.developers
                 FROM games_v2 g
-                WHERE g.appid IN (SELECT appid FROM ccu_availability WHERE ccu_available IN ('AVAILABLE', 'UNAVAILABLE'))
+                WHERE g.appid IN (SELECT appid 
+                FROM ccu_availability 
+                WHERE ccu_available IN ('AVAILABLE', 'UNAVAILABLE'))
                   AND g.developers IS NOT NULL
                   {delta_filter}
             """
@@ -227,12 +245,18 @@ def discover_candidates(conn: libsql.Connection, delta: bool = False) -> tuple[l
                     active_devs.add(d)
 
             if delta:
-                existing_devs = {r[0] for r in conn.execute("SELECT DISTINCT developer_norm FROM pre2022_ea_games").fetchall() if r[0]}
+                existing_devs = {r[0] for r in conn.execute(
+                    "SELECT DISTINCT developer_norm FROM pre2022_ea_games"
+                    ).fetchall() if r[0]}
                 before_count = len(active_devs)
                 active_devs = active_devs - existing_devs
-                log.info("Delta filter: ignored %d already-processed developers (%d remaining)", before_count - len(active_devs), len(active_devs))
+                log.info("Delta filter: ignored %d already-processed developers "
+                         "(%d remaining)", 
+                         before_count - len(active_devs), 
+                         len(active_devs))
 
-            log.info("Active corpus: %d games, %d unique dev strings to process", len(snapshotted), len(active_devs))
+            log.info("Active corpus: %d games, %d unique dev strings to process", 
+                     len(snapshotted), len(active_devs))
 
             # All games in games_v2 with ea_start_date < 2022 that share a dev
             all_rows = conn.execute("""
@@ -264,15 +288,19 @@ def discover_candidates(conn: libsql.Connection, delta: bool = False) -> tuple[l
 
                 candidates.append((appid, matching_devs[0], ea_start, bool(is_free)))
 
-            log.info("Candidates from games_v2: %d pre-2022 EA sibling games", len(candidates))
+            log.info("Candidates from games_v2: %d pre-2022 EA sibling games", 
+                     len(candidates))
             return candidates, conn
         except Exception as e:
             if attempt == DB_MAX_RETRIES:
                 raise
-            log.warning("DB discover_candidates error attempt %d: %s - reconnecting", attempt, e)
+            log.warning("DB discover_candidates error attempt %d: %s - reconnecting", 
+                        attempt, e)
             time.sleep(DB_RETRY_DELAY)
-            try: conn.close()
-            except Exception: pass
+            try: 
+                conn.close()
+            except Exception as e: 
+                log.warning("Error closing DB connection: %s", e)
             conn = get_conn()
     return [], conn
 
@@ -346,7 +374,10 @@ def infer_outcome_and_graduation(data: dict) -> tuple[str, date | None]:
 # Steam review histogram
 # ---------------------------------------------------------------------------
 
-def fetch_review_histogram(appid: int, sleep_s: float) -> tuple[list[dict] | None, int | None]:
+def fetch_review_histogram(
+        appid: int, 
+        sleep_s: float
+        ) -> tuple[list[dict] | None, int | None]:
     """
     Full lifetime review histogram, sorted ASC with synthetic end dates added.
     Returns (buckets, start_date_ts) or (None, None) on failure.
@@ -379,7 +410,8 @@ def fetch_review_histogram(appid: int, sleep_s: float) -> tuple[list[dict] | Non
         for i, rollup in enumerate(rollups):
             # bucket_start: unix ts → ISO date
             try:
-                bucket_start_dt = datetime.fromtimestamp(int(rollup["date"]), tz=timezone.utc).date()
+                bucket_start_dt = datetime.fromtimestamp(int(rollup["date"]), 
+                                                         tz=timezone.utc).date()
                 bucket_start = bucket_start_dt.isoformat()
             except (KeyError, ValueError, OSError, TypeError) as e:
                 log.warning("appid %d rollup[%d] bad date: %s", appid, i, e)
@@ -388,7 +420,8 @@ def fetch_review_histogram(appid: int, sleep_s: float) -> tuple[list[dict] | Non
             # bucket_end: start of next rollup, or today for the last bucket
             if i + 1 < len(rollups):
                 try:
-                    next_dt = datetime.fromtimestamp(int(rollups[i + 1]["date"]), tz=timezone.utc).date()
+                    next_dt = datetime.fromtimestamp(int(rollups[i + 1]["date"]), 
+                                                     tz=timezone.utc).date()
                     bucket_end = next_dt.isoformat()
                 except (KeyError, ValueError, OSError, TypeError):
                     bucket_end = today_str
@@ -467,7 +500,8 @@ def run(dry_run: bool, resume: bool, steam_sleep: float, delta: bool) -> None:
     candidates, conn  = discover_candidates(conn, delta=delta)
 
     if dry_run:
-        log.info("Dry run — candidates found: %d. No API calls, no writes.", len(candidates))
+        log.info("Dry run — candidates found: %d. No API calls, no writes.", 
+                 len(candidates))
         for appid, dev_norm, ea_start, is_free in candidates[:20]:
             log.info("  appid=%-10d  dev=%-40s  ea_start=%s  free=%d",
                      appid, dev_norm[:40], ea_start, is_free)
@@ -507,8 +541,10 @@ def run(dry_run: bool, resume: bool, steam_sleep: float, delta: bool) -> None:
 
             if hist_ea_start_ts is not None:
                 try:
-                    first_review_date = datetime.fromtimestamp(int(hist_ea_start_ts), tz=timezone.utc).date()
-                    ea_end = datetime.fromtimestamp(int(hist_ea_start_ts), tz=timezone.utc).date()
+                    first_review_date = datetime.fromtimestamp(int(hist_ea_start_ts), 
+                                                               tz=timezone.utc).date()
+                    ea_end = datetime.fromtimestamp(int(hist_ea_start_ts), 
+                                                    tz=timezone.utc).date()
                 except (ValueError, TypeError, OSError):
                     pass
 
@@ -526,7 +562,8 @@ def run(dry_run: bool, resume: bool, steam_sleep: float, delta: bool) -> None:
             )
 
             if ea_age_days < EA_AGE_MIN_DAYS or ea_end is None:
-                log.debug("appid %d: ea_age=%dd < %dd — skip", appid, ea_age_days, EA_AGE_MIN_DAYS)
+                log.debug("appid %d: ea_age=%dd < %dd — skip", 
+                          appid, ea_age_days, EA_AGE_MIN_DAYS)
                 n_skipped += 1
                 n_collected -= 1
                 #continue
@@ -549,7 +586,8 @@ def run(dry_run: bool, resume: bool, steam_sleep: float, delta: bool) -> None:
                 "developer_norm":     dev_norm,
                 "ea_start_date":      ea_start.isoformat(),
                 "graduation_date":    ea_end.isoformat() if ea_end else None,
-                "first_review_date":  first_review_date.isoformat() if first_review_date else None,
+                "first_review_date":  first_review_date.isoformat() 
+                                        if first_review_date else None,
                 "outcome":            outcome,
                 "crossed_50_reviews": crossed,
                 "ea_age_days":        ea_age_days,
@@ -603,22 +641,26 @@ def run(dry_run: bool, resume: bool, steam_sleep: float, delta: bool) -> None:
     conn.close()
 
 
-def _flush(conn: libsql.Connection, records: list[dict], buckets: list[dict] = None) -> libsql.Connection:
+def _flush(conn: libsql.Connection, 
+           records: list[dict], 
+           buckets: list[dict] = None) -> libsql.Connection:
     for attempt in range(1, DB_MAX_RETRIES + 1):
         try:
             conn.executemany(
                 """
                 INSERT OR REPLACE INTO pre2022_ea_games (
-                    appid, developer_norm, ea_start_date, graduation_date,
-                    first_review_date, outcome, crossed_50_reviews, ea_age_days, is_free,
-                    confidence, collected_at
+                    appid, developer_norm, ea_start_date, 
+                    graduation_date, first_review_date, outcome, 
+                    crossed_50_reviews, ea_age_days, 
+                    is_free, confidence, collected_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     (
                         r["appid"], r["developer_norm"], r["ea_start_date"],
-                        r["graduation_date"], r["first_review_date"], r["outcome"], r["crossed_50_reviews"],
-                        r["ea_age_days"], r["is_free"], r["confidence"], r["collected_at"],
+                        r["graduation_date"], r["first_review_date"], r["outcome"], 
+                        r["crossed_50_reviews"], r["ea_age_days"], 
+                        r["is_free"], r["confidence"], r["collected_at"],
                     )
                     for r in records
                 ],
@@ -628,22 +670,26 @@ def _flush(conn: libsql.Connection, records: list[dict], buckets: list[dict] = N
                 conn.executemany(
                     """
                     INSERT OR REPLACE INTO pre2022_review_history (
-                        appid, bucket_start, bucket_end, positive, negative, collected_at
+                        appid, bucket_start, bucket_end, 
+                        positive, negative, collected_at
                     ) VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     [
-                        (b["appid"], b["bucket_start"], b["bucket_end"], b["positive"], b["negative"], b["collected_at"])
+                        (b["appid"], b["bucket_start"], b["bucket_end"], 
+                         b["positive"], b["negative"], b["collected_at"])
                         for b in buckets
                     ],
                 )
 
             conn.commit()
-            log.info("Successfully uploaded %d records and %d buckets to the database.", len(records), len(buckets) if buckets else 0)
+            log.info("Successfully uploaded %d records and %d buckets to the database.",
+                     len(records), len(buckets) if buckets else 0)
             return conn
         except Exception as e:
             if attempt == DB_MAX_RETRIES:
                 raise
-            log.warning("DB flush error attempt %d: %s - reconnecting in %ds", attempt, e, DB_RETRY_DELAY)
+            log.warning("DB flush error attempt %d: %s - reconnecting in %ds", 
+                        attempt, e, DB_RETRY_DELAY)
             time.sleep(DB_RETRY_DELAY)
             try:
                 conn.close()
@@ -663,7 +709,8 @@ if __name__ == "__main__":
     parser.add_argument("--steam-sleep", type=float, default=DEFAULT_STEAM_SLEEP,
                         help="Seconds between Steam API calls (default: %(default)s)")
     parser.add_argument("--delta", action="store_true",
-                        help="Delta run: only check devs for active and recently graduated games, skipping existing devs")
+                        help="Delta run: only check devs for active "
+                        "and recently graduated games, skipping existing devs")
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
