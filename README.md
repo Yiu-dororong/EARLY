@@ -77,7 +77,9 @@ B["Data Pipeline<br/>GitHub Actions"] space C["XGBoost + L1 Scorecard<br/>Weekly
 ```
 
 > 💡 **Design Philosophy** <br/>
-> EARLY operates on ~1,600 historical and ~1,000 active titles — a deliberately bounded dataset for a bounded problem space. The architecture (Zilliz for vector search, Turso for transactional storage, LangGraph for agent orchestration) is designed around continuous ingestion at scale rather than the current snapshot, reflecting how this system would need to behave as Steam's Early Access catalogue grows and user-facing features are added. The goal was to build for the right problem, not just the current data.
+> EARLY operates on ~1,600 historical and ~1,000 active titles — a deliberately bounded dataset for a bounded problem space. The architecture is intentionally over-engineered for today's workload, and that was a conscious trade-off. <br/>
+> The goal wasn't to build the minimum viable system for thousands of records — it was to model the architecture this problem *would* demand at scale: decoupled services, independent deployability, end-to-end observability, and clean separation between data ingestion, model inference, agent reasoning, and the user-facing layer. Each component (Zilliz, Turso, LangGraph, Langfuse, MLflow) was chosen to be replaceable without touching the rest of the system. <br/>
+> If this were purely about shipping a result, SQLite and a flat numpy array would have done the job. That wasn't the point.
 
 ---
 
@@ -144,15 +146,17 @@ Agent tests use DeepEval. `fixtures.py` includes a fake heartbeat test case, a h
         <img width="967" height="185" alt="image" src="https://github.com/user-attachments/assets/ba7239c0-9fc3-463c-81b9-970d7448a25d" />
     </kbd>
 </p>
+
 **Model Performance & Validation Metrics (v1.3)**
 
+| Evaluation Set | AUC-ROC | PR-AUC | Lift Over Baseline¹ |
+|---|---|---|---|
+| **Test Set (Temporal Holdout, Post-2024²)** | 0.9096 | 0.7378 | +0.2271 |
+| **Validation Set (Time-Bounded Cohort³)** | 0.8761 | 0.6533 | +0.1577 |
 
-| Evaluation Framework | AUC-ROC | PR-AUC | Lift Over Scorecard Baseline |
-| --- | --- | --- | --- |
-| **Standard Holdout Set** | 0.9096 | 0.7378 | **+0.2271** |
-| **Time-Bounded Cohort**  | 0.8761 | 0.6533 | **+0.1577** |
-
-
+*¹ **Baseline Definition**: Scorecard composite score PR-AUC, measuring the ML model's uplift over the rule-based system alone.* <br/>
+*² **Temporal Split**: All games released after 2024 are held out entirely from training, preventing look-ahead leakage.*<br/>
+*³ **Time-Bounded Cohort:** Games whose Early Access lifetime exceeds the 95th percentile of the training distribution are excluded from validation to prevent outlier distortion and ensure consistent entity grouping via  `GroupKFold`.*
 
 **Risk Tier Classification Integrity**
 
