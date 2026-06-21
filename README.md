@@ -6,7 +6,6 @@
 
 EARLY monitors more than 1,000 active Early Access titles and draws on patterns from roughly 1,600 historically completed or abandoned games. It produces a distress risk score and a three-tier health label (**Healthy / Watch / At Risk**) to highlight games that are losing momentum — often well before the review scores reflect the decline.
 
-<!-- INSERT: screenshot or short GIF of the Streamlit dashboard (dark theme, risk meters, health labels) -->
 <p align="center">
     <kbd>
         <img width="1280" height="720" alt="st_demo" src="https://github.com/user-attachments/assets/f33e6fe9-3255-4ca5-bbcb-a554ce9c32f6" />
@@ -76,8 +75,10 @@ B["Data Pipeline<br/>GitHub Actions"] space C["XGBoost + L1 Scorecard<br/>Weekly
     style D fill:#60a5fa
     style H fill:#be5bf0,
 ```
-<!-- INSERT: screenshot of full game detail view — Player tab showing
-dimension bars, distress score, p_distressed badge, score history chart -->
+
+> 💡 **Design Philosophy**
+> EARLY operates on ~1,600 historical and ~1,000 active titles — a deliberately bounded dataset for a bounded problem space. The architecture (Zilliz for vector search, Turso for transactional storage, LangGraph for agent orchestration) is designed around continuous ingestion at scale rather than the current snapshot, reflecting how this system would need to behave as Steam's Early Access catalogue grows and user-facing features are added. The goal was to build for the right problem, not just the current data.
+
 ---
 
 ## 🚀 Quick Start
@@ -129,7 +130,6 @@ Agent tests use DeepEval. `fixtures.py` includes a fake heartbeat test case, a h
 **The hardest games to predict are also the ones with the least reliable data.** Games labeled At Risk average 13.6 missing features per snapshot, compared with 5.2 for Healthy games. This gap is surfaced directly in the API through a `data_quality` field (high/medium/low).
 
 **Announcement signals can be misleading.** Even when Steam’s event API returns `build_id` or `build_branch`, these fields are optional. During testing we discovered cases where a standard update announcement (Type-13) was posted with no corresponding build. This finding drove a major redesign of the agent layer, shifting its role from explanation to active conflict detection.
-<!-- INSERT: screenshot of Never Mourn game in the UI — Forensic Agent flagging event_state_mismatch, Critic verdict showing signal conflict -->
 
 <p align="center">
     <kbd>
@@ -138,7 +138,6 @@ Agent tests use DeepEval. `fixtures.py` includes a fake heartbeat test case, a h
 </p>
 
 **Signal triangulation improves reliability.** Before any LLM call, the Critic Agent runs a deterministic check across three signals: ML state, review sentiment direction, and forensic substance score. When the signals disagree, the verdict explicitly states the conflict rather than forcing a single conclusion.
-<!-- INSERT: screenshot or diagram of triangulation output — three signals, alignment result, verdict -->
 
 <p align="center">
     <kbd>
