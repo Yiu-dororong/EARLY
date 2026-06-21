@@ -76,7 +76,7 @@ B["Data Pipeline<br/>GitHub Actions"] space C["XGBoost + L1 Scorecard<br/>Weekly
     style H fill:#be5bf0,
 ```
 
-> 💡 **Design Philosophy**
+> 💡 **Design Philosophy** <br/>
 > EARLY operates on ~1,600 historical and ~1,000 active titles — a deliberately bounded dataset for a bounded problem space. The architecture (Zilliz for vector search, Turso for transactional storage, LangGraph for agent orchestration) is designed around continuous ingestion at scale rather than the current snapshot, reflecting how this system would need to behave as Steam's Early Access catalogue grows and user-facing features are added. The goal was to build for the right problem, not just the current data.
 
 ---
