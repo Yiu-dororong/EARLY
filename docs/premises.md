@@ -129,7 +129,7 @@ Operationally, EARLY defines three exit states:
 |---|---|
 | `EXIT_SUCCESS` | Game graduated to 1.0 — confirmed via appdetails graduation_date |
 | `STAYS_ACTIVE` | Build activity within allowable gap¹ — open/healthy label, excluded from training |
-| `EXIT_ABANDONED` | No build AND no dev post for >365 days — total silence |
+| `EXIT_ABANDONED` | No build AND no dev post for >allowable gap — total silence |
 | `EXIT_SILENT` | No build for >allowable gap, but dev has posted within 365 days — collapsed into EXIT_ABANDONED for training |
 
 
