@@ -100,7 +100,7 @@ Two features showed high predictive power during early feature exploration but w
 
 **SHAP Feature Attribution** — Tree-SHAP analysis is executed over a representative 2,000-snapshot sample pulled from the training partition. The top 25 features ranked by mean absolute SHAP value ($|\text{SHAP}|$) are exported as `shap_top25_{MODEL_VERSION}.json`.
 
-Rather than projecting unweighted raw data, the system extracts these top 25 SHAP values to construct optimized game profile vectors into the **Zilliz (Milvus)** Vector Search Space. When a target title triggers a risk flag, the Zilliz engine uses these vectors to perform an Approximate Nearest Neighbor (ANN) search, surfacing historically similar snapshots to understand the current title's trajectory based on historical outcomes born from similar root causes.
+Rather than projecting unweighted raw data, the system extracts these top 25 SHAP values to construct optimized game profile vectors into the **Zilliz (Milvus)** Vector Search Space. Learn more in [Similarity Search](agents.md#similarity-search).
 
 Our core attribution findings from the top 5 features indicate:
 
