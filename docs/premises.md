@@ -9,17 +9,15 @@
 ## The Problem 
 
 Steam Early Access lets developers sell a game before it is finished — here is the exact quote in [Valve's own guidelines](https://partner.steamgames.com/doc/store/earlyaccess?language=english) *(Living Document, accessed June 2026).*
-> **What Is Early Access?**
+> **What Is Early Access?** <br/>
 > Steam Early Access enables you to sell your game on Steam while it is still being developed, and provides context to customers that a product should be considered "unfinished." Early Access is a place for games that are in a playable alpha or beta state, are worth the current value of the playable build, and that you plan to continue to develop for release. 
 >Releasing a game in Early Access helps set context for prospective customers and provides them with information about your plans and goals before a "final" release.
-> 
 
 This implied development will continue toward a full release. In practice, a meaningful fraction of Early Access games stop being developed without formally saying so. Updates slow. The developer goes quiet. The game sits on storefronts, still purchasable, indefinitely.
 
-<!-- INSERT: SteamDB EA statistics — number of EA games released per year,
-segmented by review count tier. Useful to show scale of the problem:
-how many games enter EA annually, how many resolve vs remain in limbo.
-https://steamdb.info/stats/gameratings/ or the EA-specific breakdown if available. -->
+<img width="972" height="413" alt="image" src="https://github.com/user-attachments/assets/72c00435-683a-454d-81c0-3fed0b4992d4" />
+
+<sub id="steamdb-attribution"><i>Source: SteamDB, retrieved June 2026.</i></sub>
 
 According to [SteamDB](https://steamdb.info/stats/releases/?tagid=493), Early Access releases have surged dramatically, climbing from roughly 1000 annual titles in 2020 to more than 2500 in 2025. However, there is no official signal for this. Steam does not "flag" stalled games, there is only a line of warning appears after 12 months of inactivity. Review scores lag — players often don't update reviews when a game goes quiet, and a 70% positive score from 18 months ago says nothing about whether the developer shipped anything last quarter. By the time a game appears obviously abandoned, the signal has been there for months.
 
@@ -43,7 +41,7 @@ The model's design is grounded in five structural premises about Steam Early Acc
 **Premise 1 — Decentralized Risk Assessment**
 
 The platform's operational framework decentralizes product validation. By explicitly informing buyers that "**Games in Early Access are not complete and may or may not change further.**" the platform establishes a boundary where development outcomes are unpoliced. Consequently, the burden of evaluating a project’s operational trajectory and long-term viability is placed entirely on the external observer.
-![alt text](image.png)
+<img width="791" height="139" alt="Steam's Note on Early Access Game" src="https://github.com/user-attachments/assets/72205353-ef76-4b18-a047-9d0c0f3388a6" />
 
 **Premise 2 — The Developer Commitment**
 
