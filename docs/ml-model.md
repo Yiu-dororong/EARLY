@@ -52,6 +52,8 @@ This layout does not pretend the problem is completely eliminated; the structura
 
 **Scorecard (L1) Metrics** — The model ingests its own deterministic sibling metrics as advanced features, including the five individual dimensional scorecard tallies and the raw `composite_l1_score`. 
 
+*Note: `owner_estimate_at_T` is derived via the **Boxleiter Method** (the industry-standard owner-to-review multiplier framework), which serves as the foundational data source for how our `OWNER_MULTIPLIER_TIERS` are defined.*
+
 ### The Ethics Exclusion
 
 Developer cross-game features (track record, prior abandonment rate) were engineered and tested. They were excluded from the production model deliberately — not because they lacked signal, but because permanently encoding a developer's past failures as a penalty against new projects is a judgment call that the system shouldn't be making silently. The features are available; the decision not to use them is documented.

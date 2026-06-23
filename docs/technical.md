@@ -113,7 +113,7 @@ Before reading anything else, it is worth understanding the constraints the syst
 | [Scorecard](scorecard.md) | L1 weighted engine, momentum layer, calibration history |
 | [ML Model](ml-model.md) | Feature engineering, training design, evaluation, SHAP analysis, wrong turns |
 | [Agents](agents.md) | LangGraph architecture, triangulation design, vector search, cost decisions |
-| [Never Mourn](never-mourn.md) | Full case study: a build announcement that wasn't |
+| [Case Study](case-study.md) | Full case study: a build announcement that wasn't |
 | [MLOps](mlops.md) | Drift monitoring, model registry, retraining gate |
 | [Signals, Limitations & Roadmap](signals-limitations.md) | Honest scope accounting, mitigations, future work |
 
