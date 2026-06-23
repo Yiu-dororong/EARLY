@@ -24,18 +24,10 @@ Existing discovery tools make early detection of this lifecycle decay incredibly
 
 - **Delayed Alerts:** Steam's official warning only appears after **12 months of total inactivity** — long after project momentum has already collapsed.
 - **Hidden Decline:** Games falling below 10 monthly reviews lose their "Recent Reviews" metric, hiding active player abandonment behind stale, historical all-time averages.
-- **Ghost Changelogs:** Public Steam storefront APIs do not expose whether an announced text update actually shipped *compiled code binaries* or just empty words.
-- **Siloed Intelligence:** Real-time player counts, changelog substance, and developer response rates remain highly scattered with no unified structural view.
+- **Ghost Changelogs:** Public Steam storefront APIs do not expose whether an announced text update shipped *actual code* or just empty words.
+- **Siloed Intelligence:** Real-time player counts, changelog substance, and community engagement remain highly scattered with no unified structural view.
 
 EARLY addresses these gaps by deploying a weekly predictive ML pipeline coupled with an on-demand agent layer, cross-checking complex behavioral signals that a single score or a traditional storefront metric would miss.
-
-
-- Steam's official warning only appears after **12 months of inactivity** — long after momentum has already collapsed
-- Games below 10 monthly reviews lose their "Recent Reviews" metric, hiding decline behind stale all-time averages
-- Whether an announced update shipped *actual code* is not exposed through any public Steam API
-- Player counts, changelog substance, and developer response rates are scattered with no unified view
-
-EARLY addresses these gaps with a weekly ML pipeline and an on-demand agent layer that cross-checks signals a single score would miss.
 
 ---
 
@@ -43,7 +35,7 @@ EARLY addresses these gaps with a weekly ML pipeline and an on-demand agent laye
 
 | Layer | Tools |
 |---|---|
-| Data collection | Python, Steam Web API, ITAD API |
+| Data collection | Python, Steam Web API, ITAD API, Requests |
 | ML model | XGBoost, scikit-learn, SHAP, Optuna |
 | Agent layer | LangGraph, Groq (Llama 4 Scout + Llama 3.3 70B), Langfuse |
 | Vector search | Zilliz (Milvus), cosine similarity on 25-dim SHAP vectors |

@@ -1,16 +1,24 @@
 # EARLY — Technical Documentation
 
-> This is the technical front door. Each section links to a dedicated page. <br/> This reveal the full picture of the project, deeper pages are for anyone who wants to follow a specific thread all the way down.
-
+> This is the technical front door. <br/>Each section links to a dedicated page designed to reveal the complete systemic footprint of the project, <br/>  while deeper pages trace specific engineering threads all the way down.
 ---
 
 ## What EARLY Is
 
-EARLY is a solo-built, end-to-end ML system that monitors Steam Early Access games for abandonment signals — predicting distress weeks or months before a developer goes silent.
+EARLY is a solo-built, end-to-end AI decision support system for Steam Early Access game abandonment risk — surfacing warning signals weeks or months before a developer goes silent.
 
-It is NOT a review aggregator nor a sentiment dashboard. It is a **triangulation system**: three independent signal layers (a trained ML model, raw review sentiment, and developer announcement content) that are checked for agreement, and flagged explicitly when they conflict.
+It is not a review aggregator or a sentiment dashboard. It is a **decision support loop**: six functions working in sequence, each adding a layer of context the previous one couldn't provide.
 
-The full pipeline orchestrates Steam API ingestion, feature engineering, a rule-based heuristic scorecard, XGBoost classification, a LangGraph multi-agent network and Zilliz vector search. The application architecture is served via containerised FastAPI and Streamlit microservices, fully instrumented with Langfuse telemetry and managed by a four-stage MLflow-tracked MLOps framework.
+| Step | What it does |
+|---|---|
+| **Predict** | Distress probability and three-tier health label (Healthy / Watch / At Risk) |
+| **Diagnose** | Which of the five signal dimensions are failing and by how much |
+| **Investigate** | Forensic analysis of developer announcements, sentiment clustering across reviews |
+| **Triangulate** | Check whether ML result, tier label, review sentiment, and forensic signals agree |
+| **Explain** | Generates non-prescriptive, plain-language diagnostics tailored for both players and developers. |
+| **Contextualise** | Similar historical games, data quality surfacing, confidence caveats |
+
+The technical stack exists to serve this loop — not the other way around.
 
 ---
 
@@ -102,8 +110,8 @@ Before reading anything else, it is worth understanding the constraints the syst
 |---|---|
 | [The Problem & Design Premises](premises.md) | Why the problem exists, the five causal premises, eligibility criteria, what the system does not claim |
 | [Data Pipeline](data-pipeline.md) | Steam API ingestion, labelling, the wrong turns |
-| [ML Model](ml-model.md) | Feature engineering, training design, evaluation, wrong turns |
 | [Scorecard](scorecard.md) | L1 weighted engine, momentum layer, calibration history |
+| [ML Model](ml-model.md) | Feature engineering, training design, evaluation, wrong turns |
 | [Agents](agents.md) | LangGraph architecture, triangulation design, cost decisions |
 | [Never Mourn](never-mourn.md) | Full case study: a build announcement that wasn't |
 | [MLOps](mlops.md) | Drift monitoring, model registry, retraining gate |
