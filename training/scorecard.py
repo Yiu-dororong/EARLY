@@ -24,13 +24,14 @@ Output table: scorecard
     null_feature_count, computed_at
 
 Usage:
-    python scorecard.py [--dry-run] [--appid APPID] [--limit N]
+    python -m training.scorecard [--dry-run] [--appid APPID] [--limit N]
 """
 
 import argparse
 import logging
 import math
 import os
+import sys
 from datetime import datetime, timezone
 
 import libsql
@@ -50,7 +51,10 @@ from training.scorecard_config import (
 
 
 load_dotenv()
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 # ---------------------------------------------------------------------------
 # DB
 # ---------------------------------------------------------------------------
@@ -80,7 +84,7 @@ CREATE TABLE IF NOT EXISTS scorecard (
     ml_eligible                 INTEGER,
     null_feature_count          INTEGER,
     computed_at                 TEXT,
-    PRIMARY KEY (appid, snapshot_date)
+    PRIMARY KEY (appid, snapshot_date, config_version)
 )
 """
 
@@ -273,8 +277,7 @@ def score_dimension(
         raw   = row.get(feat)
         scale = FEATURE_SCALES.get(feat)
         norm  = normalise(raw, scale) if scale else None
-        # Center: shift [0,1] → [-0.5, +0.5]
-        momentum_normalised[feat] = (norm - 0.5) if norm is not None else None
+        momentum_normalised[feat] = norm if norm is not None else None
 
     momentum_delta, n_nulls = weighted_avg_with_redistribution(
         momentum_normalised, momentum
@@ -472,8 +475,7 @@ def upsert_batch(conn: libsql.Connection, results: list[dict]) -> None:
                 l1_price_market_score, l1_composite_score,
                 l1_state, ml_eligible, null_feature_count, computed_at
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-            ON CONFLICT(appid, snapshot_date) DO UPDATE SET
-                config_version              = excluded.config_version,
+            ON CONFLICT(appid, snapshot_date, config_version) DO UPDATE SET
                 l1_update_health_score      = excluded.l1_update_health_score,
                 l1_player_retention_score   = excluded.l1_player_retention_score,
                 l1_dev_engagement_score     = excluded.l1_dev_engagement_score,

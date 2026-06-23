@@ -8,10 +8,10 @@ Run once after initial model training, and again after retraining if the
 top-25 SHAP feature list changes (requires collection rebuild).
 
 Usage:
-    python seed_vector_db.py
-    python seed_vector_db.py --model-version xgb_v1.3
-    python seed_vector_db.py --dry-run          # validate without writing
-    python seed_vector_db.py --rebuild          # drop + recreate collection first
+    python -m training.seed_vector_db
+    python -m training.seed_vector_db --model-version xgb_v1.3
+    python -m training.seed_vector_db --dry-run     # validate without writing
+    python -m training.seed_vector_db --rebuild     # drop + recreate collection first
 
 Requirements:
     - TURSO_URL, TURSO_AUTH_TOKEN       (source DB)
@@ -60,9 +60,9 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 MODEL_DIR    = PROJECT_ROOT / "models"
-DEFAULT_MODEL_VERSION = "v1.3"
+DEFAULT_MODEL_VERSION = "v1.4"
 BATCH_SIZE   = 200      # upsert batch size
-CONFIG_VERSION = "v1.0" #scorecard version
+CONFIG_VERSION = "v1.1" #scorecard version
 
 # ---------------------------------------------------------------------------
 # DB connection

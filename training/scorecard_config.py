@@ -7,7 +7,7 @@ Edit this file to recalibrate — do not edit scorecard.py directly.
 Increment CONFIG_VERSION on every calibration pass so history is traceable.
 """
 
-CONFIG_VERSION = "v1.0"
+CONFIG_VERSION = "v1.1"
 
 # ---------------------------------------------------------------------------
 # Dimension weights (must sum to 1.0)
@@ -343,8 +343,8 @@ for _dim, _groups in DIMENSION_FEATURES.items():
 # ---------------------------------------------------------------------------
 
 STATE_THRESHOLDS = [
-    (0.55, "Healthy"),
-    (0.42, "Watch"),
+    (0.60, "Healthy"),
+    (0.40, "Watch"),
     (0.00, "At Risk"),
 ]
 

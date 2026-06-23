@@ -15,16 +15,16 @@ Target encoding:
   EXIT_SILENT    → 1  (behaviorally abandoned)
 
 Usage:
-  python train_xgboost.py
-  python train_xgboost.py --dry-run       # feature matrix only, no training
-  python train_xgboost.py --no-shap       # skip SHAP (faster iteration)
-  python train_xgboost.py --time-bounded-eval # time-bounded baseline evaluation
-  python train_xgboost.py --tune --n-trials 50
+  python -m training.train_xgboost
+  python -m training.train_xgboost --dry-run       # feature matrix only, no training
+  python -m training.train_xgboost --no-shap       # skip SHAP (faster iteration)
+  python -m training.train_xgboost --time-bounded-eval # time-bounded baseline eval
+  python -m training.train_xgboost --tune --n-trials 50
                         # Initialize an Optuna study with your specified search space.
                         Automatically generate interactive Plotly HTML visualizations
                         for the Optimization History and Hyperparameter Importances,
                         saving them directly into your outputs/ directory!
-                          --ignore-tuned
+                                  --ignore-tuned  # ignore Optuna results
 """
 
 from __future__ import annotations
@@ -77,11 +77,11 @@ log = logging.getLogger(__name__)
 # SECTION 0 — Config & Constants
 # ---------------------------------------------------------------------------
 
-MODEL_VERSION = "v1.3"
+MODEL_VERSION = "v1.4"
 RANDOM_SEED   = 42
 N_FOLDS       = 5
 TEMPORAL_HOLDOUT_YEAR = 2024
-CONFIG_VERSION = "v1.0" #scorecard version
+CONFIG_VERSION = "v1.1" #scorecard version
 
 # XGBoost base params — scale_pos_weight set dynamically from class balance
 XGB_PARAMS = {
@@ -239,6 +239,7 @@ def load_data(conn) -> pd.DataFrame:
     df = pd.read_sql(f"""
         SELECT
             s.*,
+            g.outcome AS g_outcome,
             g.ea_start_date,
             g.graduation_date,
             g.abandoned_date,
@@ -256,7 +257,7 @@ def load_data(conn) -> pd.DataFrame:
         JOIN games_v2 g ON s.appid = g.appid
         JOIN scorecard sc ON s.appid = sc.appid AND s.snapshot_date = sc.snapshot_date
         LEFT JOIN game_genres gg ON s.appid = gg.appid
-        WHERE s.outcome IN ('EXIT_SUCCESS', 'EXIT_ABANDONED', 'EXIT_SILENT')
+        WHERE g.outcome IN ('EXIT_SUCCESS', 'EXIT_ABANDONED', 'EXIT_SILENT')
           AND sc.l1_state IS NOT NULL
           AND sc.config_version = '{config_version}'
     """, conn)
@@ -271,6 +272,9 @@ def load_data(conn) -> pd.DataFrame:
     df["l1_dev_engagement_score"] = df.pop("sc_l1_dev_engagement_score")
     df["l1_sentiment_score"] = df.pop("sc_l1_sentiment_score")
     df["l1_price_market_score"] = df.pop("sc_l1_price_market_score")
+
+    # Overwrite outcome with latest outcome from games_v2 table (not snapshots table)
+    df["outcome"] = df.pop("g_outcome")
 
     # ── Target ──────────────────────────────────────────────────────────────
     df["label"] = df["outcome"].map({

@@ -33,6 +33,77 @@ Export scorecard stats:
 
 Usage:
     python scorecard_evaluate.py [--snapshot-pct PCT] [--output-dir DIR]
+
+---------------------
+DIRECT SCRIPT FOR CALIBRATION INSIDE SQL CONSOLE
+---------------------
+
+WITH TargetConfig AS (
+    -- ADJUST YOUR PARAMETERS HERE
+    SELECT
+        'v1.1'   AS target_version,  -- Set your specific config_version to filter by
+        0.60     AS healthy_threshold, -- Set your Healthy threshold
+        0.40    AS watch_threshold    -- Set your Watch threshold
+),
+RankedSnapshots AS (
+    -- Step 1: Join, filter by config_version, and isolate the latest snapshot per game
+    SELECT
+        sc.appid,
+        sc.l1_composite_score,
+        s.outcome,
+        ROW_NUMBER() OVER (PARTITION BY sc.appid ORDER BY sc.snapshot_date DESC) as rn
+    FROM scorecard sc
+    JOIN snapshots s
+        ON sc.appid = s.appid AND sc.snapshot_date = s.snapshot_date
+    CROSS JOIN TargetConfig cfg
+    WHERE s.outcome IS NOT NULL
+      AND sc.config_version = cfg.target_version
+      -- Enforce strict version tracking isolation
+),
+DynamicallyTieredGames AS (
+    -- Step 2: Apply the dynamic thresholds from your config block above
+    SELECT
+        r.appid,
+        r.outcome,
+        CASE
+            WHEN r.l1_composite_score >= cfg.healthy_threshold THEN 'Healthy'
+            WHEN r.l1_composite_score >= cfg.watch_threshold   THEN 'Watch'
+            ELSE 'At Risk'
+        END as dynamic_l1_state
+    FROM RankedSnapshots r
+    CROSS JOIN TargetConfig cfg
+    WHERE r.rn = 1 -- Enforce final snapshot isolation boundary
+),
+TierAggregates AS (
+    -- Step 3: Compute raw counts and success/abandonment distribution matrixes per tier
+    SELECT
+        dynamic_l1_state,
+        COUNT(*) as n_games,
+        SUM(CASE WHEN outcome = 'EXIT_SUCCESS' THEN 1 ELSE 0 END) as success_count,
+        SUM(CASE WHEN outcome
+            IN ('EXIT_ABANDONED', 'EXIT_SILENT')
+                THEN 1 ELSE 0 END) as abandoned_count -- Handle collapsed classes
+    FROM DynamicallyTieredGames
+    GROUP BY dynamic_l1_state
+)
+-- Step 4: Final formatting layer matching your target log display output
+SELECT
+    dynamic_l1_state AS "L1 State",
+    n_games AS "n_games",
+    PRINTF('%.1f%%', (CAST(success_count AS REAL) / n_games) * 100) AS "SUCCESS",
+    PRINTF('%.1f%%', (CAST(abandoned_count AS REAL) / n_games) * 100) AS "ABANDONED",
+    CASE
+        WHEN success_count >= abandoned_count
+        THEN PRINTF('%.1f%% SUCCESS', (CAST(success_count AS REAL) / n_games) * 100)
+        ELSE PRINTF('%.1f%% ABANDONED', (CAST(abandoned_count AS REAL) / n_games) * 100)
+    END AS "Agreement"
+FROM TierAggregates
+ORDER BY
+    CASE dynamic_l1_state
+        WHEN 'Healthy' THEN 1
+        WHEN 'Watch' THEN 2
+        WHEN 'At Risk' THEN 3
+    END;
 """
 
 import argparse
@@ -109,7 +180,8 @@ def load_scorecard(conn: libsql.Connection) -> pd.DataFrame:
             ON sc.appid = s.appid AND sc.snapshot_date = s.snapshot_date
         JOIN games_v2 g
             ON sc.appid = g.appid
-    """).fetchall()
+        WHERE sc.config_version = ?
+    """, (CONFIG_VERSION,)).fetchall()
 
     df = pd.DataFrame(rows, columns=[
         "appid", "snapshot_date", "config_version",

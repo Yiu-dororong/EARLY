@@ -1,0 +1,70 @@
+{
+  "config_version": "v1.1",
+  "state_agreement": {
+    "Healthy": {
+      "n_games": 680,
+      "success_rate": 0.9882352941176471,
+      "abandoned_rate": 0.011764705882352941,
+      "agreement_rate": 0.9882352941176471,
+      "expected_outcome": "SUCCESS"
+    },
+    "Watch": {
+      "n_games": 720,
+      "success_rate": 0.7625,
+      "abandoned_rate": 0.2375,
+      "agreement_rate": 0.7625,
+      "expected_outcome": "SUCCESS"
+    },
+    "At Risk": {
+      "n_games": 227,
+      "success_rate": 0.4493392070484582,
+      "abandoned_rate": 0.5506607929515418,
+      "agreement_rate": 0.5506607929515418,
+      "expected_outcome": "ABANDONED"
+    }
+  },
+  "dimension_stats": {
+    "update_health": {
+      "mean": 0.6095627839829676,
+      "p25": 0.389902,
+      "p50": 0.631722,
+      "p75": 0.79727275,
+      "null_pct": 1.880122127591194
+    },
+    "player_retention": {
+      "mean": 0.4450180358152686,
+      "p25": 0.320071,
+      "p50": 0.449635,
+      "p75": 0.5597995,
+      "null_pct": 48.85103647758316
+    },
+    "dev_engagement": {
+      "mean": 0.3885335378316411,
+      "p25": 0.199157,
+      "p50": 0.36860899999999996,
+      "p75": 0.5533060000000001,
+      "null_pct": 1.880122127591194
+    },
+    "sentiment": {
+      "mean": 0.7597993866688504,
+      "p25": 0.69740225,
+      "p50": 0.8065825,
+      "p75": 0.88142575,
+      "null_pct": 1.880122127591194
+    },
+    "price_market": {
+      "mean": 0.6647293571896495,
+      "p25": 0.55497,
+      "p50": 0.6504775,
+      "p75": 0.8031265,
+      "null_pct": 1.880122127591194
+    },
+    "composite": {
+      "mean": 0.5612553395468424,
+      "p25": 0.4870275,
+      "p50": 0.583889,
+      "p75": 0.6552450000000001,
+      "null_pct": 0.0
+    }
+  }
+}

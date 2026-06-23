@@ -49,11 +49,11 @@ OUTPUT
 ─────────────────────────────────────────────────────────────────────────────
 USAGE
 ─────────────────────────────────────────────────────────────────────────────
-  python monitor_drift.py                       # run all checks
-  python monitor_drift.py --model v1.3          # specific model version
-  python monitor_drift.py --freeze-reference    # (re)build reference file
-  python monitor_drift.py --fail-on-drift       # nonzero exit if action_needed
-  python monitor_drift.py --verbose
+  python -m training.monitor_drift                       # run all checks
+  python -m training.monitor_drift --model v1.3          # specific model version
+  python -m training.monitor_drift --freeze-reference    # (re)build reference file
+  python -m training.monitor_drift --fail-on-drift       # nonzero exit if action_needed
+  python -m training.monitor_drift --verbose
 """
 
 from __future__ import annotations
@@ -80,8 +80,8 @@ DB_AUTH = os.getenv("TURSO_AUTH_TOKEN", "")
 DB_MAX_RETRIES = 3
 DB_RETRY_DELAY = 5.0
 
-DEFAULT_MODEL_VERSION = "v1.3"
-CONFIG_VERSION = "v1.0"  # scorecard CONFIG_VERSION, matches train_xgboost.py
+DEFAULT_MODEL_VERSION = "v1.4"
+CONFIG_VERSION = "v1.1"  # scorecard CONFIG_VERSION, matches train_xgboost.py
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MODEL_DIR    = PROJECT_ROOT / "models"
