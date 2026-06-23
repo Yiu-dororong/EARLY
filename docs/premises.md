@@ -143,18 +143,15 @@ This definition is deliberately observable. "Abandoned" here means *demonstrably
     <summary> 
         Formula of allowable build gap
     </summary>
-
-    ```python
-        MIN_EVENTS_FOR_PERSONAL_THRESHOLD = 5
-        FLOOR_DAYS = 365
-        TOLERANCE_MULTIPLIER = 1.5
-
-        def compute_allowable_build_gap(historical_build_gaps: list[int]) -> int:
-            if len(historical_build_gaps) < MIN_EVENTS_FOR_PERSONAL_THRESHOLD:
-                return FLOOR_DAYS
-            return max(FLOOR_DAYS, int(median(historical_build_gaps) * TOLERANCE_MULTIPLIER))
-    ```
     
+    MIN_EVENTS_FOR_PERSONAL_THRESHOLD = 5
+    FLOOR_DAYS = 365
+    TOLERANCE_MULTIPLIER = 1.5
+
+    def compute_allowable_build_gap(historical_build_gaps: list[int]) -> int:
+        if len(historical_build_gaps) < MIN_EVENTS_FOR_PERSONAL_THRESHOLD:
+            return FLOOR_DAYS
+        return max(FLOOR_DAYS, int(median(historical_build_gaps) * TOLERANCE_MULTIPLIER))
 </details>
 
 ### The Long Hiatus Problem
