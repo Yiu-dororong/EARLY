@@ -103,7 +103,13 @@ This hard override prioritizes **immediate lifecycle state accuracy** over long-
 The system treats these silent periods as active operational risks. While a game may theoretically wake up from hibernation later, the system classifies a 365-day total build absence as a critical, unmitigated threat vector until code deployment resumes.
 
 <details>
-     <summary>📊 View Outcome Distribution by Composite Score Decile</summary>
+     <summary>
+          <b>
+          View Outcome Distribution by Composite Score Decile
+          </b>
+     </summary>
+          <img width="1600" height="1113" alt="Outcome Distribution by Composite Score Decile" src="https://github.com/user-attachments/assets/5bf18d97-54ba-48ab-8871-2a141022f4b9" />
+
 </details>
 
 
