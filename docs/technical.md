@@ -108,10 +108,10 @@ Before reading anything else, it is worth understanding the constraints the syst
 
 | Page | What it covers |
 |---|---|
-| [The Problem & Design Premises](premises.md) | Why the problem exists, the five causal premises, eligibility criteria, what the system does not claim |
-| [Data Pipeline](data-pipeline.md) | Steam API ingestion, labelling, the wrong turns |
+| [The Problem & Design Premises](premises.md) | What and Why about the problem, eligibility criteria and abandoned definition , what the system does not claim |
+| [Data Pipeline & API Serving Layer](data-pipeline.md) | Dataflow from raw data ingestion, labelling to API serving layer; the wrong turns |
 | [Scorecard](scorecard.md) | L1 weighted engine, momentum layer, calibration history |
-| [ML Model](ml-model.md) | Feature engineering, training design, evaluation, wrong turns |
+| [ML Model](ml-model.md) | Feature engineering, training design, evaluation, SHAP & vector search, wrong turns |
 | [Agents](agents.md) | LangGraph architecture, triangulation design, cost decisions |
 | [Never Mourn](never-mourn.md) | Full case study: a build announcement that wasn't |
 | [MLOps](mlops.md) | Drift monitoring, model registry, retraining gate |
