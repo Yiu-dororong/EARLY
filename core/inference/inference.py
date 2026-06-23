@@ -110,7 +110,7 @@ DB_AUTH = os.getenv("TURSO_AUTH_TOKEN", "")
 DB_MAX_RETRIES = 3
 DB_RETRY_DELAY = 5.0
 
-DEFAULT_MODEL_VERSION = "v1.3"
+DEFAULT_MODEL_VERSION = "v1.4"
 
 # Dynamically locate the project root to ensure models directory is found
 PROJECT_ROOT          = Path(__file__).resolve().parent.parent.parent
