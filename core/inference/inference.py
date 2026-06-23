@@ -192,7 +192,6 @@ def load_latest_live_snapshots(
                 AND snapshot_date = (
                     SELECT MAX(snapshot_date)
                     FROM live_snapshots ls2
-                    WHERE ls2.appid = live_snapshots.appid
                 )
                 ORDER BY appid
             """, params).fetchall()
