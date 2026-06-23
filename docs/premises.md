@@ -139,7 +139,8 @@ Operationally, EARLY defines three exit states:
 
 This definition is deliberately observable. "Abandoned" here means *demonstrably stopped* — not "failed commercially," not "bad game," not "developer gave up privately." A game the developer has mentally abandoned but is still occasionally patching is not abandoned under this definition. That is a limitation, not an oversight.
 
-*¹ Adaptive Developer-Relative Build Gap: a dynamic threshold by calulated by developers' historical update frequency.* <br/>
+*¹ Adaptive Developer-Relative Build Gap: a dynamic threshold by calulated by developers' historical update frequency.* *(Limitations see [here](signals-limitations.md))*<br/> 
+
 <details>
     <summary> 
         Formula of allowable build gap

@@ -1,10 +1,10 @@
 # EARLY — Steam Early Access Intelligence System
 
-**Predicts whether a Steam Early Access game is heading toward abandonment.**
+**AI decision support system for Steam Early Access game abandonment risk.**
 
 ![CI](https://github.com/Yiu-dororong/EARLY/actions/workflows/score.yml/badge.svg) [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/) [![Docker](https://img.shields.io/badge/Infra-Docker-2496ED.svg?logo=docker&logoColor=white)](https://www.docker.com/) [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-<sup>Independent analytical tool — not affiliated with Valve or Steam. All scores are statistical estimates. [Full disclaimer ↓](#disclaimer)</sup>
+<sup>Decision support tool — not financial or purchasing advice. Not affiliated with Valve or Steam. All scores are statistical estimates. [Full disclaimer ↓](#disclaimer)</sup>
 
 <p align="center">
     <kbd>
@@ -91,20 +91,20 @@ B["Data Pipeline<br/>GitHub Actions"] space C["XGBoost + L1 Scorecard<br/>Weekly
 
 ## 📈 Results
 
-**Model Performance (v1.3)**
+**Model Performance (v1.4)**
 
 | Evaluation Set | AUC-ROC | PR-AUC | Lift Over Baseline |
 |---|---|---|---|
-| **Test Set (Temporal Holdout, Post-2024)** | 0.9096 | 0.7378 | +0.2271 |
-| **Validation Set (Time-Bounded Cohort)** | 0.8761 | 0.6533 | +0.1577 |
+| **Test Set (Temporal Holdout, Post-2024)** | 0.9133 | 0.7341 | +0.2148 |
+| **Validation Set (Time-Bounded Cohort)** | 0.8659 | 0.6239 | +0.1187 |
 
-**Risk Tier Accuracy**
+**Risk Tier Accuracy (v1.1)**
 
 | Tier | Final Snapshot Agreement | Notes |
 |---|---|---|
-| 🟢 Healthy | 98.3% | High confidence; false positives are minimal |
-| 🟡 Watch | 75.7% | Captures transitionary phases |
-| 🔴 At Risk | 51.3% | Low-confidence triage — flags for closer review, not a verdict |
+| 🟢 Healthy | 98.8% | High confidence; false positives are minimal |
+| 🟡 Watch | 82.8% | Captures transitionary phases |
+| 🔴 At Risk | 52.7% | Low-confidence triage — flags for closer review, not a verdict |
 
 Of the [15 most recently resolved titles](docs/ea_exit_validation.csv) in our tracked universe, all 5 **At Risk** games were distressed and 2 of 3 **Watch** games reached full release. Two **Healthy**-labeled games (`Wool at the Gates`, `Kebab Chefs!`) exited successfully despite elevated scores — a reminder the model sees developer activity signals, not the full picture.
 
@@ -124,14 +124,14 @@ Of the [15 most recently resolved titles](docs/ea_exit_validation.csv) in our tr
 
 **Deterministic pre-check before any LLM call.** The Critic Agent runs a fast signal alignment check across ML score, review sentiment, and forensic substance before invoking the LLM. When signals conflict, the verdict states the conflict explicitly rather than forcing a single conclusion. This also keeps operating cost at zero — LLM calls only fire when genuinely needed.
 
-**Intentionally over-engineered for the dataset size.** EARLY runs on ~1,600 historical and ~1,000 active titles — a bounded dataset that could be handled with SQLite and a flat array. The architecture (decoupled services, independent deployability, replaceable components) models what this problem *would* demand at scale, and each component was chosen to be swappable without touching the rest.
+**Production-grade architecture on a bounded dataset.** EARLY runs on ~1,600 historical and ~1,000 active titles — a dataset that could be handled with SQLite and a flat array. The architecture reflects what this problem demands at scale: decoupled services, independent deployability, and replaceable components — every layer can be upgraded in isolation without cascading changes elsewhere.
 
 ---
 
 ## ⚠️ Limitations & Future Work
 
 **Current limitations:**
-- At Risk tier agreement is 51.3% — useful as a triage signal, not a reliable individual prediction
+- At Risk tier agreement is 52.7% — useful as a triage signal, not a reliable individual prediction
 - Cold-start problem: games with sparse history have significantly lower data quality
 - Announcement signals can be gamed; a developer posting "fake heartbeat" updates is detectable but not foolproof
 - Model sees developer activity, not game quality — a healthy-labeled game can still be mediocre
@@ -158,6 +158,7 @@ API: `http://localhost:8000` &nbsp;|&nbsp; UI: `http://localhost:8501`
 
 **Zero operating cost** — every service runs on a free tier (Groq, Zilliz, MLflow/Databricks, Turso, Render\*, Streamlit Cloud, GitHub Actions).
 
+\* *Render is free to use after a one-time $1 setup verification.*
 <details>
 <summary>Running tests</summary>
 
@@ -178,7 +179,9 @@ Agent tests use DeepEval with fake heartbeat, hotfix series, and edge case fixtu
 
 EARLY is an independent, unofficial analytical tool. It is not affiliated with, endorsed by, or connected to Valve, Steam, or any game developers.
 
-All risk scores, predictions, and tier labels are statistical estimates based on historical patterns and publicly available data. Predictions can be incorrect due to data limitations, concept drift, or changes in developer behavior. EARLY should be used for informational purposes only — not as financial, investment, or purchasing advice — and the author assumes no responsibility or liability for any decisions made based on its outputs. Always verify information directly on Steam.
+All risk scores, predictions, and tier labels are statistical estimates based on historical patterns and publicly available data. Predictions can be incorrect due to data limitations, concept drift, or changes in developer behavior. 
+
+EARLY is a decision support tool — it surfaces signals and context to help make more informed judgments. It does not constitute financial, investment, or purchasing advice, and the author assumes no responsibility for decisions made based on its outputs. Always verify directly on Steam.
 
 ---
 
