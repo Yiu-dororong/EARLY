@@ -9,17 +9,17 @@
       "expected_outcome": "SUCCESS"
     },
     "Watch": {
-      "n_games": 720,
-      "success_rate": 0.7625,
-      "abandoned_rate": 0.2375,
-      "agreement_rate": 0.7625,
+      "n_games": 571,
+      "success_rate": 0.8283712784588441,
+      "abandoned_rate": 0.17162872154115585,
+      "agreement_rate": 0.8283712784588441,
       "expected_outcome": "SUCCESS"
     },
     "At Risk": {
-      "n_games": 227,
-      "success_rate": 0.4493392070484582,
-      "abandoned_rate": 0.5506607929515418,
-      "agreement_rate": 0.5506607929515418,
+      "n_games": 376,
+      "success_rate": 0.473404255319149,
+      "abandoned_rate": 0.526595744680851,
+      "agreement_rate": 0.526595744680851,
       "expected_outcome": "ABANDONED"
     }
   },
