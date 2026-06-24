@@ -37,7 +37,7 @@ EARLY addresses these gaps by deploying a weekly predictive ML pipeline coupled 
 |---|---|
 | Data collection | Python, Steam Web API, ITAD API, Requests |
 | ML model | XGBoost, scikit-learn, SHAP, Optuna |
-| Agent layer | LangGraph, Groq (GPT OSS 120B + Qwen3.6 27B), Langfuse |
+| Agent layer | LangGraph, Cerebras (`gpt-oss-120b` + `zai-glm-4.7`), Langfuse |
 | Vector search | Zilliz (Milvus), cosine similarity on 25-dim SHAP vectors |
 | API | FastAPI, Turso (libSQL) |
 | Frontend | Streamlit |
@@ -141,14 +141,14 @@ Of the [15 most recently resolved titles](docs/ea_exit_validation.csv) in our tr
 git clone https://github.com/Yiu-dororong/EARLY.git
 cd early
 cp .env.example .env
-# Add GROQ_API_KEY to enable live AI analysis (optional)
+# Add CEREBRAS_API_KEY to enable live AI analysis (optional)
 # All cloud integrations are bypassable with pre-seeded local data
 docker compose up
 ```
 
 API: `http://localhost:8000` &nbsp;|&nbsp; UI: `http://localhost:8501`
 
-**Zero operating cost** — every service runs on a free tier (Groq, Zilliz, MLflow/Databricks, Turso, Render\*, Streamlit Cloud, GitHub Actions).
+**Zero operating cost** — every service runs on a free tier (Cerebras, Zilliz, MLflow/Databricks, Turso, Render\*, Streamlit Cloud, GitHub Actions).
 
 \* *Render is free to use after a one-time $1 setup verification.*
 <details>
@@ -158,11 +158,11 @@ API: `http://localhost:8000` &nbsp;|&nbsp; UI: `http://localhost:8501`
 # Deterministic tests (no API key needed)
 python tests/run_tests.py -m not_live
 
-# Full agent tests (requires GROQ_API_KEY)
+# Full agent tests (requires CEREBRAS_API_KEY)
 python tests/run_tests.py -m live
 ```
 
-Agent tests use DeepEval with fake heartbeat, hotfix series, and edge case fixtures. Live tests auto-skip if `GROQ_API_KEY` is unset.
+Agent tests use DeepEval with fake heartbeat, hotfix series, and edge case fixtures. Live tests auto-skip if `CEREBRAS_API_KEY` is unset.
 </details>
 
 ---
