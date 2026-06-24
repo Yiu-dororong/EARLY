@@ -54,7 +54,7 @@ Critic Agent:     always runs (synthesises whatever is available)
 - Empty announcement body → skip LLM call entirely, score = 0
 - Secondary heuristic: `score < 4 AND word_count < 20` → force `fake_heartbeat_flag = True`
 
-**Model:** Groq `meta-llama/llama-4-scout-17b-16e-instruct`, temp=0.3
+**Model:** Groq `qwen/qwen3.6-27b`, temp=0.0
 
 <!-- INSERT: example Forensic Agent output — fake heartbeat case (hollow announcement) vs genuine hotfix series -->
 
@@ -74,7 +74,7 @@ Critic Agent:     always runs (synthesises whatever is available)
 
 **Fast path:** Zero reviews available → skip LLM call entirely.
 
-**Model:** Groq `meta-llama/llama-4-scout-17b-16e-instruct`, temp=0.3 
+**Model:** Groq `qwen/qwen3.6-27b`, temp=0.0 
 
 ### Review quality adjustments
 
@@ -110,7 +110,7 @@ Both LLM verdicts are given `signal_alignment` explicitly in their prompts. The 
 
 **Two separate LLM calls** (consumer and developer verdicts), each its own Langfuse span — different audiences, different tones, different prompt structures.
 
-**Model:** Groq `llama-3.3-70b-versatile`, temp=0.3 (slightly higher than Forensic — verdicts benefit from some variation in phrasing)
+**Model:** Groq `openai/gpt-oss-120b`, temp=0.3 (slightly higher than Forensic — verdicts benefit from some variation in phrasing)
 
 <!-- INSERT: screenshot of Developer tab — developer_brief, key_concerns list, forensic detail expander -->
 

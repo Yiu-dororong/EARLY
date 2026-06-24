@@ -37,7 +37,7 @@ EARLY addresses these gaps by deploying a weekly predictive ML pipeline coupled 
 |---|---|
 | Data collection | Python, Steam Web API, ITAD API, Requests |
 | ML model | XGBoost, scikit-learn, SHAP, Optuna |
-| Agent layer | LangGraph, Groq (Llama 4 Scout + Llama 3.3 70B), Langfuse |
+| Agent layer | LangGraph, Groq (GPT OSS 120B + Qwen3.6 27B), Langfuse |
 | Vector search | Zilliz (Milvus), cosine similarity on 25-dim SHAP vectors |
 | API | FastAPI, Turso (libSQL) |
 | Frontend | Streamlit |

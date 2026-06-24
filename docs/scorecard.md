@@ -45,7 +45,7 @@ Hard override check
 | Sentiment | 0.20 | Review scores, velocity, recent delta |
 | Price & Market | 0.10 | Discount patterns, genre-relative pricing |
 
-Update Health and Player Retention comprise half of the total weight because they are fundamental to the Early Access lifecycle; build frequency directly determines abandonment risk, while player retention drives the development feedback loop. Price holds the least weight because it contains the least information about active game development. The remaining dimensions measure responses from both sides of the feedback loop.
+Update Health and Player Retention comprise half of the total weight because they are fundamental to the Early Access lifecycle; build frequency directly determines abandonment risk, while player retention drives the development feedback loop. Price holds the least weight because it contains the least information about active game development. The remaining dimensions measure responses from both sides of the feedback loop. Learn more about the meanings of each dimension at [Signals](signals-limitations.md).
 
 **Backbone features** — 90-day anchored, stable signals. What the game looks like right now.
 

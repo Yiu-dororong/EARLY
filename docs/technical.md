@@ -126,7 +126,7 @@ Before reading anything else, it is worth understanding the constraints the syst
 | Data collection | Python, Steam Web API, ITAD API, Requests |
 | ML model | XGBoost, scikit-learn, SHAP, Optuna |
 | Scorecard | Custom weighted engine |
-| Agent layer | LangGraph, Groq (Llama 4 Scout + Llama 3.3 70B), Langfuse |
+| Agent layer | LangGraph, Groq (GPT OSS 120B + Qwen3.6 27B), Langfuse |
 | Vector search | Zilliz (Milvus), cosine similarity, 25-dim SHAP vectors |
 | API | FastAPI, Turso (libSQL) |
 | Frontend | Streamlit |

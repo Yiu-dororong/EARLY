@@ -80,7 +80,7 @@ Since risk assessment is structurally decentralized while the market retains an 
         </b> 
     </summary>
 
-**The Feedback Loop**
+**The Feedback Loop** (See our [model](signals-limitations.md))
 
 Steam's own [FAQ](https://store.steampowered.com/earlyaccessfaq/?l=en) defines Early Access as an interactive feedback loop between developers and players. EARLY's eligibility gates are grounded in this definition: **a game without sufficient review count has no evidence that the feedback loop ever formed.** This is the theoretical foundation for the **50-review** ml_eligible gate and the 10-review discovery gate — not a statistical argument.
 
