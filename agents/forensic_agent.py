@@ -134,7 +134,8 @@ def assess_updates(state: ForensicState, config: RunnableConfig) -> dict:
                 "error_msg": None,
             }
 
-    llm    = _get_llm().with_structured_output(ForensicOutputModel, method="json_mode")
+    llm    = _get_llm().with_structured_output(ForensicOutputModel,
+                                               method="json_schema")
     prompt = _build_user_prompt(state)
     messages_in = [SystemMessage(content=FORENSIC_SYSTEM_PROMPT),
                    HumanMessage(content=prompt)]
