@@ -11,7 +11,7 @@ Triangulation addition:
   months, content drought" → sentiment_alignment="conflicted". This is
   the review-side half of the triangulation the Critic Agent synthesizes.
 
-Model: Groq meta-llama/llama-4-scout-17b-16e-instruct
+Model: Groq qwen/qwen3.6-27b
 Tracing: Langfuse generation span
 """
 
@@ -34,7 +34,7 @@ MAX_RECENT_REVIEWS = 25
 MAX_OLDER_REVIEWS  = 15
 MAX_REVIEW_CHARS   = 300
 
-MODEL_NAME = "meta-llama/llama-4-scout-17b-16e-instruct"
+MODEL_NAME = "qwen/qwen3.6-27b"
 
 def _fmt_reviews(reviews: list[dict], label: str) -> str:
     if not reviews:

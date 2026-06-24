@@ -3,10 +3,10 @@ EARLY — Phase 2 LangGraph Agents
 
 Agents:
   forensic_agent   — update substance scoring
-                    (Groq meta-llama/llama-4-scout-17b-16e-instruct)
+                    (Groq qwen/qwen3.6-27b)
   sentiment_auditor — review theme clustering
-                    (Groq meta-llama/llama-4-scout-17b-16e-instruct)
-  critic_agent     — narrative synthesis (Groq llama-3.3-70b-versatile)
+                    (Groq qwen/qwen3.6-27b)
+  critic_agent     — narrative synthesis (openai/gpt-oss-120b)
   orchestrator     — coordinates all three, implements trigger logic
 
 Typical usage:

@@ -19,8 +19,8 @@ Triangulation note:
   but the actual content says otherwise. This is the signal the Critic
   Agent uses to override or soften the ML-derived l1_state.
 
-Model: Groq meta-llama/llama-4-scout-17b-16e-instruct
-Tracing: Langfuse generation span (optional, no-op if disabled)
+Model: Groq qwen/qwen3.6-27b
+Tracing: Langfuse generation span
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ MAX_EVENTS_CONSIDERED = 3
 LOOKBACK_DAYS         = 365
 MAX_BODY_CHARS        = 1000   # per-event truncation to bound total prompt size
 
-MODEL_NAME = "meta-llama/llama-4-scout-17b-16e-instruct"
+MODEL_NAME = "qwen/qwen3.6-27b"
 
 def _event_label(event_type: int) -> str:
     return {

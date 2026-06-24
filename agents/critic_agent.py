@@ -20,7 +20,8 @@ Triangulation logic (signal_alignment):
     no conflict                                       → "aligned"
   - If forensic or auditor did not run                → "partial"
 
-Model: Groq llama-3.3-70b-versatile
+Model: Groq openai/gpt-oss-120b
+Tracing: Langfuse generation span
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ from agents.prompts import CRITIC_CONSUMER_SYSTEM, CRITIC_DEVELOPER_SYSTEM
 from agents.states import CriticState
 
 
-MODEL_NAME = "llama-3.3-70b-versatile"
+MODEL_NAME = "openai/gpt-oss-120b"
 
 def _fmt(v: float | None) -> str:
     return f"{v:.3f}" if v is not None else "N/A"
