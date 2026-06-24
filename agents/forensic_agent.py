@@ -94,8 +94,9 @@ def _get_llm() -> ChatCerebras:
     return ChatCerebras(
         model=MODEL_NAME,
         temperature=0.0,
-        max_tokens=350,
+        max_tokens=2000,
         api_key=api_key,
+        reasoning_effort="low"
         )
 
 

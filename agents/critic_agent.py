@@ -149,7 +149,7 @@ def _get_llm() -> ChatCerebras:
         raise OSError("CEREBRAS_API_KEY not set")
     return ChatCerebras(model=MODEL_NAME,
                         temperature=0.3,
-                        max_tokens=512,
+                        max_tokens=3000,
                         api_key=api_key)
 
 
