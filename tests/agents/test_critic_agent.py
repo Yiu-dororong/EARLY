@@ -125,7 +125,7 @@ def test_conflicted_verdict_mentions_discrepancy():
 
     metric = GEval(
         name="ConflictCommunication",
-        model=DeepEvalGroqAdapter(model_name="llama-3.3-70b-versatile",
+        model=DeepEvalGroqAdapter(model_name="openai/gpt-oss-120b",
                                   temperature=0.0),
         criteria=(
             "The verdict must explain WHY there is uncertainty — specifically that "
@@ -203,7 +203,7 @@ def test_aligned_healthy_signal_verdict_is_positive():
 
     metric = GEval(
         name="PositiveTone",
-        model=DeepEvalGroqAdapter(model_name="llama-3.3-70b-versatile",
+        model=DeepEvalGroqAdapter(model_name="openai/gpt-oss-120b",
                                   temperature=0.0),
         criteria=(
             "When all signals are positive and aligned, the verdict should be "
@@ -241,7 +241,7 @@ def test_developer_brief_ends_with_action():
 
     metric = GEval(
         name="ActionableEnding",
-        model=DeepEvalGroqAdapter(model_name="llama-3.3-70b-versatile",
+        model=DeepEvalGroqAdapter(model_name="openai/gpt-oss-120b",
                                   temperature=0.0),
         criteria=(
             "The developer brief must end with a specific, concrete action the "

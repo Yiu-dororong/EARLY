@@ -111,7 +111,7 @@ def test_auditor_summary_mentions_conflict():
 
     metric = GEval(
         name="ConflictArticulation",
-        model=DeepEvalGroqAdapter(model_name="llama-3.3-70b-versatile",
+        model=DeepEvalGroqAdapter(model_name="openai/gpt-oss-120b",
                                   temperature=0.0),
         criteria=(
             "The summary must explicitly state that player reviews CONTRADICT or "
@@ -152,7 +152,7 @@ def test_key_concerns_are_actionable():
 
     metric = GEval(
         name="ConcernSpecificity",
-        model=DeepEvalGroqAdapter(model_name="llama-3.3-70b-versatile",
+        model=DeepEvalGroqAdapter(model_name="openai/gpt-oss-120b",
                                   temperature=0.0),
         criteria=(
             "Each concern should identify a SPECIFIC, ACTIONABLE issue a developer "
