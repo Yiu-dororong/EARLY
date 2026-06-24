@@ -19,7 +19,7 @@ Triangulation note:
   but the actual content says otherwise. This is the signal the Critic
   Agent uses to override or soften the ML-derived l1_state.
 
-Model: Groq qwen/qwen3.6-27b
+Model: Cerebras gpt-oss-120b
 Tracing: Langfuse generation span
 """
 
@@ -29,9 +29,9 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from langchain_cerebras import ChatCerebras
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
-from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
 
 from agents.prompts import FORENSIC_SYSTEM_PROMPT
@@ -43,7 +43,7 @@ MAX_EVENTS_CONSIDERED = 3
 LOOKBACK_DAYS         = 365
 MAX_BODY_CHARS        = 1000   # per-event truncation to bound total prompt size
 
-MODEL_NAME = "qwen/qwen3.6-27b"
+MODEL_NAME = "gpt-oss-120b"
 
 def _event_label(event_type: int) -> str:
     return {
@@ -87,16 +87,15 @@ def _build_user_prompt(state: ForensicState) -> str:
     return "\n".join(parts)
 
 
-def _get_llm() -> ChatGroq:
-    api_key = os.getenv("GROQ_API_KEY")
+def _get_llm() -> ChatCerebras:
+    api_key = os.getenv("CEREBRAS_API_KEY")
     if not api_key:
-        raise OSError("GROQ_API_KEY not set")
-    return ChatGroq(
+        raise OSError("CEREBRAS_API_KEY not set")
+    return ChatCerebras(
         model=MODEL_NAME,
         temperature=0.0,
         max_tokens=350,
         api_key=api_key,
-        reasoning_format="hidden",
         )
 
 
@@ -135,7 +134,8 @@ def assess_updates(state: ForensicState, config: RunnableConfig) -> dict:
             }
 
     llm    = _get_llm().with_structured_output(ForensicOutputModel,
-                                               method="json_schema")
+                                               method="json_schema",
+                                               strict=True)
     prompt = _build_user_prompt(state)
     messages_in = [SystemMessage(content=FORENSIC_SYSTEM_PROMPT),
                    HumanMessage(content=prompt)]

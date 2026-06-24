@@ -20,7 +20,7 @@ Triangulation logic (signal_alignment):
     no conflict                                       → "aligned"
   - If forensic or auditor did not run                → "partial"
 
-Model: Groq openai/gpt-oss-120b
+Model: Cerebras zai-glm-4.7
 Tracing: Langfuse generation span
 """
 
@@ -30,16 +30,16 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from langchain_cerebras import ChatCerebras
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
-from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
 
 from agents.prompts import CRITIC_CONSUMER_SYSTEM, CRITIC_DEVELOPER_SYSTEM
 from agents.states import CriticState
 
 
-MODEL_NAME = "openai/gpt-oss-120b"
+MODEL_NAME = "zai-glm-4.7"
 
 def _fmt(v: float | None) -> str:
     return f"{v:.3f}" if v is not None else "N/A"
@@ -143,11 +143,14 @@ def _context(state: CriticState) -> str:
     return "\n".join(parts)
 
 
-def _get_llm() -> ChatGroq:
-    api_key = os.getenv("GROQ_API_KEY")
+def _get_llm() -> ChatCerebras:
+    api_key = os.getenv("CEREBRAS_API_KEY")
     if not api_key:
-        raise OSError("GROQ_API_KEY not set")
-    return ChatGroq(model=MODEL_NAME, temperature=0.3, max_tokens=512, api_key=api_key)
+        raise OSError("CEREBRAS_API_KEY not set")
+    return ChatCerebras(model=MODEL_NAME,
+                        temperature=0.3,
+                        max_tokens=512,
+                        api_key=api_key)
 
 
 def _llm_call(

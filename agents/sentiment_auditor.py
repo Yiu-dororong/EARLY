@@ -11,7 +11,7 @@ Triangulation addition:
   months, content drought" → sentiment_alignment="conflicted". This is
   the review-side half of the triangulation the Critic Agent synthesizes.
 
-Model: Groq qwen/qwen3.6-27b
+Model: Cerebras gpt-oss-120b
 Tracing: Langfuse generation span
 """
 
@@ -21,9 +21,9 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from langchain_cerebras import ChatCerebras
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
-from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
 
 from agents.prompts import AUDITOR_SYSTEM_PROMPT
@@ -34,7 +34,7 @@ MAX_RECENT_REVIEWS = 25
 MAX_OLDER_REVIEWS  = 15
 MAX_REVIEW_CHARS   = 300
 
-MODEL_NAME = "qwen/qwen3.6-27b"
+MODEL_NAME = "gpt-oss-120b"
 
 def _fmt_reviews(reviews: list[dict], label: str) -> str:
     if not reviews:
@@ -71,16 +71,15 @@ Check whether player sentiment below AGREES or CONFLICTS with "{l1}".
 Return JSON only."""
 
 
-def _get_llm() -> ChatGroq:
-    api_key = os.getenv("GROQ_API_KEY")
+def _get_llm() -> ChatCerebras:
+    api_key = os.getenv("CEREBRAS_API_KEY")
     if not api_key:
-        raise OSError("GROQ_API_KEY not set")
-    return ChatGroq(
+        raise OSError("CEREBRAS_API_KEY not set")
+    return ChatCerebras(
         model=MODEL_NAME,
         temperature=0.0,
         max_tokens=1024,
         api_key=api_key,
-        reasoning_format="hidden",
         )
 
 
@@ -102,7 +101,8 @@ def should_skip(state: SentimentState) -> str:
 
 def analyse_sentiment(state: SentimentState, config: RunnableConfig) -> dict:
     llm    = _get_llm().with_structured_output(SentimentOutputModel,
-                                               method="json_schema")
+                                               method="json_schema",
+                                               strict=True)
     prompt = _build_prompt(state)
     msgs   = [SystemMessage(content=AUDITOR_SYSTEM_PROMPT),
               HumanMessage(content=prompt)]
