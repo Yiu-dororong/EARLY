@@ -48,7 +48,14 @@ This layout does not pretend the problem is completely eliminated; the structura
 
 **Cross-dimension & Context** — `ea_age_days`, `owner_estimate_at_T`, `genre_scope`, `review_update_divergence`. High-level structural anchors that condition how the raw telemetry should be interpreted relative to the game's lifecycle stage.
 
-**Primary Genre Tracking** — One-hot encoded categorical vectors mapping the game's primary tags (e.g., *Action, RPG, Simulation, Strategy*). This allows the tree-based architecture to establish distinct baseline expectations by genre.
+**Primary Genre Tracking¹** — One-hot encoded categorical vectors mapping the game's primary tags (e.g., *Action, RPG, Simulation, Strategy*). This allows the tree-based architecture to establish distinct baseline expectations by genre. This should be static and immutable, capturing the initial planned or dominant genre at launch.
+
+<details>
+  <summary> Difference from Genre Scope</summary>
+  <p>
+    <code>genre_scope</code> serves a separate structural purpose: it measures objective architectural complexity (e.g., an MMORPG carries a fundamentally higher baseline complexity than a Visual Novel), acting as a potential proxy to measure other signals such as expected update frequencies and relative pricing.
+  </p>
+</details>
 
 **Scorecard (L1) Metrics** — The model ingests its own deterministic sibling metrics as advanced features, including the five individual dimensional scorecard tallies and the raw `composite_l1_score`. 
 

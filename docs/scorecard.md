@@ -43,7 +43,9 @@ Hard override check
 | Player Retention | 0.25 | CCU levels, floor, trajectory |
 | Developer Engagement | 0.20 | Post frequency, build-to-post ratio |
 | Sentiment | 0.20 | Review scores, velocity, recent delta |
-| Price & Market | 0.10 | Discount patterns, genre-relative pricing |
+| Price & Market¹ | 0.10 | Discount patterns, genre-relative pricing |
+
+*¹ **Note:** Price & Market Signals replaced the initial "Roadmap Integrity" dimension. Tracking roadmap deviations programmatically is highly unreliable due to the qualitative nature of shifting scope (e.g., swapping a planned biome for a new multiplayer feature), whereas market and pricing features are quantifiable.*
 
 Update Health and Player Retention comprise half of the total weight because they are fundamental to the Early Access lifecycle; build frequency directly determines abandonment risk, while player retention drives the development feedback loop. Price holds the least weight because it contains the least information about active game development. The remaining dimensions measure responses from both sides of the feedback loop. Learn more about the meanings of each dimension at [Signals](signals-limitations.md).
 

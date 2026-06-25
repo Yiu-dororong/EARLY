@@ -91,6 +91,8 @@ The binary training label is: `1 = abandoned (EXIT_ABANDONED + EXIT_SILENT)`, `0
 
 **Snapshot timing** — snapshots are mostly taken at the mid-lifecycle (not at launch or exit) in each game's Early Access lifecycle. This avoids the trivial case where a game looks healthy at launch and abandoned just before exit. Prediction near graduation is also trivial because of the potential existence of "1.0 release is coming soon" announcement.
 
+To achieve this, snapshot timestamps are evenly sliced from the mid-lifecycle window (defaulting to percentires $P_{25} \text{ to } P_{70}$ of a game's lifespan), where longer-running Early Access games dynamically scale their snapshot volume: initializing at a default of $4$, increasing by $+1$ for every additional 180 days once a project passes 360 days of age, and capped at $8$ to prevent long-tail games from skewing model weights.
+
 **Look-ahead Leakage** — To simulate a live production inference pipeline, features are engineered strictly using historical logs trailing behind the specific snapshot date.
 
 ---
