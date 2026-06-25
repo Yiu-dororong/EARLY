@@ -22,7 +22,7 @@ from tests.agents.fixtures import (
 )
 
 
-pytestmark = pytest.mark.live  # requires GROQ_API_KEY
+pytestmark = pytest.mark.live  # requires CEREBRAS_API_KEY
 
 
 # ---------------------------------------------------------------------------

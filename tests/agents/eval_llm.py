@@ -1,16 +1,17 @@
 from deepeval.models.base_model import DeepEvalBaseLLM
+from langchain_cerebras import ChatCerebras
 from langchain_core.messages import HumanMessage
-from langchain_groq import ChatGroq
 
 
-class DeepEvalGroqAdapter(DeepEvalBaseLLM):
+class DeepEvalCerebrasAdapter(DeepEvalBaseLLM):
     def __init__(self,
-                 model_name: str = "openai/gpt-oss-120b",
+                 model_name: str = "zai-glm-4.7",
                  temperature: float = 0.0):
-        # 1. Instantiate the raw LangChain ChatGroq model internally
-        self.chat_model = ChatGroq(
+        # 1. Instantiate the raw LangChain ChatCerebras model internally
+        self.chat_model = ChatCerebras(
             model=model_name,
-            temperature=temperature
+            temperature=temperature,
+            reasoning_effort="low"
         )
         self.model_name = model_name
 
@@ -28,4 +29,4 @@ class DeepEvalGroqAdapter(DeepEvalBaseLLM):
         return str(response.content)
 
     def get_model_name(self) -> str:
-        return f"Groq - {self.model_name}"
+        return f"Cerebras - {self.model_name}"
