@@ -460,8 +460,8 @@ def train_final_model(
     feature_names: list[str],
     threshold: float,
 ):
-    # n_estimators: mean of CV folds + 10% data-volume buffer
-    # final_n = int(np.mean(best_iters) * 1.1)
+    # n_estimators: p75 of CV folds + 10% data-volume buffer
+    # use 75th percentile instead of median to prevent skewness from early stopping
     final_n = int(np.percentile(best_iters, 75) * 1.1)
     log.info("CV best_iterations: %s → final_n_estimators: %d",
              best_iters, final_n)
