@@ -10,7 +10,7 @@ This distinction matters. A system that narrates the score tells you *what* the 
 
 ## Why On-Demand, Not Scheduled
 
-The weekly `score.yml` cron scores ~1,000 games. Approximately 400+ are in Watch or At Risk at any given time — the only games eligible for agent analysis. Running LLM calls across all of them weekly would exhaust free-tier Groq rate limits and produce stale analysis (a game's agent output is only meaningful relative to its current signals).
+The weekly `score.yml` cron scores ~1,000 games. Approximately 400+ are in Watch or At Risk at any given time — the only games eligible for agent analysis. Running LLM calls across all of them weekly would exhaust free-tier Cerebras rate limits and produce stale analysis (a game's agent output is only meaningful relative to its current signals).
 
 **Design decision:** agents run on-demand only, triggered by a user action in Streamlit (`POST /games/{appid}/analyse`). Results are cached in the `agent_analysis` table and stay valid until `l1_state` changes or 14 days pass. A "Refresh Analysis" button bypasses the staleness check (`force=true`) but still respects the hard eligibility gate — Healthy games never run agents.
 
@@ -54,7 +54,7 @@ Critic Agent:     always runs (synthesises whatever is available)
 - Empty announcement body → skip LLM call entirely, score = 0
 - Secondary heuristic: `score < 4 AND word_count < 20` → force `fake_heartbeat_flag = True`
 
-**Model:** Groq `qwen/qwen3.6-27b`, temp=0.0
+**Model:** Cerebras `gpt-oss-120b`, temp=0.0
 
 <!-- INSERT: example Forensic Agent output — fake heartbeat case (hollow announcement) vs genuine hotfix series -->
 
@@ -74,7 +74,7 @@ Critic Agent:     always runs (synthesises whatever is available)
 
 **Fast path:** Zero reviews available → skip LLM call entirely.
 
-**Model:** Groq `qwen/qwen3.6-27b`, temp=0.0 
+**Model:** Cerebras `gpt-oss-120b`, temp=0.0 
 
 ### Review quality adjustments
 
@@ -110,7 +110,7 @@ Both LLM verdicts are given `signal_alignment` explicitly in their prompts. The 
 
 **Two separate LLM calls** (consumer and developer verdicts), each its own Langfuse span — different audiences, different tones, different prompt structures.
 
-**Model:** Groq `openai/gpt-oss-120b`, temp=0.3 (slightly higher than Forensic — verdicts benefit from some variation in phrasing)
+**Model:** Cerebras `zai-glm-4.7`, temp=0.3 (slightly higher than Forensic — verdicts benefit from some variation in phrasing)
 
 <!-- INSERT: screenshot of Developer tab — developer_brief, key_concerns list, forensic detail expander -->
 

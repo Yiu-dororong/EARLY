@@ -134,12 +134,12 @@ Agent behaviour is tested with DeepEval. `tests/agents/fixtures.py` includes:
 
 **Deterministic tests** (no LLM) cover `compute_signal_alignment` — the pure Python alignment node in the Critic Agent. These run without any API key.
 
-**Live tests** (`@pytest.mark.live`) test full agent behaviour end-to-end. Auto-skipped if `GROQ_API_KEY` is unset, so CI doesn't fail in environments without credentials.
+**Live tests** (`@pytest.mark.live`) test full agent behaviour end-to-end. Auto-skipped if `CEREBRAS_API_KEY` is unset, so CI doesn't fail in environments without credentials.
 
 ```bash
 # Deterministic tests (no API key needed)
 python tests/run_tests.py -m not_live
 
-# Full agent tests (requires GROQ_API_KEY)
+# Full agent tests (requires CEREBRAS_API_KEY)
 python tests/run_tests.py -m live
 ```
