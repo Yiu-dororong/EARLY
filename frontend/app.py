@@ -304,10 +304,10 @@ def render_browse():
     st.markdown("""
     **Welcome to the EARLY Intelligence Dashboard.**
 
-    EARLY analyzes public Steam data (update cadence, player retention,
-                community sentiment, developer behavior, and more)
-                to estimate the probability that an Early Access game
-                will **stop updating** before reaching full release (1.0).
+    EARLY analyzes signals from public Steam data (update cadence, player retention,
+    community sentiment, developer behavior, and more) and act as an AI decision support
+    system for Steam Early Access games that are **stop updating** before reaching
+    full release (1.0).
     """)
 
     with st.expander("📜 Why This Tool Exists", expanded=False):
@@ -326,13 +326,16 @@ def render_browse():
                 It looks at the game's overall footprint to calculate the statistical
                 risk ($p_{\text{distressed}}$) of the project stalling or being
                 abandoned before launch.
-                - **AI Forensic Agents:** Deep-dives into the text. When requested, our
+                - **AI Agents:** Deep-dives into the text. When requested, our
                 specialized AI agents cross-reference recent developer announcements
                 and player reviews, translating raw community text and patch notes
-                into clear, actionable intelligence.
+                into clear intelligence.
                 - **Similarity Search:** Looks for lookalike projects. It instantly
                 scans our database of historical games to find past projects with the
                 exact same data footprint, identifying how similar cases turned out.
+                - **Similarity Search:** Scans historical database footprints to match
+                the project with lookalike games, showing you exactly how similar cases
+                played out.
                 """
                 )
     # Prominent Disclaimer
@@ -340,17 +343,19 @@ def render_browse():
                 """
             **⚠️ Important Disclaimer**:
 
-            EARLY is an independent analytical tool, **not affiliated with Valve,
-            Steam, or any game developers**.
+            EARLY is an independent, unofficial analytical tool. It is **not affiliated
+            with, endorsed by, or connected to Valve, Steam, or any game developers.**
 
-            - All predictions are statistical estimates only. Past performance does
-            not guarantee future results.
-            - Predictions can be wrong. The model may suffer from data limitations
-            and concept drift over time.
-            - A self-fulfilling prophecy effect is possible — public awareness of
-            risk can influence outcomes.
-            - **Always verify information directly on Steam**, use EARLY as one
-            data point among many — always do your own research.
+            - All risk scores, predictions, and tier labels are statistical estimates
+            based on historical patterns and publicly available data. Predictions can
+            be incorrect due to data limitations, concept drift, or changes in developer
+            behavior.
+
+            - **Always verify information directly on Steam**, use EARLY as a
+            decision support tool — it surfaces signals and context to help make more
+            informed judgments. It does not constitute financial, investment, or
+            purchasing advice, and the author assumes no responsibility for decisions
+            made based on its outputs.
             """
             )
 
@@ -958,11 +963,10 @@ tab1, tab2, tab3 = st.tabs(["Overview", "Technical Details", "Performance"])
 
 with tab1:
     st.markdown("""
-    **EARLY** is a solo-built hybrid ML system designed to give
-    consumers and developers early warning signals about Early Access game health.
+    **EARLY** is a solo-built, end-to-end AI decision support system for Steam Early
+    Access game abandonment risk — surfacing warning signals weeks or months before a
+    developer goes silent.
 
-    It combines rule-based scoring with machine learning
-    and LLM agents to deliver transparent, explainable risk assessments.
     """)
 
 with tab2:
@@ -981,14 +985,13 @@ with tab2:
         - **Similarity Search**: Finds historically similar games using SHAP
           vector embeddings (Zilliz)
 
-        **Tech Stack**: Python, XGBoost, FastAPI, LangGraph, Groq, Streamlit,
+        **Tech Stack**: Python, XGBoost, FastAPI, LangGraph, Cerebras, Streamlit,
         Turso (libSQL), Zilliz Cloud
         """
         )
 
     with st.expander("Key Design Principles"):
         st.markdown("""
-        - Developer-relative abandonment thresholds
         - Strict look-ahead discipline during training
         - Free-tier first design
         - On-demand agents (cost control)
@@ -997,17 +1000,17 @@ with tab2:
 
 with tab3:
     st.markdown("""
-    ### Current Model Performance (v1.3)
+    ### Current Model Performance (v1.4)
 
-    - **Holdout AUC-ROC**: 0.9127
-    - **Holdout PR-AUC**: 0.7382
-    - **Lift over Scorecard**: +0.262
+    - **Holdout AUC-ROC**: 0.9133
+    - **Holdout PR-AUC**: 0.7341
+    - **Lift over Scorecard**: +0.2148
     """)
 
     st.info("""
     Three risk tiers:
-    - **Healthy** — 98.2% success rate
-    - **Watch** — 74.9% success rate
+    - **Healthy** — 98.8% success rate
+    - **Watch** — 82.8% success rate
     - **At Risk** — ~48% success rate
     """)
 
