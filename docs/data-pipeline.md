@@ -47,7 +47,7 @@ One row per game per snapshot date
 
 **CCU history**  — collected through Steam Charts, a third party website, however, a substantial amount of games has **no available CCU history**.
 
-**Event history** — collected via Steam event API endpoint (undocumented). Includes Steam event feed, filtered to types 12/13/14(build), 28(update announcements). Captures event title, body text, word count, and timestamp. This is the proxy for "did the developer ship something" — with the important caveat that event types are announcement categories, not depot-verified signals (see [Never Mourn](never-mourn.md)).
+**Event history** — collected via Steam event API endpoint (undocumented). Includes Steam event feed, filtered to types 12/13/14(build), 28(update announcements). Captures event title, body text, word count, and timestamp. This is the proxy for "did the developer ship something" — with the important caveat that event types are announcement categories, not depot-verified signals (see [Case Study](case-study.md)).
 
 **Review history** — collected via Steam histogram API endpoint (undocumented). Includes weekly histogram of review scores and counts. Produces the rolling sentiment signals. Exact review can be collected by `appreviews` API.
 

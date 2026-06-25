@@ -139,7 +139,7 @@ This definition is deliberately observable. "Abandoned" here means *demonstrably
 
 This threshold is aligned with the 365-day boundary where Steam automatically flags a project with an consumer warning note, meaning EARLY aims to predict project distress before that.
 
-*¹ Adaptive Developer-Relative Build Gap: a dynamic threshold by calulated by developers' historical update frequency.* *(Limitations see [here](signals-limitations.md))*<br/> 
+*¹ Adaptive Developer-Relative Build Gap: a dynamic threshold by calulated by developers' historical update frequency.* *(Limitations see [here](signals-limitations.md#near-term-roadmap))*<br/> 
 
 <details>
     <summary> 
@@ -181,7 +181,7 @@ The core data constraint shaping this system is the lack of public access to Ste
 
 A developer can publish a "Build Update" announcement without pushing actual code. At the feature level, the ML model cannot distinguish a real release from a hollow text post. This is not a gap that can be closed with more data or a better model. It is a fundamental limitation of what Steam makes publicly observable.
 
-The agent layer exists partly because of this constraint. The Forensic Agent reads announcement *content* to check whether it supports the implied event type — a check the ML model cannot perform. See [Never Mourn](never-mourn.md) for the case that made this explicit.
+The agent layer exists partly because of this constraint. The Forensic Agent reads announcement *content* to check whether it supports the implied event type — a check the ML model cannot perform. See [Case Study](case-study.md) for the case that made this explicit.
 
 ---
 

@@ -105,9 +105,9 @@ Two features showed high predictive power during early feature exploration but w
 *   **At Risk Agreement:** $P(\text{Abandoned} \mid \text{Scored At Risk})$ — Verifies minority class precision.
 *   **Watch Agreement:** $P(\text{Abandoned} \mid \text{Scored Watch})$ — Monitored strictly as a baseline distress index, as the *Watch* tier is designed to isolate volatile, structurally ambiguous trajectories.
 
-> 📊 **System Promotion Gate:** These per-tier metrics are logged natively within MLflow during evaluation. To pass the production deployment gate, a challenger model cannot degrade any individual tier's historical agreement by more than 2 percentage points (2pp), even if its aggregate global PR-AUC increases. 
-> 
-> *Note on Scope:* Unlike the Scorecard's internal agreement check—which evaluates only a game's final, terminal snapshot—the ML model evaluation ingests **all historical snapshots across a title's lifespan** to guarantee long-term risk calibration.
+**System Promotion Gate:** These per-tier metrics are logged natively within MLflow during evaluation. To pass the production deployment gate, a challenger model cannot degrade any individual tier's historical agreement by more than 2 percentage points (2pp), even if its aggregate global PR-AUC increases. 
+ 
+*Note: Unlike the Scorecard's internal agreement check—which evaluates only a game's final, terminal snapshot—the ML model evaluation ingests **all historical snapshots across a title's lifespan** to guarantee long-term risk calibration.*
 
 ---
 
