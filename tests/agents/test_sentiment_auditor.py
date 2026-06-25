@@ -111,8 +111,7 @@ def test_auditor_summary_mentions_conflict():
 
     metric = GEval(
         name="ConflictArticulation",
-        model=DeepEvalCerebrasAdapter(model_name="gpt-oss-120b",
-                                      temperature=0.0),
+        model=DeepEvalCerebrasAdapter(model_name="zai-glm-4.7",),
         criteria=(
             "The summary must explicitly state that player reviews CONTRADICT or "
             "CONFLICT with the stated health classification. It should describe "
@@ -152,8 +151,7 @@ def test_key_concerns_are_actionable():
 
     metric = GEval(
         name="ConcernSpecificity",
-        model=DeepEvalCerebrasAdapter(model_name="gpt-oss-120b",
-                                      temperature=0.0),
+        model=DeepEvalCerebrasAdapter(model_name="zai-glm-4.7",),
         criteria=(
             "Each concern should identify a SPECIFIC, ACTIONABLE issue a developer "
             "can address — e.g. 'No response to bug reports in forum' or "
