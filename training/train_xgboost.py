@@ -821,6 +821,7 @@ def run_tuning(df_train_val: pd.DataFrame, scale_pos_weight: float, n_trials: in
 
     def objective(trial):
         params = {
+            # n_estimators currently overwritten during training
             "n_estimators":      trial.suggest_int("n_estimators", 100, 500),
             "max_depth":         trial.suggest_int("max_depth", 3, 8),
             "learning_rate":     trial.suggest_float("learning_rate", 0.01, 0.3,
