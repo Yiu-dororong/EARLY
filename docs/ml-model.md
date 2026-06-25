@@ -88,6 +88,12 @@ Two features showed high predictive power during early feature exploration but w
 
 **Temporal Holdout Evaluation** — To enforce a rigorous final audit, a separate test set is completely isolated using an explicit temporal cutoff. This evaluates the system's generalization capacity not just across distinct titles (`GroupKFold`), but across forward-looking temporal shifts—the most demanding and realistic deployment condition. Given our baseline eligibility gate targets titles launched post-2022, a **2024 temporal cutoff** was established, maintaining an optimal sample volume while isolating a pure forward-looking test population.
 
+**Hyperparameter Tuning** — Most hyperparameters are tuned by Optuna, the **75th percentile** stopping iteration of the folds is saved as an outlier-robust baseline (`base_trees`).
+* **Production Stage (Full Retrain):** The final model is retrained on 100% of the data without early stopping. To prevent underfitting on the larger data volume, the final tree count is hardcoded using a $+10\%$ scaling buffer: 
+
+**Hyperparameter Tuning** — Most structural hyperparameters are tuned via Optuna, while `n_estimators` is calculated by the 75th percentile (prevent skewness from early-stopping) of the cross-validation folds scaled by a $+10\%$ data-volume buffer.
+
+
 ---
 
 ## Metric Selection & Tiered Agreement 
