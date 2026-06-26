@@ -133,7 +133,8 @@ Both LLM verdicts are given `signal_alignment` explicitly in their prompts. The 
 
 **Model:** Cerebras `zai-glm-4.7`, temp=0.3 (slightly higher than Forensic — verdicts benefit from some variation in phrasing)
 
-**Sample Outputs:**
+**Sample Outputs:** 
+
 *Triangulation clarify Watch label*
 <p align="center">
     <kbd>

@@ -8,7 +8,7 @@
 
 <p align="center">
     <kbd>
-        <img width="1280" height="720" alt="EARLY dashboard demo" src="https://github.com/user-attachments/assets/f33e6fe9-3255-4ca5-bbcb-a554ce9c32f6" />
+        <img width="1280" height="720" alt="EARLY dashboard demo" src="https://github.com/user-attachments/assets/2119a420-a810-4606-91cc-a13c4632e847" />
     </kbd>
 </p>
 
