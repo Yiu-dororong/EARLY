@@ -98,7 +98,7 @@ B["Data Pipeline<br/>GitHub Actions"] space C["XGBoost + L1 Scorecard<br/>Weekly
 | 🟡 Watch | 82.8% | Captures transitionary phases |
 | 🔴 At Risk | 52.7% | Low-confidence triage — flags for closer review, not a verdict |
 
-Of the [15 most recently resolved titles](docs/ea_exit_validation.csv) in our tracked universe, all 5 **At Risk** games were distressed and 2 of 3 **Watch** games reached full release. Two **Healthy**-labeled games (`Wool at the Gates`, `Kebab Chefs!`) exited successfully despite elevated scores — a reminder the model sees developer activity signals, not the full picture.
+Of the [20 most recently resolved titles](docs/ea_exit_validation.csv) in our tracked universe, 6 of 7 **At Risk** games were distressed and 3 of 4 **Watch** games reached full release. Two **Healthy**-labeled games (`Wool at the Gates`, `Kebab Chefs! - Restaurant Simulator`) exited successfully despite elevated scores — a reminder the model sees developer activity signals, not the full picture.
 
 📄 *Validation methodology, leakage controls, and error analysis are in the [ML Model Documentation](docs/ml-model.md).*
 
