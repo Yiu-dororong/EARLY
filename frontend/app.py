@@ -572,7 +572,8 @@ def _render_analysis_section(score: dict, audience: str):
     state   = score.get("l1_state")
     eligible = state in ("Watch", "At Risk")
 
-    st.markdown("**AI Analysis**")
+    st.markdown("**AI Analysis**", help="AI can make mistakes. "
+                "Please verify critical findings and technical metrics independently.")
 
     if not eligible:
         st.info(

@@ -16,6 +16,9 @@ The weekly `score.yml` cron scores ~1,000 games. Approximately 400+ are in Watch
 
 This is the single biggest architectural difference from the original plan. The cron handles scoring; users opt into interpretation.
 
+### Text Trimming vs. Completeness
+To ensure token budget stability and prevent pipeline crashes on text-heavy games, developer announcements and reviews are trimmed. The clear trade-off is completeness for deterministic cost and speed: while this guarantees predictable inference performance, it carries the slight risk of omitting details hidden deep within long text logs.
+
 ### Future Scale Optimization
 
 While the current on-demand model protects our API rate limits, it introduces **user-facing latency** during active LLM evaluation cycles. 

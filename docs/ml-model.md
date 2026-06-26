@@ -167,6 +167,47 @@ The analysis reveals that the hierarchical order of error-driving features is al
 
 Consolidating the insights from the [Reflection on Redundancy](#reflection-on-redundancy) section, the agent layer is explicitly designed to capture the qualitative nuance that numerical thresholds destroy, where these critical error vectors are trapped within our highest-variance feature channels in the model. 
 
+### Edge Cases
+
+An error analysis on the anomalous predictions identified within the [20 most recently resolved titles](docs/ea_exit_validation.csv) exposes the subtle boundaries between traditional activity metrics and real-world developer behaviors. *(**Bolded** metrics denote the **conflicting** signals that misled the core model.)*
+
+#### 1. Missing or misleading signals
+
+* **`Kebab Chefs! - Restaurant Simulator`**
+* **Model Output: $p_{distressed} = 0.586$** | Labeled: Healthy | Outcome: `EXIT_SUCCESS`
+* *Root Cause:* The developer transitioned the game through a Beta Release (Type 29) and an Upcoming Release (Type 16) sequence that went completely undetected by our ingestion pipeline. Because the studio only posted basic text news announcements—leaving a 10-month period of zero "Build Update" logs—the model falsely penalized the project as operationally inactive.
+
+* **`Wool at the Gates`**
+* **Model Output: $p_{distressed} = 0.692$** | Labeled: Healthy | Outcome: `EXIT_SUCCESS`
+* *Root Cause:* This title exhibited a combination of frequent discount sales paired with an extremely low Concurrent User (CCU) floor. Historically, this combination was frequently associated with distressed projects in the training set, leading the model to overestimate abandonment risk.
+
+**Mitigation:** Successfully mitigated and overridden in the final classification via scorecard triage.
+
+
+
+#### 2. Uunseen behavior
+
+* **`Burger Bots Inc.`**
+* Model Output: $p_{distressed} = 0.699$ | Labeled: Watch | **Outcome: `EXIT_SUCCESS`**
+* *Root Cause:* The model flagged this project due to flatlining CCU and a near-total lack of public developer-to-community communication. However, the system missed the fact that backend code pushes were sparse but mechanically consistent.
+
+* **`Icaria`**
+* Model Output: $p_{distressed} = 0.518$ | Labeled: At Risk | **Outcome: `EXIT_SUCCESS`**
+* *Root Cause:* A severe false positive triggered by an extreme low-CCU baseline combined with infrequent and brief announcements. The model interpreted this as operational failure, failing to account for teams working silently toward a hard milestone.
+
+**Mitigation:** This failure mode can be partially mitigated during system-level inference (studying last N announcements).
+
+#### 3. Temporal representation limitations
+
+* **`Fisher Idle` (`appid: 3449840`)**
+* **Model Output: $p_{distressed} = 0.456$** | Labeled: At Risk | Outcome: `EXIT_ABANDONED`
+* *Root Cause:* A classic "dead-on-arrival" project. When capturing the trend snapshot, the model observed completely flatlined, steady lines (consistently near-zero CCU, unchanging review volume and average sentiment). Because the metrics weren't actively actively *dropping*, the model mistook this permanent flatline for a steady mid-lifecycle development plateau rather than an instant post-launch abandonment, highlighting a lack of temporal sensitivity to early lifecycle velocity.
+
+**Mitigation:** The downstream agent layer can recover from this failure by incorporating chronological announcement context (`days_ago`).
+
+
+Across these cases, false positives were primarily driven by activity proxies that failed to distinguish silent but healthy development from genuine abandonment, while the principal false negative resulted from insufficient temporal sensitivity during very early project lifecycles. These patterns motivated the introduction of the agent layer and the future work on survival modeling and richer event features.
+
 ---
 
 ## Wrong Turns

@@ -54,6 +54,15 @@ Steam's public API exposes announcement event types but does not verify that a d
 
 This is the core constraint that motivated the [Never Mourn case study](case-study.md) and the Forensic Agent's `event_state_mismatch` flag. The proxy (event types ≈ build activity) is the best available signal — it is not the same as the ground truth.
 
+*Even SteamDB can measure the 'last update' differently compared to Steam's official storefront figures.*
+
+<details>
+<summary>Example</summary>
+<i>Steam flagged its last update as being more than 12 months ago, but the SteamDB extension on the right shows the last update occurred 8 months ago.</i>
+<br/>
+<img width="1249" height="1062" alt="Example of last update date mismatch" src="https://github.com/user-attachments/assets/bd650fc2-2a10-47cb-98b3-d8d1b8933ae7" />
+</details>
+
 **Mitigation in place:** Forensic Agent cross-checks announcement content against the implied event type. `event_state_mismatch` is passed to the Critic Agent's alignment node and surfaces in the verdict.
 
 **What's not solved:** A developer posting detailed, plausible-sounding patch notes for a build that didn't ship would still pass forensic analysis. The agent reads text, not depots.

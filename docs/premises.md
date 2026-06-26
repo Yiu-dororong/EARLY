@@ -158,7 +158,7 @@ This threshold is aligned with the 365-day boundary where Steam automatically fl
 
 ### The Long Hiatus Problem
 
-One edge case this definition does not resolve cleanly: a game that goes dark for an extended period and then ships a 1.0 release. Under the current scheme it is labelled `EXIT_SUCCESS`, but any snapshot taken during the hiatus looks indistinguishable from an abandoned game — no updates, no communication, declining player counts.
+One edge case this definition does not resolve cleanly: a game that goes dark for an extended period and then ships a 1.0 release. Under the current scheme it is labelled `EXIT_SUCCESS`, but any snapshot taken during the hiatus looks indistinguishable from an abandoned game — no updates, no communication, declining player counts. (*Example: [Die For The Lich](https://store.steampowered.com/news/app/3415570/view/508483399701234021)*)
 
 This creates a genuine **labelling ambiguity** in the ML model: the training data contains hiatus-period snapshots labelled as successes, which weakens the model's ability to call At Risk confidently.
 
