@@ -118,6 +118,8 @@ Of the [15 most recently resolved titles](docs/ea_exit_validation.csv) in our tr
 
 **Production-grade architecture on a bounded dataset.** EARLY runs on ~1,600 historical and ~1,000 active titles — a dataset that could be handled with SQLite and a flat array. The architecture reflects what this problem demands at scale: decoupled services, independent deployability, and replaceable components — every layer can be upgraded in isolation without cascading changes elsewhere.
 
+*The hardest engineering problems were not model training, but preventing silent data leakage, detecting unreliable signals, and making uncertainty legible to users.*
+
 ---
 
 ## ⚠️ Limitations & Future Work
