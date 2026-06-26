@@ -80,7 +80,7 @@ log = logging.getLogger(__name__)
 # SECTION 0 — Config & Constants
 # ---------------------------------------------------------------------------
 
-MODEL_VERSION = "v1.4"
+MODEL_VERSION = "v1.5"
 RANDOM_SEED   = 42
 N_FOLDS       = 5
 TEMPORAL_HOLDOUT_YEAR = 2024
@@ -911,8 +911,7 @@ def run_tuning(df_train_val: pd.DataFrame, scale_pos_weight: float, n_trials: in
 
     def objective(trial):
         params = {
-            # n_estimators currently overwritten during training
-            "n_estimators":      trial.suggest_int("n_estimators", 100, 500),
+            # n_estimators will be calculated during cross-validation
             "max_depth":         trial.suggest_int("max_depth", 3, 8),
             "learning_rate":     trial.suggest_float("learning_rate", 0.01, 0.3,
                                                      log=True),
