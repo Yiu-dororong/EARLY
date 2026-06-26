@@ -39,6 +39,8 @@ Sentiment Auditor: always runs if there is at least 1 recent review
 Critic Agent:     always runs (synthesises whatever is available)
 ```
 
+Note: While the architecture is logically modeled with a parallel fan-out structure, it is currently executed sequentially due to free-tier API rate limits (RPM/TPM throttling). In a standard production environment with a higher tier, the Forensic Agent and Sentiment Auditor branches would run concurrently to minimize total latency.
+
 ---
 
 ## Forensic Agent
@@ -59,7 +61,21 @@ Critic Agent:     always runs (synthesises whatever is available)
 
 **Model:** Cerebras `gpt-oss-120b`, temp=0.0
 
-<!-- INSERT: example Forensic Agent output — fake heartbeat case (hollow announcement) vs genuine hotfix series -->
+**Sample Outputs:**
+
+*Hiatus announcemet*
+<p align="center">
+    <kbd>
+        <img width="947" height="146" alt="fake heartbeat example" src="https://github.com/user-attachments/assets/90cdb04b-1ad8-4807-a49d-cc69e3211c56" />
+    </kbd>
+</p>
+
+*Small hotfix*
+<p align="center">
+    <kbd>
+        <img width="953" height="122" alt="hotfix example" src="https://github.com/user-attachments/assets/fd1811bd-d711-46f4-8db8-7aebe3494749" />
+    </kbd>
+</p>
 
 ---
 
@@ -86,6 +102,8 @@ Reviews are not taken at face value before they reach the Auditor. Three adjustm
 - **Meme discount** — high funny/helpful ratio on negative reviews reduces their weight. A review with 200 "funny" votes and 5 "helpful" votes is not the same signal as a review with 200 "helpful" votes.
 - **CJK-aware length scoring** — CJK characters weighted 2.5× vs Latin characters. A 50-character Chinese review contains roughly the same information as a 125-character English review.
 - **Great Wall of Text guard** — line-level and token-level deduplication before scoring length; smart sentence-boundary truncation to 300 chars. Prevents copy-pasted walls of text from inflating substance scores.
+
+Sample output please see below Critic Agent section.
 
 ---
 
@@ -115,7 +133,32 @@ Both LLM verdicts are given `signal_alignment` explicitly in their prompts. The 
 
 **Model:** Cerebras `zai-glm-4.7`, temp=0.3 (slightly higher than Forensic — verdicts benefit from some variation in phrasing)
 
-<!-- INSERT: screenshot of Developer tab — developer_brief, key_concerns list, forensic detail expander -->
+**Sample Outputs:**
+*Triangulation clarify Watch label*
+<p align="center">
+    <kbd>
+        <img width="968" height="897" alt="Triangulation from critic agent" src="https://github.com/user-attachments/assets/6e7d8db0-df66-4cb7-a284-cd20ca91dd90" />
+    </kbd>
+</p>
+
+
+---
+
+## Error Handling
+
+- **Structured JSON Schemas via Pydantic**
+
+All agent outputs are strictly bound using LangGraph `.with_structured_output` following Pydantic schemas. This guarantees that when a node executes successfully, the downstream payload is perfectly formed.
+
+- **LangGraph Exception Catching & Visibility**
+
+If an LLM node encounters a validation anomaly, rate limit, or generation failure, the graph does not return an empty state or crash. Instead, LangGraph explicitly catches the exception at the node boundary. The error payload is captured and rendered directly to the user interface. The user sees an honest error log rather than a blank screen. The Critic Agent will also aware the upstream failure by reading `forensic_ran` and `auditor_ran`.
+
+- **Current Free-Tier Constraints**
+
+**No Silent Degradation:** We intentionally avoid hiding failures behind safe, hardcoded fallback metrics. If an LLM node fails, the data stream explicitly reflects it. It is because the primary objective of the agent layer is to inject net-new signals from external sources—rather than merely repackaging our existing metrics—allowing a failed agent to silently fall back to the original baseline metrics adds zero structural value to the system. 
+
+**No Auto-Retry (Yet):** Due to strict free-tier rate limits (RPM/TPM throttling), an automated retry loop is intentionally omitted to prevent immediate API lockouts. This constraint forces the pipeline to be a clean, single-pass evaluation framework where errors are documented rather than looped.
 
 ---
 
@@ -128,8 +171,6 @@ Every `run_analysis()` call produces one top-level Langfuse trace tagged by `app
 ---
 
 ## Streamlit Integration
-
-<!-- INSERT: GIF of agent analysis flow — trigger button → polling → ready state with verdict panels -->
 
 - Watch/At Risk games show an "Analyse" trigger button
 - Polls `GET /games/{appid}/analysis` every 3 seconds (max 12 polls / ~36s)

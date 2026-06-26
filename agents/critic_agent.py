@@ -120,7 +120,7 @@ def _context(state: CriticState) -> str:
                 "does not support it — activity signal may be misleading."
             )
     else:
-        parts += ["", "Forensic: did not run — no announcements in last 60 days"]
+        parts += ["", "Forensic: did not run"]
 
     if state.get("auditor_ran"):
         alignment = state.get("sentiment_alignment")
@@ -202,8 +202,6 @@ def add_confidence_note(state: CriticState) -> dict:
     if not state.get("ml_eligible"):
         notes.append("Score based on rule-based scorecard only "
                      "— fewer than 50 reviews.")
-    if not state.get("forensic_ran"):
-        notes.append("No announcements in last 60 days at snapshot time.")
     if state.get("fake_heartbeat_flag") == 1:
         notes.append("Most recent update flagged as minimal content.")
     if state.get("signal_alignment") == "conflicted":
