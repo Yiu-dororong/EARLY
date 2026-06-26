@@ -40,12 +40,15 @@ from datetime import datetime
 from pathlib import Path
 
 import libsql
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
 import numpy as np
 import optuna
 import optuna.visualization as vis
 import pandas as pd
 import xgboost as xgb
 from dotenv import load_dotenv
+from sklearn.calibration import calibration_curve
 from sklearn.metrics import (
     average_precision_score,
     confusion_matrix,
@@ -546,6 +549,89 @@ def find_optimal_threshold(y_true: np.ndarray, oof_probs: np.ndarray) -> float:
              threshold, f1[best_idx])
     return threshold
 
+def plot_eval_curves(
+    y_true: np.ndarray,
+    probs: np.ndarray,
+    threshold: float,
+    model_version: str = MODEL_VERSION,
+    split_label: str = "Holdout (2024+)",
+) -> Path:
+    """
+    Saves a side-by-side calibration curve + PR curve to outputs/.
+
+    Args:
+        y_true:        Ground-truth binary labels.
+        probs:         Predicted probabilities from model.predict_proba()[:, 1].
+        threshold:     Dynamic threshold from find_optimal_threshold()
+                        shown as vline on PR plot.
+        model_version: Stamped into the filename and titles.
+        split_label:   e.g. "Holdout (2024+)" or "OOF (train_val)" — shown in subtitles.
+
+    Returns:
+        Path to the saved PNG.
+    """
+    out_dir = Path("outputs")
+    out_dir.mkdir(exist_ok=True)
+
+    fig = plt.figure(figsize=(12, 5))
+    gs = gridspec.GridSpec(1, 2, wspace=0.35)
+
+    # ── Left: Calibration curve ─────────────────────────────────────────────
+    ax_cal = fig.add_subplot(gs[0])
+
+    fraction_of_pos, mean_predicted = calibration_curve(y_true, probs, n_bins=10)
+    ax_cal.plot(mean_predicted, fraction_of_pos, "o-", color="#1D9E75", lw=2,
+                label="XGBoost", zorder=3)
+    ax_cal.plot([0, 1], [0, 1], "--", color="#888780", lw=1.2, label="Perfect")
+    ax_cal.fill_between(mean_predicted, fraction_of_pos, mean_predicted,
+                        alpha=0.08, color="#1D9E75")
+
+    ax_cal.set_xlabel("Mean predicted probability", fontsize=11)
+    ax_cal.set_ylabel("Fraction of positives", fontsize=11)
+    ax_cal.set_title(f"Calibration — {split_label}", fontsize=12, fontweight="bold")
+    ax_cal.legend(fontsize=10)
+    ax_cal.set_xlim(0, 1)
+    ax_cal.set_ylim(0, 1)
+    ax_cal.grid(True, alpha=0.3, linewidth=0.5)
+
+    # ── Right: PR curve ─────────────────────────────────────────────────────
+    ax_pr = fig.add_subplot(gs[1])
+
+    precision_vals, recall_vals, pr_thresholds = precision_recall_curve(y_true, probs)
+    pr_auc = average_precision_score(y_true, probs)
+
+    ax_pr.plot(recall_vals, precision_vals, color="#185FA5", lw=2,
+               label=f"XGBoost (PR-AUC = {pr_auc:.4f})", zorder=3)
+
+    # Mark the dynamic threshold point
+    closest_idx = np.argmin(np.abs(pr_thresholds - threshold))
+    ax_pr.scatter(
+        recall_vals[closest_idx], precision_vals[closest_idx],
+        color="#993C1D", s=80, zorder=5,
+        label=f"Threshold = {threshold:.3f}",
+    )
+
+    # Baseline = positive class prevalence
+    baseline = float(np.mean(y_true))
+    ax_pr.axhline(baseline, linestyle="--", color="#888780", lw=1.2,
+                  label=f"Baseline (prevalence = {baseline:.2f})")
+
+    ax_pr.set_xlabel("Recall", fontsize=11)
+    ax_pr.set_ylabel("Precision", fontsize=11)
+    ax_pr.set_title(f"Precision–Recall — {split_label}", fontsize=12, fontweight="bold")
+    ax_pr.legend(fontsize=10)
+    ax_pr.set_xlim(0, 1)
+    ax_pr.set_ylim(0, 1)
+    ax_pr.grid(True, alpha=0.3, linewidth=0.5)
+
+    fig.suptitle(f"EARLY {model_version} — Evaluation Curves", fontsize=13, y=1.02)
+
+    out_path = out_dir / f"eval_curves_{model_version}_{split_label}.png"
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+    log.info("Saved evaluation curves → %s", out_path)
+    return out_path
 
 def evaluate(
     model,
@@ -699,8 +785,12 @@ def evaluate(
 
     log.info("-" * 60)
 
-    return res
+    plot_eval_curves(y_train_val.values, oof_preds, threshold,
+                     split_label="OOF (train_val)")
+    plot_eval_curves(y_test.values, test_probs, threshold,
+                     split_label="Holdout (2024+)")
 
+    return res
 
 # ---------------------------------------------------------------------------
 # SECTION 6 — SHAP

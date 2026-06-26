@@ -850,8 +850,8 @@ def _render_how_to_read():
         (0–100%) that a game is on a distressed or failing trajectory.
 
         - **&lt; 45%** → Generally healthy footprint
-        - **45–65%** → Gray zone / Watch territory
-        - **&gt; 65%** → Elevated risk / High operational distress
+        - **45–70%** → Gray zone / Watch territory
+        - **&gt; 70%** → Elevated risk / High operational distress
 
         The ML model evaluates the whole ecosystem simultaneously, meaning it
         often catches subtle, compounding warning signs that simple checkboxes miss.

@@ -152,6 +152,25 @@ Excluding the price trajectory, the top structural SHAP features heavily interse
 
 ***² Time-Bounded Cohort:** Outlier titles whose active Early Access lifespans exceed the 95th percentile of the baseline training distribution are excluded from cross-validation. This prevents long-tail entity distortions, ensuring stable, homogenous grouping metrics inside the `GroupKFold` cross-validation loops.*
 
+<p align="center">
+    <kbd>
+        <img width="1520" height="778" alt="Evaluation Curves" src="https://github.com/user-attachments/assets/cd862134-662f-441d-9086-3e00eb2659c4" />
+    </kbd>
+</p>
+
+### Curve Analysis (Holdout 2024+)
+
+#### Calibration Curve
+
+* **Overconfidence:** The curve sags significantly below the diagonal ideal line for predicted risk scores below 0.70, leading to overestimation. For example, in the mid-range, a predicted risk of 0.45 corresponds empirically to a ~0.26 true positive rate only.
+
+* **Mitigation Necessity:** This mathematical bias directly explains the false flags seen in [edge cases](#edge-cases) like *Kebab Chefs!* (0.586) and *Icaria* (0.518), justifying the need for a downstream agentic alignment and scorecard triage layer to filter these false positives.
+
+#### Precision-Recall Curve 
+
+* **F1-Optimal Thresholding:** The operating threshold is set at **0.472**, representing the mathematically optimal point that maximizes the balance between Precision and Recall via the **F1-score**.
+* **Trade-off:** At this $F_1$-optimized ($F_1 = 0.7086$) threshold, the model captures a high volume of true failures with a **Recall of 0.8231**, while accepting a **Precision of 0.6221**. The consequence of this balanced threshold is that roughly 1 in 3 automated alerts will be a false positive, validating the architectural need of our downstream multi-agent layer to clean up these baseline mistakes.
+
 ---
 
 ## Error Analysis
