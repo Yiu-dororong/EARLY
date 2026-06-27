@@ -171,6 +171,41 @@ Excluding the price trajectory, the top structural SHAP features heavily interse
 * **F1-Optimal Thresholding:** The operating threshold is set at **0.472**, representing the mathematically optimal point that maximizes the balance between Precision and Recall via the **F1-score**.
 * **Trade-off:** At this $F_1$-optimized ($F_1 = 0.7086$) threshold, the model captures a high volume of true failures with a **Recall of 0.8231**, while accepting a **Precision of 0.6221**. The consequence of this balanced threshold is that roughly 1 in 3 automated alerts will be a false positive, validating the architectural need of our downstream multi-agent layer to clean up these baseline mistakes.
 
+### Prediction Interpretation
+
+The output from the ML model(`p_distressed`) is **not** a final recommendation. Although the threshold (**0.472**) optimizes $F_1$-score, calibration analysis demonstrates that probabilities below roughly **0.70** remain susceptible to overestimation. Consequently, EARLY does not expose the probability as the sole decision signal.
+
+Instead, every prediction should be interpreted through signal triangulation, usually combining:
+
+- Scorecard
+- ML probability 
+- Agent analysis
+
+### Signal Matrix
+
+The framework below governs how clashing indicators between the deterministic L1 Scorecard and the ML model are routed. It acts as a triage layer, highlighting where signals align, indicating the underlying confidence of the signals, and mapping where disagreement requires deeper analysis.
+
+
+| L1 Scorecard | Low Risk ($p_{\text{distressed}} < 0.47$) | Uncertain ($0.47 \le p_{\text{distressed}} < 0.70$) | High Risk ($p_{\text{distressed}} \ge 0.70$) |
+| --- | --- | --- | --- |
+| **Healthy**<br>*(>95% success rate)* | **Healthy** | **Mostly Healthy** | **Mostly Healthy (Override)**<br>*Rare Signal Conflict* |
+| **Watch**<br>*(75–80% success rate)* | **Mostly Healthy** | **Slight Risk** | **Elevated Risk** |
+| **At Risk**<br>*(~50% success rate)* | **Slight Risk**<br>*Signal Conflict* | **Elevated Risk** | **High Risk** |
+
+
+While a **Healthy** scorecard serves as an excellent primary triage indicator—demonstrating greater than 95% historical agreement with positive outcomes—the **Watch** and **At Risk** categories require deeper nuance.
+
+This is exactly why we need **Signal Triangulation** for the majority of *Watch* and *At Risk* entries to reduce ambiguity, especially when signal conflicts exist. By injecting agent analysis over announcements and community sentiment, we can review these titles from an independent perspective as a new signal, providing the contextual evidence needed to determine whether a conflicted prediction should lean toward healthy or risky as we triangulate the final output against our metrics.
+
+<details>
+  <summary> Empirical Distribution of ML probability Splits Across L1 States</summary>
+  <p align="center">
+      <kbd>
+          <img width="1100" height="700" alt="Empirical Distribution of ML probability Splits Across L1 States" src="https://github.com/user-attachments/assets/a38e2a33-562e-4d53-81d9-79bd5ab99eeb" />
+      </kbd>
+  </p>
+</details>
+
 ---
 
 ## Error Analysis

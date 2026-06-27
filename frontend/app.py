@@ -828,18 +828,16 @@ def _render_how_to_read():
         EARLY classifies games into three risk tiers based on a **weighted
         scorecard** across five health dimensions:
 
-        - **🟢 Healthy** Strong momentum across most dimensions.
-          **Historical outcome**: High likelihood of a successful 1.0 full
+        - **🟢 Healthy** Strong momentum across most dimensions.<br/>
+          **Historical outcome**: Very High(>95%) likelihood of a successful 1.0 full
           launch.
 
         - **🟡 Watch** Mixed or weakening signals. Worth monitoring. Acts as a
-          transitional boundary.
-          **Historical outcome**: Unstable middle tier—some games stabilize
-          and launch, while others degrade further.
+          transitional boundary.<br/>
+          **Historical outcome**: Slight risk(~20%) of abandonment.
 
-        - **🔴 At Risk** Clear signs of stagnation or structural decline.
-          **Historical outcome**: High probability of developer abandonment
-          or permanent radio silence.
+        - **🔴 At Risk** Various signs of stagnation or structural decline.<br/>
+          **Historical outcome**: Relatively high risk(~50%) of developer abandonment.
         """
         )
 
@@ -869,22 +867,7 @@ def _render_how_to_read():
                 "against our entire historical training database**. A score of "
                 '"50" means the game is performing exactly at the industry '
                 'average for that metric, while a "75+" means it is '
-                "outperforming 75% of early access history:\n\n"
-                "| Dimension | What it measures | Why it matters |\n"
-                "| :--- | :--- | :--- |\n"
-                "| **Update Health** | Cadence + substance of build updates | "
-                "Core signal of developer coding momentum |\n"
-                "| **Player Retention** | Player count trends and engagement | "
-                "Real consumer interest over time |\n"
-                "| **Dev Engagement** | Community posts & developer "
-                "responsiveness | Verifies the studio is still actively "
-                "involved |\n"
-                "| **Sentiment** | Review scores & recent review velocity | "
-                "Player happiness & community momentum |\n"
-                "| **Price & Market** | Pricing trends, discounts, and genre "
-                "context | Long-term commercial viability |\n\n"
-                "Each dimension factors in a **backbone** (long-term history) "
-                "and a **momentum** (recent change) component."
+                "outperforming 75% of early access history."
 
         )
 
@@ -895,9 +878,8 @@ def _render_how_to_read():
         which can cause data gaps (null values) in our trackers.
 
         If a game has a high number of missing features,
-        treat its predictive scores with extra caution.
-        A sudden drop in data density is frequently
-        an early indicator that a project's operational wheels have stopped turning.
+        treat its predictive scores with extra caution,
+        as the absence of key features can degrade model confidence.
         """)
 
     with st.expander("🧠 AI Analysis & Similar Games"):

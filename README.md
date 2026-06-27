@@ -100,7 +100,9 @@ B["Data Pipeline<br/>GitHub Actions"] space C["XGBoost + L1 Scorecard<br/>Weekly
 
 Of the [20 most recently resolved titles](docs/ea_exit_validation.csv) in our tracked universe, 6 of 7 **At Risk** games were distressed and 3 of 4 **Watch** games reached full release. Two **Healthy**-labeled games (`Wool at the Gates`, `Kebab Chefs! - Restaurant Simulator`) exited successfully despite elevated scores — a reminder the model sees developer activity signals, not the full picture.
 
-📄 *Validation methodology, leakage controls, and error analysis are in the [ML Model Documentation](docs/ml-model.md).*
+Hence, outputs from EARLY should be interpreted together as a cohesive decision support system rather than in isolation.
+
+📄 *Validation methodology, leakage controls, prediction interpretation, and error analysis are in the [ML Model Documentation](docs/ml-model.md).*
 
 ---
 
@@ -126,7 +128,7 @@ Of the [20 most recently resolved titles](docs/ea_exit_validation.csv) in our tr
 
 **Current limitations:**
 - At Risk tier agreement is 52.7% — useful as a triage signal, not a reliable individual prediction
-- Cold-start problem: games with sparse history have significantly lower data quality
+- Data sparsity: games in a declining stage have significantly more null values, lowering data quality and model confidence
 - Announcement signals can be gamed; a developer posting "fake heartbeat" updates is detectable but not foolproof
 - Model sees developer activity, not game quality — a healthy-labeled game can still be mediocre
 
