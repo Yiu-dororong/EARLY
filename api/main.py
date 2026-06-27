@@ -63,10 +63,10 @@ async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded):
 # ── 1. Configure Dynamic CORS ──────────────────────────────────────────────────
 if IS_RENDER:
     # Production: Restrict to your specific Frontend deployment URL on Render
-    frontend_url = os.getenv("RENDER_URL")
+    frontend_url = os.getenv("STREAMLIT_APP_URL")
     if not frontend_url:
         # This will be logged by FastAPI on startup if empty.
-        print("WARNING: RENDER_URL environment variable not set. CORS may fail.")
+        print("WARNING: STREAMLIT_APP_URL environment variable not set. CORS may fail.")
     allowed_origins = [frontend_url] if frontend_url else []
 else:
     # Local Development: Allow your local Streamlit instance to connect freely
