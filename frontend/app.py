@@ -828,15 +828,15 @@ def _render_how_to_read():
         EARLY classifies games into three risk tiers based on a **weighted
         scorecard** across five health dimensions:
 
-        - **🟢 Healthy** Strong momentum across most dimensions.<br/>
+        - **🟢 Healthy** Strong momentum across most dimensions.<br>
           **Historical outcome**: Very High(>95%) likelihood of a successful 1.0 full
           launch.
 
         - **🟡 Watch** Mixed or weakening signals. Worth monitoring. Acts as a
-          transitional boundary.<br/>
+          transitional boundary.<br>
           **Historical outcome**: Slight risk(~20%) of abandonment.
 
-        - **🔴 At Risk** Various signs of stagnation or structural decline.<br/>
+        - **🔴 At Risk** Various signs of stagnation or structural decline.<br>
           **Historical outcome**: Relatively high risk(~50%) of developer abandonment.
         """
         )
