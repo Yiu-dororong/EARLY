@@ -80,7 +80,7 @@ DB_AUTH = os.getenv("TURSO_AUTH_TOKEN", "")
 DB_MAX_RETRIES = 3
 DB_RETRY_DELAY = 5.0
 
-DEFAULT_MODEL_VERSION = "v1.4"
+DEFAULT_MODEL_VERSION = "v1.5"
 CONFIG_VERSION = "v1.1"  # scorecard CONFIG_VERSION, matches train_xgboost.py
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -241,6 +241,7 @@ def build_reference(
             LEFT JOIN game_genres gg ON s.appid = gg.appid
         WHERE s.outcome IN ('EXIT_SUCCESS', 'EXIT_ABANDONED', 'EXIT_SILENT')
           AND sc.l1_state IS NOT NULL
+          AND s.ml_eligible = 1
           AND sc.config_version = '{CONFIG_VERSION}'
     """
     cursor = conn.execute(query)

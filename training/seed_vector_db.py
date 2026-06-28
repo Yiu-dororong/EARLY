@@ -60,7 +60,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 MODEL_DIR    = PROJECT_ROOT / "models"
-DEFAULT_MODEL_VERSION = "v1.4"
+DEFAULT_MODEL_VERSION = "v1.5"
 BATCH_SIZE   = 200      # upsert batch size
 CONFIG_VERSION = "v1.1" #scorecard version
 
@@ -129,6 +129,7 @@ def fetch_labeled_snapshots(db) -> list[dict]:
     rows = db.execute(f"""
         SELECT
             {','.join(select_cols)},
+            g.outcome AS g_outcome,
             sc.l1_state AS sc_l1_state,
             sc.l1_composite_score AS sc_l1_composite_score,
             sc.l1_update_health_score AS sc_l1_update_health_score,
@@ -138,10 +139,12 @@ def fetch_labeled_snapshots(db) -> list[dict]:
             sc.l1_price_market_score AS sc_l1_price_market_score,
             gg.genre_scope AS gg_genre_scope
         FROM snapshots s
+        JOIN games_v2 g ON s.appid = g.appid
         JOIN scorecard sc ON s.appid = sc.appid AND s.snapshot_date = sc.snapshot_date
         LEFT JOIN game_genres gg ON s.appid = gg.appid
-        WHERE s.outcome IN ('EXIT_SUCCESS', 'EXIT_ABANDONED', 'EXIT_SILENT')
+        WHERE g.outcome IN ('EXIT_SUCCESS', 'EXIT_ABANDONED', 'EXIT_SILENT')
           AND sc.l1_state IS NOT NULL
+          AND s.ml_eligible = 1
           AND sc.config_version = '{config_version}'
         ORDER BY s.appid, s.snapshot_date
     """).fetchall()
@@ -149,7 +152,8 @@ def fetch_labeled_snapshots(db) -> list[dict]:
     extended_cols = col_names + [
         "sc_l1_state", "sc_l1_composite_score", "sc_l1_update_health_score",
         "sc_l1_player_retention_score", "sc_l1_dev_engagement_score",
-        "sc_l1_sentiment_score", "sc_l1_price_market_score", "gg_genre_scope"
+        "sc_l1_sentiment_score", "sc_l1_price_market_score",
+        "gg_genre_scope","g_outcome"
     ]
 
     L1_STATE_MAP = {"Healthy": 0, "Watch": 1, "At Risk": 2}
@@ -172,6 +176,7 @@ def fetch_labeled_snapshots(db) -> list[dict]:
         d["l1_sentiment_score"] = d.pop("sc_l1_sentiment_score")
         d["l1_price_market_score"] = d.pop("sc_l1_price_market_score")
         d["genre_scope"] = d.pop("gg_genre_scope")
+        d["outcome"] = d.pop("g_outcome")
 
         l1_val = L1_STATE_MAP.get(d["l1_state"])
         d["l1_state_encoded"] = l1_val if l1_val is not None else 2

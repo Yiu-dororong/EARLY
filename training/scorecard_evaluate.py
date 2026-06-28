@@ -181,6 +181,7 @@ def load_scorecard(conn: libsql.Connection) -> pd.DataFrame:
         JOIN games_v2 g
             ON sc.appid = g.appid
         WHERE sc.config_version = ?
+        AND s.ml_eligible = 1
     """, (CONFIG_VERSION,)).fetchall()
 
     df = pd.DataFrame(rows, columns=[

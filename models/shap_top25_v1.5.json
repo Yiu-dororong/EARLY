@@ -1,0 +1,32 @@
+{
+  "model_version": "v1.5",
+  "feature_count": 25,
+  "cumulative_variance_pct": 83.19000244140625,
+  "features": [
+    "l1_composite_score",
+    "price_trend_encoded",
+    "l1_update_health_score",
+    "peak_ccu_alltime",
+    "update_frequency_trend",
+    "discount_frequency",
+    "ccu_vs_peak_ratio",
+    "review_score_at_T",
+    "l1_price_market_score",
+    "ccu_vs_launch_ratio",
+    "avg_changelog_word_count",
+    "changelog_word_count_trend",
+    "l1_sentiment_score",
+    "price_vs_genre_median",
+    "build_to_post_ratio",
+    "build_update_count_last_180d",
+    "review_score_last_180d",
+    "days_since_last_build_update",
+    "ccu_median_all",
+    "current_price_at_T",
+    "ccu_avg_last_180d",
+    "ccu_trend_slope_90d",
+    "review_score_last_30d",
+    "review_count_at_T",
+    "ccu_avg_last_30d"
+  ]
+}

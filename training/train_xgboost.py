@@ -52,6 +52,7 @@ from sklearn.calibration import calibration_curve
 from sklearn.metrics import (
     average_precision_score,
     confusion_matrix,
+    fbeta_score,
     precision_recall_curve,
     roc_auc_score,
 )
@@ -85,6 +86,7 @@ RANDOM_SEED   = 42
 N_FOLDS       = 5
 TEMPORAL_HOLDOUT_YEAR = 2024
 CONFIG_VERSION = "v1.1" #scorecard version
+BETA = 2
 
 # XGBoost base params — scale_pos_weight set dynamically from class balance
 XGB_PARAMS = {
@@ -262,6 +264,7 @@ def load_data(conn) -> pd.DataFrame:
         LEFT JOIN game_genres gg ON s.appid = gg.appid
         WHERE g.outcome IN ('EXIT_SUCCESS', 'EXIT_ABANDONED', 'EXIT_SILENT')
           AND sc.l1_state IS NOT NULL
+          AND s.ml_eligible = 1
           AND sc.config_version = '{config_version}'
     """, conn)
 
@@ -508,12 +511,12 @@ def train_final_model(
 # SECTION 5 — Evaluation
 # ---------------------------------------------------------------------------
 
-def analyze_scorecard_thresholds(df, thresholds=[0.60, 0.52, 0.44, 0.32]):
+def analyze_scorecard_thresholds(df, thresholds=[0.60, 0.45]):
     df = df.copy()
     # pd.cut requires strictly increasing bins
     bins = [0.0] + thresholds[::-1] + [1.0]
     # Labels must match the ascending bins (lowest scores = Abandoned)
-    labels = ["Abandoned", "High Risk", "Stalled", "Slow but Honest", "Healthy"]
+    labels = ["At Risk", "Watch", "Healthy"]
 
     df['state'] = pd.cut(df['composite_score'],
                         bins=bins,
@@ -527,26 +530,20 @@ def analyze_scorecard_thresholds(df, thresholds=[0.60, 0.52, 0.44, 0.32]):
     ).round(4)
 
     # Reorder index to display Healthy at the top
-    summary = summary.reindex(["Healthy", "Slow but Honest",
-                               "Stalled", "High Risk", "Abandoned"])
+    summary = summary.reindex(["Healthy", "Watch", "At Risk"])
 
     log.info("\n%s", summary.to_string())
     return summary
 
 
 def find_optimal_threshold(y_true: np.ndarray, oof_probs: np.ndarray) -> float:
-    """F1-maximising threshold from OOF predictions."""
-    precisions, recalls, thresholds = precision_recall_curve(y_true, oof_probs)
-    # precision_recall_curve returns one more value than thresholds — align
-    f1 = np.where(
-        (precisions[:-1] + recalls[:-1]) > 0,
-        2 * precisions[:-1] * recalls[:-1] / (precisions[:-1] + recalls[:-1]),
-        0.0,
-    )
-    best_idx = np.argmax(f1)
+    """F-beta maximising threshold from OOF predictions."""
+    thresholds = np.linspace(0.01, 0.99, 200)
+    f_scores = [fbeta_score(y_true, oof_probs >= t, beta=BETA) for t in thresholds]
+    best_idx = int(np.argmax(f_scores))
     threshold = float(thresholds[best_idx])
-    log.info("Optimal OOF threshold: %.4f  (F1=%.4f at that threshold)",
-             threshold, f1[best_idx])
+    log.info("Optimal OOF threshold: %.4f  (F%.1f=%.4f)",
+             threshold, BETA, f_scores[best_idx])
     return threshold
 
 def plot_eval_curves(
@@ -689,10 +686,15 @@ def evaluate(
     recall    = tp / (tp + fn) if (tp + fn) > 0 else 0
     f1        = (2 * precision * recall / (precision + recall)
                  if (precision + recall) > 0 else 0)
-
+    f_beta = (
+    (1 + BETA ** 2) * precision * recall / (BETA ** 2 * precision + recall)
+    if (BETA ** 2 * precision + recall) > 0
+    else 0
+)
     log.info("Confusion matrix (threshold=%.4f):", threshold)
     log.info("  TP: %d  FP: %d  TN: %d  FN: %d", tp, fp, tn, fn)
-    log.info("  Precision: %.4f  Recall: %.4f  F1: %.4f", precision, recall, f1)
+    log.info("  Precision: %.4f  Recall: %.4f  F1: %.4f F%.1f: %.4f",
+             precision, recall, f1, BETA, f_beta)
 
     # ── LIFT vs Scorecard baseline ─────────────────────────────────────────
     # Invert composite score:
@@ -727,7 +729,8 @@ def evaluate(
         "lift_oof":   float(oof_prauc  - baseline_prauc),
         "lift_test":  float(test_prauc - baseline_prauc_test),
         "tp": int(tp), "fp": int(fp), "tn": int(tn), "fn": int(fn),
-        "precision": float(precision), "recall": float(recall), "f1": float(f1),
+        "precision": float(precision), "recall": float(recall),
+        "f1": float(f1), "f_beta": float(f_beta), "beta": float(BETA),
     }
 
     if time_bounded_eval:
