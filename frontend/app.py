@@ -166,7 +166,7 @@ def _history_chart(snapshots: list[dict]) -> go.Figure:
         name="Distress Risk",
     ))
     fig.add_hline(
-        y=0.5124,
+        y=MODEL_META["threshold"],
         line_dash="dot", line_color="#852312",
         annotation_text="Threshold",
         annotation_font_color="#7d8590",
