@@ -110,8 +110,7 @@ The system treats these silent periods as active operational risks. While a game
           View Outcome Distribution by Composite Score Decile
           </b>
      </summary>
-          <img width="1600" height="1113" alt="Outcome Distribution by Composite Score Decile" src="https://github.com/user-attachments/assets/5bf18d97-54ba-48ab-8871-2a141022f4b9" />
-
+          <img width="1638" height="1095" alt="Outcome Distribution by Composite Score Decile" src="https://github.com/user-attachments/assets/3fc25ca8-d30a-4b7c-ad52-ba504e010d62" />
 </details>
 
 
@@ -147,9 +146,9 @@ The baseline heuristic scorecard is calibrated by tracking the final lifecycle s
 
 | Risk Tier          | Final&nbsp;Snapshot&nbsp;Agreement | Operational Takeaway |
 |--------------------|--------------------------------------------------|----------------------|
-| 🟢&nbsp;**Healthy**     | 98.8%                                            | High-confidence identification of stable, actively progressing titles; false positives are minimal. |
-| 🟡&nbsp;**Watch**        | 82.8%                                            | Captures transitionary phases; represents an elevated risk profile with a lower probability of reaching distress. |
-| 🔴&nbsp;**At Risk**      | 52.7%                                            | Identifies titles experiencing communication gaps or abandonment; functions as a low-confidence heuristic triage step. |
+| 🟢&nbsp;**Healthy**     | 98.7%                                            | High-confidence identification of stable, actively progressing titles; false positives are minimal. |
+| 🟡&nbsp;**Watch**        | 79.7%                                            | Captures transitionary phases; represents an elevated risk profile with a lower probability of reaching distress. |
+| 🔴&nbsp;**At Risk**      | 58.1%                                            | Identifies titles experiencing communication gaps or abandonment; functions as a low-confidence heuristic triage step. |
 
 *Note: Scorecard calibration is evaluated at a game’s terminal checkpoint to calculate the precise outcome agreement rate. For Healthy and Watch tiers, agreement measures successful full release. For the At Risk tier, agreement measures meeting the definition of distressed.*
 

@@ -4,6 +4,8 @@
 
 A binary XGBoost classifier trained to distinguish games that will be abandoned from those that will reach a 1.0 release, using mid-lifecycle snapshot features. The model is one layer of a three-layer system — its output feeds the scorecard and triggers the agent layer, but no verdict is final until the agents have checked whether independent signals agree.
 
+> **Important**: The following analysis was conducted on v1.4. Key findings informed the v1.5 retraining — see [v1.5 Model Notes](#retraining-to-v15) for updated metrics and threshold changes.
+
 ---
 
 ## The Core Design Constraint: Preventing Look-Ahead Leakage
@@ -271,3 +273,31 @@ Across these cases, false positives were primarily driven by activity proxies th
 **Score Normalization Faults** — Early versions of the L1 Scorecard utilized an unstable normalization methodology. Individual dimensional scores frequently broke past their intended $[0, 1]$ bounds, and momentum metrics failed to center cleanly at $0$. 
 
 During initial ablation studies, removing these raw L1 features actually *improved* the ML model's PR-AUC, which initially suggested the heuristic layer was introducing harmful noise. However, after revising the normalization algorithms, the L1 features earned their place. The validation of this fix is concrete: as shown in our SHAP analysis, the corrected `l1_composite_score` immediately jumped to become the 3rd most predictive feature in the entire machine learning model.
+
+### Retraining to v1.5  
+
+During production drift monitoring, the pipeline triggered an anomalous spike in high-PSI feature warnings. Investigation revealed upstream data contamination: snapshots with `ml_eligible=0` had leaked into the training data reference baseline. Filtering out noise (~6,300 $\rightarrow$ ~4,500 snapshots from ~1,600 $\rightarrow$ ~1,200 games) to improve signal quality is needed.
+
+After correcting this baseline flaw, the dynamic threshold strategy was strategically pivoted from maximizing the $F_1$-score to optimizing the $F_2$-score. This re-calibration deliberately weighs Recall twice as heavily as Precision, prioritizing a wider dragnet to minimize missed distressed titles (False Negatives) over a minor increase in false alarms (False Positives).
+
+**Results:**
+
+<p align="center">
+    <kbd>
+        <img width="1520" height="778" alt="Evaluation Curves v1.5 Holdout (2024+)" src="https://github.com/user-attachments/assets/157130f8-5580-497a-acca-925157ec477e" />
+    </kbd>
+</p>
+
+* **What Changed:** The optimal decision boundary shifted from `0.472` ($F_1$) to `0.4680` ($F_2$), and the empirical calibration crossover point tightened from `0.70` down to `0.55`. 
+* **What Held:** Generalization remained stable, with Holdout PR-AUC tracking consistently from `0.7341` to `0.7362`—confirming the core model's discriminative power was left entirely intact. Classification performance was also maintained, with precision (`0.6221` $\rightarrow$ `0.6444`) and recall (`0.8231` $\rightarrow$ `0.8060`).
+
+<details>
+  <summary> Empirical Distribution of ML probability (v1.5) Splits Across L1 States</summary>
+  <p align="center">
+      <kbd>
+          <img width="1100" height="700" alt="Empirical Distribution of ML probability (v1.5) Splits Across L1 States" src="https://github.com/user-attachments/assets/a71103ea-07a5-403a-9a7f-875592cc1e83" />
+      </kbd>
+  </p>
+</details>
+
+Full error analysis for v1.5 is pending sufficient outcome resolution on the 2024+ holdout cohort. A full retrospective is planned once the cohort matures.

@@ -39,9 +39,9 @@ Output is written to both `drift_reports` (queryable) and `outputs/drift_report_
 
 ### Note on False Positives
 
-When auditing the pipeline, it is critical to contextualize feature drift spikes rather than blindly treating every alert as a data corruption event. Certain feature channels are inherently volatile due to external marketplace rhythms. For example, during major platform events (such as Steam Seasonal Sales), price-related features will regularly register massive, temporary PSI spikes. 
+When auditing the pipeline, it is critical to contextualize feature drift spikes rather than blindly treating every alert as a data corruption event. Certain feature channels are inherently volatile due to external marketplace rhythms. For example, during major platform events (such as Steam Seasonal Sales), some features will register temporary PSI spikes. 
 
-Because the training baseline spans a multi-year historical epoch, a sudden, synchronized drop in across-the-board pricing during a summer sale heavily skews the active distribution away from the historical mean. This should be treated as a predictable, event-driven anomaly rather than real systemic feature drift.
+Because the training baseline spans a multi-year historical epoch, a sudden, synchronized movement during a summer sale can skews the active distribution away from the historical mean. This should be treated as a predictable, event-driven anomaly rather than real systemic feature drift.
 
 ---
 

@@ -39,7 +39,7 @@ flowchart RL
 
             C --> D[Feature Engineering<br/>Outcome Labeling]
 
-            D --> E[Reconstruct ~6,200 <br/>Historical Snapshots<br/> from ~1,600 Games]
+            D --> E[Reconstruct ~6,300 <br/>Historical Snapshots<br/> from ~1,600 Games]
 
             E --> F["<span style='white-space:nowrap;'>Scorecard Calibration<br/> (5-dimension, backbone + momentum)"]
 
@@ -139,7 +139,7 @@ Before reading anything else, it is worth understanding the constraints the syst
 | Metric | Value |
 |---|---|
 | Steam catalog ingested | 160,000+ apps |
-| Snapshots in training dataset | ~6300 snapshots from ~1,600 games (labelled outcomes) |
+| Snapshots in training dataset | ~6,300 snapshots from ~1,600 games |
 | Live games monitored | ~1,000 |
 | SHAP top-25 feature variance coverage | 82.2% |
 | At Risk avg null features | 13.6 (vs 5.2 Healthy) |
