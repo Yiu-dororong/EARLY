@@ -121,9 +121,14 @@ DIMENSION_LABELS = {
 }
 
 TOTAL_FEATURES  = 76
-POLL_INTERVAL_S = 3
-MAX_POLLS       = 12   # ~36 seconds before giving up
+POLL_INTERVAL_S = 5
+MAX_POLLS       = 10   # ~50 seconds before giving up
 
+MODEL_META = {
+    "version": "1.5",
+    "updated_at": "2026-06-28",
+    "threshold": 0.4680,
+}
 
 def _ts_to_date(ts: int | None) -> str:
     if not ts:
@@ -506,6 +511,12 @@ def render_player_tab(score: dict, history: dict | None):
     if history and history.get("snapshots"):
         st.markdown("")
         st.markdown("**Distress Risk Over Time**")
+        st.caption(
+            f"Risk score scaling and decision boundaries vary across model versions. "
+            f"Current: v{MODEL_META['version']}"
+            f"(trained on {MODEL_META['updated_at']}), "
+            f"Threshold: {MODEL_META['threshold']:.4f}."
+            )
         st.plotly_chart(
             _history_chart(history["snapshots"]),
             use_container_width=True,
@@ -851,8 +862,8 @@ def _render_how_to_read():
         (0–100%) that a game is on a distressed or failing trajectory.
 
         - **&lt; 45%** → Generally healthy footprint
-        - **45–70%** → Gray zone / Watch territory
-        - **&gt; 70%** → Elevated risk / High operational distress
+        - **45–55%** → Gray zone / Watch territory
+        - **&gt; 55%** → Elevated risk
 
         The ML model evaluates the whole ecosystem simultaneously, meaning it
         often catches subtle, compounding warning signs that simple checkboxes miss.
@@ -995,9 +1006,9 @@ with tab3:
 
     st.info("""
     Three risk tiers:
-    - **Healthy** — 98.8% success rate
-    - **Watch** — 82.8% success rate
-    - **At Risk** — ~48% success rate
+    - **Healthy** — 98.7% success rate
+    - **Watch** — 79.7% success rate
+    - **At Risk** — ~41.9% success rate
     """)
 
     st.caption("Metrics are for resolved games (2022+). "
