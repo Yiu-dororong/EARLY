@@ -150,10 +150,11 @@ def fetch_labeled_snapshots(db) -> list[dict]:
     """).fetchall()
 
     extended_cols = col_names + [
-        "sc_l1_state", "sc_l1_composite_score", "sc_l1_update_health_score",
+        "g_outcome", "sc_l1_state",
+        "sc_l1_composite_score", "sc_l1_update_health_score",
         "sc_l1_player_retention_score", "sc_l1_dev_engagement_score",
         "sc_l1_sentiment_score", "sc_l1_price_market_score",
-        "gg_genre_scope","g_outcome"
+        "gg_genre_scope"
     ]
 
     L1_STATE_MAP = {"Healthy": 0, "Watch": 1, "At Risk": 2}
@@ -161,10 +162,10 @@ def fetch_labeled_snapshots(db) -> list[dict]:
     for row in rows:
         d = dict(zip(extended_cols, row))
         # Normalise outcome label
-        d["outcome"] = (
-            "SUCCESS"   if d["outcome"] == "EXIT_SUCCESS"   else
-            "ABANDONED" if d["outcome"] in ("EXIT_ABANDONED", "EXIT_SILENT") else
-            d["outcome"]
+        d["g_outcome"] = (
+            "SUCCESS"   if d["g_outcome"] == "EXIT_SUCCESS"   else
+            "ABANDONED" if d["g_outcome"] in ("EXIT_ABANDONED", "EXIT_SILENT") else
+            d["g_outcome"]
         )
 
         # Merge derived L1 and genre features
