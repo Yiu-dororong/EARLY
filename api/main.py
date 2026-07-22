@@ -29,6 +29,7 @@ from api.rate_limit import (
 )
 from api.routers import games, health
 from api.routers.search import router as search_router
+from api.services.zilliz import get_client
 
 
 @asynccontextmanager
@@ -152,11 +153,28 @@ async def readiness(request: Request, response: Response):
     Indicates whether the application is ready to process queries.
     Verifies that backing services like the database are connected.
     """
+
+    errors = []
+
+    # 1. Check Relational DB
     try:
         db = get_db()
-        # A simple, fast query to check if the DB is responsive.
         db.execute("SELECT 1")
-        return {"status": "READY"}
     except Exception as e:
+        errors.append(f"Relational DB error: {e}")
+
+    # 2. Check Vector DB
+    try:
+        vector_db = get_client()
+        vector_db.list_collections()
+    except Exception as e:
+        errors.append(f"Vector DB error: {e}")
+
+    if errors:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        return {"status": "UNREADY", "reason": f"Database connection failed: {e}"}
+        return {
+            "status": "UNREADY",
+            "reasons": errors
+        }
+
+    return {"status": "READY"}

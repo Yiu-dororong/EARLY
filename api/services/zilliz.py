@@ -131,6 +131,9 @@ class ResilientZilliz:
     def drop_collection(self, *args, **kwargs):
         return self._execute_with_retry("drop_collection", *args, **kwargs)
 
+    def list_collections(self, *args, **kwargs):
+        return self._execute_with_retry("list_collections", *args, **kwargs)
+
     def create_schema(self, *args, **kwargs):
         return self._execute_with_retry("create_schema", *args, **kwargs)
 
