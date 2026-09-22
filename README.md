@@ -56,25 +56,37 @@ For titles flagged **Watch** or **At Risk**, an on-demand LangGraph agent layer 
 block-beta
     columns 5
     
-B["Data Pipeline<br/>GitHub Actions"] space C["XGBoost + L1 Scorecard<br/>Weekly Inference<br/>~1000 Apps"] space D["FastAPI<br/>Turso + Zilliz (Milvus)"]
+    B["Data Pipeline<br/>GitHub Actions"] 
+    space 
+    C["XGBoost + L1 Scorecard<br/>Weekly Inference<br/>~1000 Apps"] 
+    space 
+    D["FastAPI<br/>Turso + Zilliz (Milvus)"]
     
     space space space space space 
 
-    G["LangGraph Agents<br/>Forensic • Auditor • Critic<br/>(On-demand)"] space E{"Watch / At Risk?"} space  F["Vector Search<br/>Similar Snapshots Lookup<br/>(On-demand)"] 
+    G["LangGraph Agents<br/>Forensic • Auditor • Critic<br/>(On-demand)"] 
+    space 
+    E["Watch / At Risk?"] 
+    space  
+    F["Vector Search<br/>Similar Snapshots Lookup<br/>(On-demand)"] 
 
     space space space space space 
     
-    I["Signal Triangulation + AI Verdict"] space H["Streamlit Frontend"]  space  space
+    I["Signal Triangulation + AI Verdict"] 
+    space 
+    H["Streamlit Frontend"]  
+    space space
 
     B --> C
     C --> D
-    D -- "Scorecard Label" --> E
-    D -.-> F
-    E -- "Yes" --> G
-    E -- "No" --> H
+    D --> E
+    D --> F
+    E --> G
+    E --> H
     G --> I
     F --> H
     I --> H
+    
     style D fill:#60a5fa
     style H fill:#be5bf0
 ```
