@@ -166,7 +166,11 @@ def _llm_call(
         response: AIMessage = llm.invoke([SystemMessage(content=system),
                                           HumanMessage(content=prompt)],
                                           config=config)
-        return response.content.strip(), None
+        content = response.content
+        if isinstance(content, list):
+            content = "".join(part.get("text", "") if isinstance(part, dict)
+                              else str(part) for part in content)
+        return str(content or "").strip(), None
     except Exception as e:
         return None, f"LLM call failed: {type(e).__name__}: {e}"
 

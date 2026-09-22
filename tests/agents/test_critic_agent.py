@@ -128,6 +128,28 @@ def test_critic_graph_concurrent_execution():
         assert final.get("error_msg") is None
 
 
+@pytest.mark.not_live
+def test_llm_call_extract_text_list():
+    """
+    Verify that _llm_call handles list-type response.content without AttributeError.
+    """
+    from unittest.mock import MagicMock, patch
+
+    from agents.critic_agent import _llm_call
+
+    mock_msg = MagicMock()
+    mock_msg.content = [{"type": "text", "text": "Verdict text line 1"}, " and line 2"]
+
+    mock_llm = MagicMock()
+    mock_llm.invoke.return_value = mock_msg
+
+    with patch("agents.critic_agent._get_llm", return_value=mock_llm):
+        content, error = _llm_call("sys", "prompt", {})
+        assert content == "Verdict text line 1 and line 2"
+        assert error is None
+
+
+
 # ---------------------------------------------------------------------------
 # Live LLM tests — verdict quality
 # ---------------------------------------------------------------------------
