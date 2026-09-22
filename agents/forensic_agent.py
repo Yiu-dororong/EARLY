@@ -29,9 +29,9 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-from langchain_cerebras import ChatCerebras
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, StateGraph
 
 from agents.prompts import FORENSIC_SYSTEM_PROMPT
@@ -43,7 +43,8 @@ MAX_EVENTS_CONSIDERED = 3
 LOOKBACK_DAYS         = 365
 MAX_BODY_CHARS        = 1000   # per-event truncation to bound total prompt size
 
-MODEL_NAME = "gpt-oss-120b"
+MODEL_NAME = "gemini-3.5-flash-lite"
+
 
 def _event_label(event_type: int) -> str:
     return {
@@ -87,17 +88,16 @@ def _build_user_prompt(state: ForensicState) -> str:
     return "\n".join(parts)
 
 
-def _get_llm() -> ChatCerebras:
-    api_key = os.getenv("CEREBRAS_API_KEY")
+def _get_llm() -> ChatGoogleGenerativeAI:
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
     if not api_key:
-        raise OSError("CEREBRAS_API_KEY not set")
-    return ChatCerebras(
+        raise OSError("GOOGLE_API_KEY not set")
+    return ChatGoogleGenerativeAI(
         model=MODEL_NAME,
         temperature=0.0,
-        max_tokens=2000,
-        api_key=api_key,
-        reasoning_effort="low"
-        )
+        max_output_tokens=2000,
+        google_api_key=api_key,
+    )
 
 
 # ---------------------------------------------------------------------------

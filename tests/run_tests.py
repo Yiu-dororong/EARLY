@@ -25,8 +25,8 @@ def main():
     # 2. Load environment variables from the root .env file
     load_dotenv(os.path.join(project_root, ".env"))
 
-    if not os.getenv("GROQ_API_KEY"):
-        print("⚠️ WARNING: GROQ_API_KEY is not set. Live LLM tests will fail.",
+    if not (os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")):
+        print("WARNING: GOOGLE_API_KEY is not set. Live LLM tests will fail.",
               file=sys.stderr)
 
     print("🚀 Running EARLY agent tests...\n")

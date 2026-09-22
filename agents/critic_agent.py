@@ -30,16 +30,17 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-from langchain_cerebras import ChatCerebras
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, StateGraph
 
 from agents.prompts import CRITIC_CONSUMER_SYSTEM, CRITIC_DEVELOPER_SYSTEM
 from agents.states import CriticState
 
 
-MODEL_NAME = "zai-glm-4.7"
+MODEL_NAME = "gemini-3.8-flash"
+
 
 def _fmt(v: float | None) -> str:
     return f"{v:.3f}" if v is not None else "N/A"
@@ -143,15 +144,16 @@ def _context(state: CriticState) -> str:
     return "\n".join(parts)
 
 
-def _get_llm() -> ChatCerebras:
-    api_key = os.getenv("CEREBRAS_API_KEY")
+def _get_llm() -> ChatGoogleGenerativeAI:
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
     if not api_key:
-        raise OSError("CEREBRAS_API_KEY not set")
-    return ChatCerebras(model=MODEL_NAME,
-                        temperature=0.3,
-                        max_tokens=3000,
-                        api_key=api_key,
-                        reasoning_effort="low")
+        raise OSError("GOOGLE_API_KEY not set")
+    return ChatGoogleGenerativeAI(
+        model=MODEL_NAME,
+        temperature=0.3,
+        max_output_tokens=3000,
+        google_api_key=api_key,
+    )
 
 
 def _llm_call(

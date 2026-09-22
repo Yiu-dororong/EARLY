@@ -14,7 +14,7 @@ from deepeval.metrics import GEval
 from deepeval.test_case import LLMTestCase, SingleTurnParams
 
 from agents.sentiment_auditor import run_sentiment_auditor
-from tests.agents.eval_llm import DeepEvalCerebrasAdapter
+from tests.agents.eval_llm import DeepEvalGoogleAdapter
 from tests.agents.fixtures import (
     ALIGNED_REVIEWS_OLDER,
     ALIGNED_REVIEWS_RECENT,
@@ -111,7 +111,7 @@ def test_auditor_summary_mentions_conflict():
 
     metric = GEval(
         name="ConflictArticulation",
-        model=DeepEvalCerebrasAdapter(model_name="zai-glm-4.7",),
+        model=DeepEvalGoogleAdapter(model_name="gemini-3.8-flash",),
         criteria=(
             "The summary must explicitly state that player reviews CONTRADICT or "
             "CONFLICT with the stated health classification. It should describe "
@@ -151,7 +151,7 @@ def test_key_concerns_are_actionable():
 
     metric = GEval(
         name="ConcernSpecificity",
-        model=DeepEvalCerebrasAdapter(model_name="zai-glm-4.7",),
+        model=DeepEvalGoogleAdapter(model_name="gemini-3.8-flash",),
         criteria=(
             "Each concern should identify a SPECIFIC, ACTIONABLE issue a developer "
             "can address — e.g. 'No response to bug reports in forum' or "
