@@ -15,6 +15,7 @@ Auditor receives l1_state for sentiment_alignment triangulation.
 
 from __future__ import annotations
 
+import concurrent.futures
 import contextlib
 import logging
 from dataclasses import dataclass, field
@@ -203,16 +204,21 @@ def run_analysis(ctx: GameContext) -> AnalysisResult:
             if ctx.session_id:
                 stack.enter_context(propagate_attributes(session_id=ctx.session_id))
 
-        # --- Forensic Agent ---
+        # --- Parallel Fan-Out: Forensic Agent & Sentiment Auditor ---
         announcements = _select_announcements(ctx.recent_announcements,
                                               ctx.snapshot_date)
-        if announcements:
+
+        def _exec_forensic() -> ForensicResult | None:
+            if not announcements:
+                logger.info("Forensic skipped appid=%d (no announcements in last %dd)",
+                            ctx.appid, LOOKBACK_DAYS)
+                return None
             logger.info(
                 "Forensic Agent: running for appid=%d (%d announcements in last %dd)",
                 ctx.appid, len(announcements), LOOKBACK_DAYS,
             )
             try:
-                forensic = run_forensic_agent(
+                return run_forensic_agent(
                     appid=ctx.appid, game_name=ctx.game_name,
                     snapshot_date=snap_date_str,
                     ea_age_days=ctx.ea_age_days,
@@ -220,26 +226,17 @@ def run_analysis(ctx: GameContext) -> AnalysisResult:
                     announcements=announcements,
                     trace=trace,
                 )
-                result.forensic = forensic
-                result.forensic_ran = True
-                if forensic.error:
-                    logger.warning("Forensic error appid=%d: %s",
-                                   ctx.appid,
-                                   forensic.error)
             except Exception as e:
-                logger.error("Forensic exception appid=%d: %s",
-                             ctx.appid,
-                             e)
-        else:
-            logger.info("Forensic skipped appid=%d (no announcements in last %dd)",
-                        ctx.appid,
-                        LOOKBACK_DAYS)
+                logger.error("Forensic exception appid=%d: %s", ctx.appid, e)
+                return None
 
-        # --- Sentiment Auditor ---
-        if ctx.xgboost.ml_eligible:
+        def _exec_auditor() -> SentimentResult | None:
+            if not ctx.xgboost.ml_eligible:
+                logger.info("Auditor skipped appid=%d (ml_eligible=False)", ctx.appid)
+                return None
             logger.info("Sentiment Auditor: running for appid=%d", ctx.appid)
             try:
-                auditor = run_sentiment_auditor(
+                return run_sentiment_auditor(
                     appid=ctx.appid, game_name=ctx.game_name,
                     snapshot_date=snap_date_str,
                     review_score_at_T=ctx.review_score_at_T,
@@ -249,18 +246,37 @@ def run_analysis(ctx: GameContext) -> AnalysisResult:
                     l1_state=ctx.scorecard.l1_state,
                     trace=trace,
                 )
-                result.auditor = auditor
-                result.auditor_ran = True
-                if auditor.error:
-                    logger.warning("Auditor error appid=%d: %s",
-                                   ctx.appid,
-                                   auditor.error)
             except Exception as e:
-                logger.error("Auditor exception appid=%d: %s",
-                             ctx.appid,
-                             e)
-        else:
-            logger.info("Auditor skipped appid=%d (ml_eligible=False)", ctx.appid)
+                logger.error("Auditor exception appid=%d: %s", ctx.appid, e)
+                return None
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            fut_forensic = executor.submit(_exec_forensic)
+            fut_auditor = executor.submit(_exec_auditor)
+
+            try:
+                forensic = fut_forensic.result()
+                if forensic is not None:
+                    result.forensic = forensic
+                    result.forensic_ran = True
+                    if forensic.error:
+                        logger.warning("Forensic error appid=%d: %s",
+                                       ctx.appid,
+                                       forensic.error)
+            except Exception as e:
+                logger.error("Forensic exception appid=%d: %s", ctx.appid, e)
+
+            try:
+                auditor = fut_auditor.result()
+                if auditor is not None:
+                    result.auditor = auditor
+                    result.auditor_ran = True
+                    if auditor.error:
+                        logger.warning("Auditor error appid=%d: %s",
+                                       ctx.appid,
+                                       auditor.error)
+            except Exception as e:
+                logger.error("Auditor exception appid=%d: %s", ctx.appid, e)
 
         # --- Critic Agent ---
         logger.info("Critic Agent: running for appid=%d", ctx.appid)

@@ -217,7 +217,8 @@ def _build_graph() -> StateGraph:
     g.add_node("add_confidence_note", add_confidence_note)
     g.set_entry_point("determine_alignment")
     g.add_edge("determine_alignment", "write_consumer_verdict")
-    g.add_edge("write_consumer_verdict", "write_developer_brief")
+    g.add_edge("determine_alignment", "write_developer_brief")
+    g.add_edge("write_consumer_verdict", "add_confidence_note")
     g.add_edge("write_developer_brief", "add_confidence_note")
     g.add_edge("add_confidence_note", END)
     return g

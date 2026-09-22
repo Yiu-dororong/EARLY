@@ -39,7 +39,7 @@ Sentiment Auditor: always runs if there is at least 1 recent review
 Critic Agent:     always runs (synthesises whatever is available)
 ```
 
-Note: While the architecture is logically modeled with a parallel fan-out structure, it is currently executed sequentially due to free-tier API rate limits (RPM/TPM throttling). It is also the reason that why Prometheus and Grafana are intentionally excluded. In a standard production environment with a higher tier, the Forensic Agent and Sentiment Auditor branches would run concurrently to minimize total latency.
+Note: The architecture uses a concurrent fan-out structure. The Forensic Agent and Sentiment Auditor branches run concurrently via a ThreadPoolExecutor in the orchestrator to minimize total latency, and the Critic Agent internal nodes (`write_consumer_verdict` and `write_developer_brief`) fan out in parallel before converging into the final confidence note.
 
 ---
 
