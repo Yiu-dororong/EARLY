@@ -90,10 +90,42 @@ def test_alignment_partial_when_neither_ran():
     from agents.states import CriticState
     state: CriticState = {
         **{k: None for k in CriticState.__annotations__},
-        "forensic_ran": False, "event_state_mismatch": None,
-        "auditor_ran": False, "sentiment_alignment": None,
+        "forensic_ran": False, "auditor_ran": False,
     }
     assert compute_signal_alignment(state) == "partial"
+
+
+@pytest.mark.not_live
+def test_critic_graph_concurrent_execution():
+    """
+    Verify that Critic Agent graph concurrent nodes run
+    without INVALID_CONCURRENT_GRAPH_UPDATE error.
+    """
+    from unittest.mock import patch
+
+    from agents.critic_agent import get_graph
+    from agents.states import CriticState
+
+    state: CriticState = {
+        "messages": [], "appid": 1, "game_name": "Test", "snapshot_date": "2026-01-01",
+        "ea_age_days": 100, "l1_state": "Watch", "l1_composite_score": 0.4,
+        "update_health": 0.3, "player_retention": 0.4, "dev_engagement": 0.3,
+        "sentiment": 0.5, "price_market": 0.5, "p_distressed": 0.6,
+        "is_distressed": 1, "ml_eligible": True, "forensic_ran": True,
+        "update_substance_score": 7.0, "fake_heartbeat_flag": 0,
+        "momentum": "consistent_progress", "event_state_mismatch": 0,
+        "forensic_reasoning": "Ok", "auditor_ran": True, "theme_clusters": [],
+        "sentiment_shift": "stable", "sentiment_alignment": "aligned",
+        "key_concerns": [], "auditor_summary": "Ok", "signal_alignment": None,
+        "consumer_verdict": None, "developer_brief": None, "confidence_note": None,
+        "error_msg": None,
+    }
+
+    with patch("agents.critic_agent._llm_call", return_value=("Mocked content", None)):
+        final = get_graph().invoke(state)
+        assert final.get("consumer_verdict") == "Mocked content"
+        assert final.get("developer_brief") == "Mocked content"
+        assert final.get("error_msg") is None
 
 
 # ---------------------------------------------------------------------------

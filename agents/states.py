@@ -88,6 +88,12 @@ class SentimentOutputModel(BaseModel):
 # Critic Agent
 # ---------------------------------------------------------------------------
 
+def _combine_errors(left: str | None, right: str | None) -> str | None:
+    if left and right:
+        return f"{left}; {right}"
+    return left or right
+
+
 class CriticState(TypedDict):
     messages: Annotated[list, add_messages]
     appid: int
@@ -124,4 +130,4 @@ class CriticState(TypedDict):
     consumer_verdict: str | None
     developer_brief: str | None
     confidence_note: str | None
-    error_msg: str | None
+    error_msg: Annotated[str | None, _combine_errors]
