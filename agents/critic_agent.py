@@ -39,7 +39,7 @@ from agents.prompts import CRITIC_CONSUMER_SYSTEM, CRITIC_DEVELOPER_SYSTEM
 from agents.states import CriticState
 
 
-MODEL_NAME = "gemini-3.8-flash"
+MODEL_NAME = "gemini-3.5-flash-lite"
 
 
 def _fmt(v: float | None) -> str:

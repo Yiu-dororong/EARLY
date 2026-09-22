@@ -34,7 +34,7 @@ MAX_RECENT_REVIEWS = 25
 MAX_OLDER_REVIEWS  = 15
 MAX_REVIEW_CHARS   = 300
 
-MODEL_NAME = "gemini-3.5-flash-lite"
+MODEL_NAME = "gemini-3.1-flash-lite"
 
 
 def _fmt_reviews(reviews: list[dict], label: str) -> str:

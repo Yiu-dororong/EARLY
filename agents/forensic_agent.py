@@ -43,7 +43,7 @@ MAX_EVENTS_CONSIDERED = 3
 LOOKBACK_DAYS         = 365
 MAX_BODY_CHARS        = 1000   # per-event truncation to bound total prompt size
 
-MODEL_NAME = "gemini-3.5-flash-lite"
+MODEL_NAME = "gemini-3.1-flash-lite"
 
 
 def _event_label(event_type: int) -> str:

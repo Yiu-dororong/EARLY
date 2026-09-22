@@ -125,7 +125,7 @@ def test_conflicted_verdict_mentions_discrepancy():
 
     metric = GEval(
         name="ConflictCommunication",
-        model=DeepEvalGoogleAdapter(model_name="gemini-3.8-flash",),
+        model=DeepEvalGoogleAdapter(model_name="gemini-3.5-flash-lite",),
         criteria=(
             "The verdict must explain WHY there is uncertainty — specifically that "
             "the game's official activity signals (recent announcements) don't match "
@@ -202,7 +202,7 @@ def test_aligned_healthy_signal_verdict_is_positive():
 
     metric = GEval(
         name="PositiveTone",
-        model=DeepEvalGoogleAdapter(model_name="gemini-3.8-flash",),
+        model=DeepEvalGoogleAdapter(model_name="gemini-3.5-flash-lite",),
         criteria=(
             "When all signals are positive and aligned, the verdict should be "
             "encouraging and reassuring. It should NOT hedge excessively or add "
@@ -239,7 +239,7 @@ def test_developer_brief_ends_with_action():
 
     metric = GEval(
         name="ActionableEnding",
-        model=DeepEvalGoogleAdapter(model_name="gemini-3.8-flash",),
+        model=DeepEvalGoogleAdapter(model_name="gemini-3.5-flash-lite",),
         criteria=(
             "The developer brief must end with a specific, concrete action the "
             "developer can take — e.g. 'ship a small but real patch this week to "

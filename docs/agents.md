@@ -59,7 +59,7 @@ Note: The architecture uses a concurrent fan-out structure. The Forensic Agent a
 - Empty announcement body → skip LLM call entirely, score = 0
 - Secondary heuristic: `score < 4 AND word_count < 20` → force `fake_heartbeat_flag = True`
 
-**Model:** Google AI `gemini-3.5-flash-lite`, temp=0.0
+**Model:** Google AI `gemini-3.1-flash-lite`, temp=0.0
 
 **Sample Outputs:**
 
@@ -93,7 +93,7 @@ Note: The architecture uses a concurrent fan-out structure. The Forensic Agent a
 
 **Fast path:** Zero reviews available → skip LLM call entirely.
 
-**Model:** Google AI `gemini-3.5-flash-lite`, temp=0.0 
+**Model:** Google AI `gemini-3.1-flash-lite`, temp=0.0 
 
 ### Review quality adjustments
 
@@ -131,7 +131,7 @@ Both LLM verdicts are given `signal_alignment` explicitly in their prompts. The 
 
 **Two separate LLM calls** (consumer and developer verdicts), each its own Langfuse span — different audiences, different tones, different prompt structures.
 
-**Model:** Google AI `gemini-3.8-flash`, temp=0.3 (slightly higher than Forensic — verdicts benefit from some variation in phrasing)
+**Model:** Google AI `gemini-3.5-flash-lite`, temp=0.3 (slightly higher than Forensic — verdicts benefit from some variation in phrasing)
 
 **Sample Outputs:** 
 

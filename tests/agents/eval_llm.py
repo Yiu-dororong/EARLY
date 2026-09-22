@@ -7,7 +7,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 class DeepEvalGoogleAdapter(DeepEvalBaseLLM):
     def __init__(self,
-                 model_name: str = "gemini-3.8-flash",
+                 model_name: str = "gemini-3.5-flash-lite",
                  temperature: float = 0.0):
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         self.chat_model = ChatGoogleGenerativeAI(
